@@ -1,0 +1,7 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- manila_v1beta1_manilaapi.yaml
+- manila_v1beta1_manila.yaml
+- manila_v1beta1_manilascheduler.yaml
+- manila_v1beta1_manilashare.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

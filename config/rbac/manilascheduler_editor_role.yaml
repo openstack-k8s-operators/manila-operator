@@ -1,0 +1,24 @@
+# permissions for end users to edit manilaschedulers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manilascheduler-editor-role
+rules:
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaschedulers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaschedulers/status
+  verbs:
+  - get

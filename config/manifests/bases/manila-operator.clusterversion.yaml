@@ -1,0 +1,58 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: manila-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: ManilaAPI is the Schema for the manilaapis API
+      displayName: Manila API
+      kind: ManilaAPI
+      name: manilaapis.manila.***REMOVED***.org
+      version: v1beta1
+    - description: Manila is the Schema for the manilas API
+      displayName: Manila
+      kind: Manila
+      name: manilas.manila.***REMOVED***.org
+      version: v1beta1
+    - description: ManilaScheduler is the Schema for the manilaschedulers API
+      displayName: Manila Scheduler
+      kind: ManilaScheduler
+      name: manilaschedulers.manila.***REMOVED***.org
+      version: v1beta1
+    - description: ManilaVolume is the Schema for the manilavolumes API
+      displayName: Manila Volume
+      kind: ManilaVolume
+      name: manilavolumes.manila.***REMOVED***.org
+      version: v1beta1
+  description: Manila Operator
+  displayName: Manila Operator
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - ***REMOVED***
+  - cn-***REMOVED***
+  links:
+  - name: Manila Operator
+    url: https://github.com/***REMOVED***-k8s-operators/manila-operator
+  maturity: alpha
+  provider:
+    name: Red Hat
+    url: https://***REMOVED***.com
+  version: 0.0.0

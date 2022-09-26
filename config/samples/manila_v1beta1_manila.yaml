@@ -1,0 +1,6 @@
+apiVersion: manila.***REMOVED***.org/v1beta1
+kind: Manila
+metadata:
+  name: manila-sample
+spec:
+  # TODO(user): Add fields here

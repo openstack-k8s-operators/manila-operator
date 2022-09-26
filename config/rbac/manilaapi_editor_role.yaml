@@ -1,0 +1,24 @@
+# permissions for end users to edit manilaapis.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manilaapi-editor-role
+rules:
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaapis
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaapis/status
+  verbs:
+  - get
