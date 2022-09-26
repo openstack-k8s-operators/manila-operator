@@ -1,0 +1,20 @@
+# permissions for end users to view manilaschedulers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manilascheduler-viewer-role
+rules:
+- apiGroups:
+  - manila.openstack.org
+  resources:
+  - manilaschedulers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - manila.openstack.org
+  resources:
+  - manilaschedulers/status
+  verbs:
+  - get
