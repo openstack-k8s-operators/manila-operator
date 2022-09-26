@@ -1,0 +1,9 @@
+domain: ***REMOVED***.org
+layout:
+- go.kubebuilder.io/v3
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: manila-operator
+repo: github.com/***REMOVED***-k8s-operators/manila-operator
+version: "3"
