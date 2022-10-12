@@ -1,0 +1,11 @@
+{
+  "command": "/usr/local/bin/container-scripts/bootstrap.sh",
+  "config_files": [
+    {
+      "source": "/var/lib/config-data/merged/manila.conf",
+      "dest": "/etc/manila/manila.conf",
+      "owner": "manila",
+      "perm": "0600"
+    }
+  ]
+}

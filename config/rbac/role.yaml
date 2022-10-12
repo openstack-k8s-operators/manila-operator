@@ -1,0 +1,111 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaapis
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaapis/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaapis/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilas
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilas/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilas/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaschedulers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaschedulers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilaschedulers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilashares
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilashares/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilashares/status
+  verbs:
+  - get
+  - patch
+  - update
