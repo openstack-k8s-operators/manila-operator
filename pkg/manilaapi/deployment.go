@@ -22,7 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -66,13 +66,11 @@ func Deployment(
 		// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 		//
 
-		//TODO: Config livenessProbe
-		/*livenessProbe.HTTPGet = &corev1.HTTPGetAction{
+		livenessProbe.HTTPGet = &corev1.HTTPGetAction{
 			Path: "/healthcheck",
 			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(manila.ManilaPublicPort)},
 		}
 		readinessProbe.HTTPGet = livenessProbe.HTTPGet
-		*/
 	}
 
 	envVars := map[string]env.Setter{}

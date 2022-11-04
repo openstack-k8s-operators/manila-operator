@@ -6,6 +6,110 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - keystone.***REMOVED***.org
+  resources:
+  - keystoneapis
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - keystone.***REMOVED***.org
+  resources:
+  - keystoneendpoints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - keystone.***REMOVED***.org
+  resources:
+  - keystoneservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - manila.***REMOVED***.org
   resources:
   - manilaapis
@@ -27,6 +131,32 @@ rules:
   - manila.***REMOVED***.org
   resources:
   - manilaapis/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilabackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilabackups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilabackups/status
   verbs:
   - get
   - patch
@@ -109,3 +239,69 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilavolumes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilavolumes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - manila.***REMOVED***.org
+  resources:
+  - manilavolumes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mariadb.***REMOVED***.org
+  resources:
+  - mariadbdatabases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: manager-role
+  namespace: ***REMOVED***
+rules:
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - privileged
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
