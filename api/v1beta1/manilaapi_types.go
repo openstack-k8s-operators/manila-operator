@@ -127,6 +127,6 @@ func init() {
 }
 
 // IsReady - returns true if service is ready to serve requests
-func (instance ManilaAPI) isReady() bool {
+func (instance ManilaAPI) IsReady() bool {
 	return instance.Status.ReadyCount >=1
 }

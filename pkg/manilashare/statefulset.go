@@ -22,7 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -77,19 +77,13 @@ func StatefulSet(
 		args = append(args, ServiceCommand)
 		// Use the HTTP probe now that we have a simple server running
 
-		// TODO: Config livenessProbe
-		/*livenessProbe.HTTPGet = &corev1.HTTPGetAction{
+		livenessProbe.HTTPGet = &corev1.HTTPGetAction{
 			Port: intstr.FromInt(8080),
 		}
 		startupProbe.HTTPGet = livenessProbe.HTTPGet
-		// Probe doesn't run kolla_set_configs because it uses the 'manila' uid
-		// and gid and doesn't have permissions to make files be owned by root,
-		// so manila.conf is in its original location
 		probeCommand = []string{
-			"/usr/local/bin/container-scripts/healthcheck.py",
-			"volume",
-			"/var/lib/config-data/merged/manila.conf",
-		}*/
+			"/bin/sleep", "infinity",
+		}
 	}
 
 	envVars := map[string]env.Setter{}
