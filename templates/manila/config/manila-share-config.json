@@ -1,0 +1,11 @@
+{
+  "command": "/usr/bin/manila-share --config-file /usr/share/manila/manila-dist.conf --config-file /etc/manila/manila.conf",
+  "config_files": [
+    {
+      "source": "/var/lib/config-data/merged/manila.conf",
+      "dest": "/etc/manila/manila.conf",
+      "owner": "root:manila",
+      "perm": "0640"
+    }
+  ]
+}

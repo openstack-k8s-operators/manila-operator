@@ -10,21 +10,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package manila
+package manilaapi
 
 const (
 	// ServiceName -
 	ServiceName = "manila"
-	// ServiceNameV2 -
-	ServiceNameV2 = "manilav2"
-	// ServiceType -
-	ServiceType = "manila"
-	// ServiceTypeV2 -
-	ServiceTypeV2 = "sharev2"
-	// DatabaseName -
-	DatabaseName = "manila"
 	// ServiceAccount -
 	ServiceAccount = "manila-operator-manila"
+	// ServiceType -
+	ServiceType = "manila"
+	// DatabaseName -
+	DatabaseName = "manila"
 
 	// ManilaAdminPort -
 	ManilaAdminPort int32 = 8786
@@ -33,6 +29,6 @@ const (
 	// ManilaInternalPort -
 	ManilaInternalPort int32 = 8786
 
-	// KollaConfigDbSync -
-	KollaConfigDbSync = "/var/lib/config-data/merged/db-sync-config.json"
+	// KollaConfig -
+	KollaConfig = "/var/lib/config-data/merged/manila-api-config.json"
 )

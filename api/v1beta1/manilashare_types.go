@@ -18,6 +18,8 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -25,17 +27,76 @@ import (
 
 // ManilaShareSpec defines the desired state of ManilaShare
 type ManilaShareSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=manila
+	// ServiceUser - optional username used for this service to register in manila
+	ServiceUser string `json:"serviceUser"`
 
-	// Foo is an example field of ManilaShare. Edit manilashare_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +kubebuilder:validation:Optional
+	// ContainerImage - manila Volume Container Image URL
+	ContainerImage string `json:"containerImage,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Maximum=1
+	// Replicas - manila Volume Replicas
+	Replicas int32 `json:"replicas"`
+
+	// +kubebuilder:validation:Optional
+	// DatabaseHostname - manila Database Hostname
+	DatabaseHostname string `json:"databaseHostname,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=manila
+	// DatabaseUser - optional username used for manila DB, defaults to manila
+	// TODO: -> implement needs work in mariadb-operator, right now only manila
+	DatabaseUser string `json:"databaseUser,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Secret containing OpenStack password information for manilaDatabasePassword
+	Secret string `json:"secret,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// PasswordSelectors - Selectors to identify the DB and TransportURL from the Secret
+	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// NodeSelector to target subset of worker nodes for running the Volume service
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
+	// actual action pod gets started with sleep infinity
+	Debug ManilaServiceDebug `json:"debug,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="# add your customization here"
+	// CustomServiceConfig - customize the service config using this parameter to change service defaults,
+	// or overwrite rendered information using raw OpenStack config format. The content gets added to
+	// to /etc/<service>/<service>.conf.d directory as custom.conf file.
+	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// ConfigOverwrite - interface to overwrite default config files like e.g. policy.json.
+	// But can also be used to add additional files. Those get added to the service config dir in /etc/<service> .
+	DefaultConfigOverwrite map[string]string `json:"defaultConfigOverwrite,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Resources - Compute Resources required by this service (Limits/Requests).
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // ManilaShareStatus defines the observed state of ManilaShare
 type ManilaShareStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Map of hashes to track e.g. job status
+	Hash map[string]string `json:"hash,omitempty"`
+
+	// Conditions
+	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
+
+	// ReadyCount of ManilaShare instances
+	ReadyCount int32 `json:"readyCount,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -61,4 +122,9 @@ type ManilaShareList struct {
 
 func init() {
 	SchemeBuilder.Register(&ManilaShare{}, &ManilaShareList{})
+}
+
+// IsReady - returns true if service is ready to serve requests
+func (instance ManilaShare) IsReady() bool {
+	return instance.Status.ReadyCount >= 1
 }
