@@ -30,20 +30,20 @@ import (
 	"github.com/go-logr/logr"
 
 	routev1 "github.com/openshift/api/route/v1"
-	keystonev1 "github.com/***REMOVED***-k8s-operators/keystone-operator/api/v1beta1"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/condition"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/configmap"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/deployment"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/endpoint"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/env"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/helper"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/labels"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/secret"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/util"
-	manilav1beta1 "github.com/***REMOVED***-k8s-operators/manila-operator/api/v1beta1"
-	"github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manila"
-	manilaapi "github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manilaapi"
+	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/lib-common/modules/common"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
+	manilaapi "github.com/openstack-k8s-operators/manila-operator/pkg/manilaapi"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -76,17 +76,17 @@ var (
 	}
 )
 
-//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaapis,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaapis/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaapis/finalizers,verbs=update
+//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;create;update;patch;delete;watch
-// +kubebuilder:rbac:groups=keystone.***REMOVED***.org,resources=keystoneservices,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=keystone.***REMOVED***.org,resources=keystoneendpoints,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneendpoints,verbs=get;list;watch;create;update;patch;delete
 
 // GetClient -
 func (r *ManilaAPIReconciler) GetClient() client.Client {
@@ -419,7 +419,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	// expose service - end
 
 	//
-	// create service and user in keystone - - https://docs.***REMOVED***.org/manila/ocata/adminref/quick_start.html
+	// create service and user in keystone - - https://docs.openstack.org/manila/ocata/adminref/quick_start.html
 	//
 	if instance.Status.ServiceIDs == nil {
 		instance.Status.ServiceIDs = map[string]string{}

@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: manilaschedulers.manila.***REMOVED***.org
+  name: manilaschedulers.manila.openstack.org
 spec:
-  group: manila.***REMOVED***.org
+  group: manila.openstack.org
   names:
     kind: ManilaScheduler
     listKind: ManilaSchedulerList

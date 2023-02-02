@@ -13,11 +13,11 @@ limitations under the License.
 package manilascheduler
 
 import (
-	common "github.com/***REMOVED***-k8s-operators/lib-common/modules/common"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/affinity"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/env"
-	manilav1 "github.com/***REMOVED***-k8s-operators/manila-operator/api/v1beta1"
-	manila "github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manila"
+	common "github.com/openstack-k8s-operators/lib-common/modules/common"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
+	manila "github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +38,7 @@ func StatefulSet(
 ) *appsv1.StatefulSet {
 	rootUser := int64(0)
 	// manila's uid and gid magic numbers come from the 'manila-user' in
-	// https://github.com/***REMOVED***/kolla/blob/master/kolla/common/users.py
+	// https://github.com/openstack/kolla/blob/master/kolla/common/users.py
 	manilaUser := int64(42429)
 	manilaGroup := int64(42429)
 

@@ -13,22 +13,22 @@ spec:
     - description: ManilaAPI is the Schema for the manilaapis API
       displayName: Manila API
       kind: ManilaAPI
-      name: manilaapis.manila.***REMOVED***.org
+      name: manilaapis.manila.openstack.org
       version: v1beta1
     - description: Manila is the Schema for the manilas API
       displayName: Manila
       kind: Manila
-      name: manilas.manila.***REMOVED***.org
+      name: manilas.manila.openstack.org
       version: v1beta1
     - description: ManilaScheduler is the Schema for the manilaschedulers API
       displayName: Manila Scheduler
       kind: ManilaScheduler
-      name: manilaschedulers.manila.***REMOVED***.org
+      name: manilaschedulers.manila.openstack.org
       version: v1beta1
     - description: ManilaVolume is the Schema for the manilavolumes API
       displayName: Manila Volume
       kind: ManilaVolume
-      name: manilavolumes.manila.***REMOVED***.org
+      name: manilavolumes.manila.openstack.org
       version: v1beta1
   description: Manila Operator
   displayName: Manila Operator
@@ -46,13 +46,13 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - ***REMOVED***
-  - cn-***REMOVED***
+  - openstack
+  - cn-openstack
   links:
   - name: Manila Operator
-    url: https://github.com/***REMOVED***-k8s-operators/manila-operator
+    url: https://github.com/openstack-k8s-operators/manila-operator
   maturity: alpha
   provider:
     name: Red Hat
-    url: https://***REMOVED***.com
+    url: https://redhat.com
   version: 0.0.0
