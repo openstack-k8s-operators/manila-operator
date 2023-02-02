@@ -34,18 +34,18 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/condition"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/configmap"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/env"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/helper"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/labels"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/secret"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/statefulset"
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/util"
-	manilav1beta1 "github.com/***REMOVED***-k8s-operators/manila-operator/api/v1beta1"
-	"github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manila"
-	manilascheduler "github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manilascheduler"
+	"github.com/openstack-k8s-operators/lib-common/modules/common"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/statefulset"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
+	manilascheduler "github.com/openstack-k8s-operators/manila-operator/pkg/manilascheduler"
 )
 
 // GetClient -
@@ -76,9 +76,9 @@ type ManilaSchedulerReconciler struct {
 	Kclient kubernetes.Interface
 }
 
-//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaschedulers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaschedulers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaschedulers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;create;update;patch;delete;watch

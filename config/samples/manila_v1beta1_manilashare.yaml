@@ -1,4 +1,4 @@
-apiVersion: manila.***REMOVED***.org/v1beta1
+apiVersion: manila.openstack.org/v1beta1
 kind: ManilaShare
 metadata:
   name: manilashare-sample

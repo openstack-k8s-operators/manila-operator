@@ -13,7 +13,7 @@ limitations under the License.
 package manila
 
 import (
-	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 
 	corev1 "k8s.io/api/core/v1"
 )

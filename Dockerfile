@@ -41,14 +41,14 @@ ARG IMAGE_NAME="manila-operator"
 ARG IMAGE_VERSION="1.0.0"
 ARG IMAGE_SUMMARY="Manila Operator"
 ARG IMAGE_DESC="This image includes the manil-operator"
-ARG IMAGE_TAGS="cn-***REMOVED*** ***REMOVED***"
+ARG IMAGE_TAGS="cn-openstack openstack"
 
 ### DO NOT EDIT LINES BELOW
 # Auto generated using CI tools from
-# https://github.com/***REMOVED***-k8s-operators/***REMOVED***-k8s-operators-ci
+# https://github.com/openstack-k8s-operators/openstack-k8s-operators-ci
 
 # Labels required by upstream and osbs build system
-LABEL com.***REMOVED***.component="${IMAGE_COMPONENT}" \
+LABEL com.redhat.component="${IMAGE_COMPONENT}" \
       name="${IMAGE_NAME}" \
       version="${IMAGE_VERSION}" \
       summary="${IMAGE_SUMMARY}" \
