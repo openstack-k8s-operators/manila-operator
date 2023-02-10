@@ -435,10 +435,8 @@ func (r *ManilaShareReconciler) reconcileUpgrade(ctx context.Context, instance *
 	return ctrl.Result{}, nil
 }
 
-//
 // generateServiceConfigMaps - create custom configmap to hold service-specific config
 // TODO add DefaultConfigOverwrite
-//
 func (r *ManilaShareReconciler) generateServiceConfigMaps(
 	ctx context.Context,
 	h *helper.Helper,
@@ -475,18 +473,11 @@ func (r *ManilaShareReconciler) generateServiceConfigMaps(
 		},
 	}
 
-	err := configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
-	if err != nil {
-		return nil
-	}
-
-	return nil
+	return configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
 }
 
-//
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart
 // if any of the input resources change, like configs, passwords, ...
-//
 func (r *ManilaShareReconciler) createHashOfInputHashes(
 	ctx context.Context,
 	instance *manilav1beta1.ManilaShare,

@@ -557,10 +557,8 @@ func (r *ManilaReconciler) reconcileUpgrade(ctx context.Context, instance *manil
 	return ctrl.Result{}, nil
 }
 
-//
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
-//
 func (r *ManilaReconciler) generateServiceConfigMaps(
 	ctx context.Context,
 	h *helper.Helper,
@@ -620,18 +618,11 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 		},
 	}
 
-	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
 }
 
-//
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart
 // if any of the input resources change, like configs, passwords, ...
-//
 func (r *ManilaReconciler) createHashOfInputHashes(
 	ctx context.Context,
 	instance *manilav1beta1.Manila,
