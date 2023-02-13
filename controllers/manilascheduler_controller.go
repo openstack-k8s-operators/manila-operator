@@ -433,10 +433,8 @@ func (r *ManilaSchedulerReconciler) reconcileUpgrade(ctx context.Context, instan
 	return ctrl.Result{}, nil
 }
 
-//
 // generateServiceConfigMaps - create custom configmap to hold service-specific config
 // TODO add DefaultConfigOverwrite
-//
 func (r *ManilaSchedulerReconciler) generateServiceConfigMaps(
 	ctx context.Context,
 	h *helper.Helper,
@@ -481,10 +479,8 @@ func (r *ManilaSchedulerReconciler) generateServiceConfigMaps(
 	return nil
 }
 
-//
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart
 // if any of the input resources change, like configs, passwords, ...
-//
 func (r *ManilaSchedulerReconciler) createHashOfInputHashes(
 	ctx context.Context,
 	instance *manilav1beta1.ManilaScheduler,

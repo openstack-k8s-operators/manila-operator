@@ -557,10 +557,8 @@ func (r *ManilaReconciler) reconcileUpgrade(ctx context.Context, instance *manil
 	return ctrl.Result{}, nil
 }
 
-//
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
-//
 func (r *ManilaReconciler) generateServiceConfigMaps(
 	ctx context.Context,
 	h *helper.Helper,
@@ -590,13 +588,19 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	if err != nil {
 		return err
 	}
-	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointPublic)
+	keystonePublicURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointPublic)
 	if err != nil {
 		return err
 	}
+	keystoneInternalURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointInternal)
+	if err != nil {
+		return err
+	}
+
 	templateParameters := make(map[string]interface{})
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
-	templateParameters["KeystonePublicURL"] = authURL
+	templateParameters["KeystonePublicURL"] = keystonePublicURL
+	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 
 	cms := []util.Template{
 		// ScriptsConfigMap
@@ -628,10 +632,8 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	return nil
 }
 
-//
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart
 // if any of the input resources change, like configs, passwords, ...
-//
 func (r *ManilaReconciler) createHashOfInputHashes(
 	ctx context.Context,
 	instance *manilav1beta1.Manila,
