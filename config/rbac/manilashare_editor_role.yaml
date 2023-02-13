@@ -5,7 +5,7 @@ metadata:
   name: manilashare-editor-role
 rules:
 - apiGroups:
-  - manila.openstack.org
+  - manila.***REMOVED***.org
   resources:
   - manilashares
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - manila.openstack.org
+  - manila.***REMOVED***.org
   resources:
   - manilashares/status
   verbs:

@@ -1,12 +1,12 @@
-module github.com/openstack-k8s-operators/manila-operator
+module github.com/***REMOVED***-k8s-operators/manila-operator
 
 go 1.18
 
 require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.20.1
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20221014085528-1bd40eedfb90
-	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
+	github.com/***REMOVED***-k8s-operators/lib-common/modules/common v0.0.0-20221014085528-1bd40eedfb90
+	github.com/***REMOVED***-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.2
 	k8s.io/client-go v0.25.0
@@ -53,10 +53,10 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/openshift/api v3.9.0+incompatible // indirect
-	github.com/openstack-k8s-operators/keystone-operator/api v0.0.0-20221103151949-0bc224a94f40 // indirect
-	github.com/openstack-k8s-operators/lib-common/modules/database v0.0.0-20221103175706-2c39582ce513 // indirect
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.0.0-20220915080953-f73a201a1da6 // indirect
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.0.0-20221014164348-0a612ae8b391 // indirect
+	github.com/***REMOVED***-k8s-operators/keystone-operator/api v0.0.0-20221103151949-0bc224a94f40 // indirect
+	github.com/***REMOVED***-k8s-operators/lib-common/modules/database v0.0.0-20221103175706-2c39582ce513 // indirect
+	github.com/***REMOVED***-k8s-operators/lib-common/modules/***REMOVED*** v0.0.0-20220915080953-f73a201a1da6 // indirect
+	github.com/***REMOVED***-k8s-operators/mariadb-operator/api v0.0.0-20221014164348-0a612ae8b391 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.13.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
@@ -90,6 +90,6 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/openstack-k8s-operators/manila-operator/api => ./api
+replace github.com/***REMOVED***-k8s-operators/manila-operator/api => ./api
 
 replace sigs.k8s.io/structured-merge-diff/v4 v4.2.2 => sigs.k8s.io/structured-merge-diff/v4 v4.2.1

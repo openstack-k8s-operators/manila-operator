@@ -35,18 +35,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/go-logr/logr"
-	"github.com/openstack-k8s-operators/lib-common/modules/common"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/statefulset"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
-	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
-	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
-	"github.com/openstack-k8s-operators/manila-operator/pkg/manilashare"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/condition"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/configmap"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/env"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/helper"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/labels"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/secret"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/statefulset"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/util"
+	manilav1beta1 "github.com/***REMOVED***-k8s-operators/manila-operator/api/v1beta1"
+	"github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manila"
+	"github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manilashare"
 )
 
 // GetClient -
@@ -77,13 +77,13 @@ type ManilaShareReconciler struct {
 	Log     logr.Logger
 }
 
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares/finalizers,verbs=update
+//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilashares,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilashares/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilashares/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;create;update;patch;delete;watch
-//+kubebuilder:rbac:groups=security.openshift.io,namespace=openstack,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
+//+kubebuilder:rbac:groups=security.openshift.io,namespace=***REMOVED***,resources=securitycontextconstraints,resourceNames=privileged,verbs=use
 
 // Reconcile -
 func (r *ManilaShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -435,10 +435,8 @@ func (r *ManilaShareReconciler) reconcileUpgrade(ctx context.Context, instance *
 	return ctrl.Result{}, nil
 }
 
-//
 // generateServiceConfigMaps - create custom configmap to hold service-specific config
 // TODO add DefaultConfigOverwrite
-//
 func (r *ManilaShareReconciler) generateServiceConfigMaps(
 	ctx context.Context,
 	h *helper.Helper,
@@ -483,10 +481,8 @@ func (r *ManilaShareReconciler) generateServiceConfigMaps(
 	return nil
 }
 
-//
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart
 // if any of the input resources change, like configs, passwords, ...
-//
 func (r *ManilaShareReconciler) createHashOfInputHashes(
 	ctx context.Context,
 	instance *manilav1beta1.ManilaShare,

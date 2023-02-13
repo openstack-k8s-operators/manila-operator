@@ -22,21 +22,21 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
-	"github.com/openstack-k8s-operators/lib-common/modules/common"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
-	"github.com/openstack-k8s-operators/lib-common/modules/database"
-	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
-	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
-	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
+	keystonev1 "github.com/***REMOVED***-k8s-operators/keystone-operator/api/v1beta1"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/condition"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/configmap"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/endpoint"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/env"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/helper"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/job"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/labels"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/secret"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/util"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/database"
+	manilav1beta1 "github.com/***REMOVED***-k8s-operators/manila-operator/api/v1beta1"
+	"github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manila"
+	mariadbv1 "github.com/***REMOVED***-k8s-operators/mariadb-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -77,26 +77,26 @@ type ManilaReconciler struct {
 	Scheme  *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilas,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilas/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilas/finalizers,verbs=update
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis/finalizers,verbs=update
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers/finalizers,verbs=update
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilabackups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilabackups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilabackups/finalizers,verbs=update
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilavolumes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilavolumes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilavolumes/finalizers,verbs=update
+//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilas,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilas/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilas/finalizers,verbs=update
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaapis,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaapis/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaapis/finalizers,verbs=update
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaschedulers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaschedulers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilaschedulers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilabackups,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilabackups/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilabackups/finalizers,verbs=update
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilavolumes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilavolumes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=manila.***REMOVED***.org,resources=manilavolumes/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;update;patch;delete;watch
-// +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch
+// +kubebuilder:rbac:groups=mariadb.***REMOVED***.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=keystone.***REMOVED***.org,resources=keystoneapis,verbs=get;list;watch
 
 // Reconcile -
 func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -557,10 +557,8 @@ func (r *ManilaReconciler) reconcileUpgrade(ctx context.Context, instance *manil
 	return ctrl.Result{}, nil
 }
 
-//
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
-//
 func (r *ManilaReconciler) generateServiceConfigMaps(
 	ctx context.Context,
 	h *helper.Helper,
@@ -590,13 +588,19 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	if err != nil {
 		return err
 	}
-	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointPublic)
+	keystonePublicURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointPublic)
 	if err != nil {
 		return err
 	}
+	keystoneInternalURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointInternal)
+	if err != nil {
+		return err
+	}
+
 	templateParameters := make(map[string]interface{})
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
-	templateParameters["KeystonePublicURL"] = authURL
+	templateParameters["KeystonePublicURL"] = keystonePublicURL
+	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 
 	cms := []util.Template{
 		// ScriptsConfigMap
@@ -628,10 +632,8 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	return nil
 }
 
-//
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart
 // if any of the input resources change, like configs, passwords, ...
-//
 func (r *ManilaReconciler) createHashOfInputHashes(
 	ctx context.Context,
 	instance *manilav1beta1.Manila,

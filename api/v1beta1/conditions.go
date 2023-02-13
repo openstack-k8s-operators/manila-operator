@@ -13,7 +13,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	condition "github.com/***REMOVED***-k8s-operators/lib-common/modules/common/condition"
 )
 
 //
