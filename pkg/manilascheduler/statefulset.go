@@ -22,7 +22,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -74,14 +73,15 @@ func StatefulSet(
 		}
 	} else {
 		args = append(args, ServiceCommand)
-		livenessProbe.HTTPGet = &corev1.HTTPGetAction{
-			Port: intstr.FromInt(8080),
+		livenessProbe.Exec = &corev1.ExecAction{
+			Command: []string{
+				"/bin/true",
+			},
 		}
-		startupProbe.HTTPGet = livenessProbe.HTTPGet
+		startupProbe.Exec = livenessProbe.Exec
 		probeCommand = []string{
 			"/bin/sleep", "infinity",
 		}
-
 	}
 
 	envVars := map[string]env.Setter{}
