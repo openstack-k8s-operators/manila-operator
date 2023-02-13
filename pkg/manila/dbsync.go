@@ -1,9 +1,9 @@
 package manila
 
 import (
-	common "github.com/openstack-k8s-operators/lib-common/modules/common"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
-	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
+	common "github.com/***REMOVED***-k8s-operators/lib-common/modules/common"
+	"github.com/***REMOVED***-k8s-operators/lib-common/modules/common/env"
+	manilav1 "github.com/***REMOVED***-k8s-operators/manila-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

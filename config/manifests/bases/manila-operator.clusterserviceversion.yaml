@@ -13,22 +13,22 @@ spec:
     - description: ManilaAPI is the Schema for the manilaapis API
       displayName: Manila API
       kind: ManilaAPI
-      name: manilaapis.manila.openstack.org
+      name: manilaapis.manila.***REMOVED***.org
       version: v1beta1
     - description: Manila is the Schema for the manilas API
       displayName: Manila
       kind: Manila
-      name: manilas.manila.openstack.org
+      name: manilas.manila.***REMOVED***.org
       version: v1beta1
     - description: ManilaScheduler is the Schema for the manilaschedulers API
       displayName: Manila Scheduler
       kind: ManilaScheduler
-      name: manilaschedulers.manila.openstack.org
+      name: manilaschedulers.manila.***REMOVED***.org
       version: v1beta1
     - description: ManilaShare is the Schema for the manilashares API
       displayName: Manila Share
       kind: ManilaShare
-      name: manilashares.manila.openstack.org
+      name: manilashares.manila.***REMOVED***.org
       version: v1beta1
   description: manila
   displayName: manila
@@ -54,7 +54,7 @@ spec:
   - name: Manila Operator
     url: https://manila-operator.domain
   maintainers:
-  - email: fpantano@redhat.com
+  - email: fpantano@***REMOVED***.com
     name: fmount
   maturity: alpha
   provider:

@@ -1,7 +1,7 @@
 package manilascheduler
 
 import (
-	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
+	"github.com/***REMOVED***-k8s-operators/manila-operator/pkg/manila"
 	corev1 "k8s.io/api/core/v1"
 )
 

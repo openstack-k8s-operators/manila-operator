@@ -2,7 +2,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: manilaapis.manila.openstack.org
+  name: manilaapis.manila.***REMOVED***.org
 spec:
   conversion:
     strategy: Webhook

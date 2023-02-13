@@ -1,9 +1,9 @@
-module github.com/openstack-k8s-operators/manila-operator/api
+module github.com/***REMOVED***-k8s-operators/manila-operator/api
 
 go 1.18
 
 require (
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20221011142240-0083b30cf4f3
+	github.com/***REMOVED***-k8s-operators/lib-common/modules/common v0.0.0-20221011142240-0083b30cf4f3
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.2
 	sigs.k8s.io/controller-runtime v0.13.0

@@ -5,7 +5,7 @@ metadata:
   name: manilaapi-viewer-role
 rules:
 - apiGroups:
-  - manila.openstack.org
+  - manila.***REMOVED***.org
   resources:
   - manilaapis
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - manila.openstack.org
+  - manila.***REMOVED***.org
   resources:
   - manilaapis/status
   verbs:

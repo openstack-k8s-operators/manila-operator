@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: manilaapis.manila.openstack.org
+  name: manilaapis.manila.***REMOVED***.org
 spec:
-  group: manila.openstack.org
+  group: manila.***REMOVED***.org
   names:
     kind: ManilaAPI
     listKind: ManilaAPIList

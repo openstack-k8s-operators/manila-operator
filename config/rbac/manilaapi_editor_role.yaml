@@ -5,7 +5,7 @@ metadata:
   name: manilaapi-editor-role
 rules:
 - apiGroups:
-  - manila.openstack.org
+  - manila.***REMOVED***.org
   resources:
   - manilaapis
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - manila.openstack.org
+  - manila.***REMOVED***.org
   resources:
   - manilaapis/status
   verbs:

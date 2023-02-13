@@ -18,7 +18,7 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	condition "github.com/***REMOVED***-k8s-operators/lib-common/modules/common/condition"
 	corev1 "k8s.io/api/core/v1"
 )
 
