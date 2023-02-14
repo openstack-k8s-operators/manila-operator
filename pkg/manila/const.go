@@ -17,8 +17,6 @@ const (
 	ServiceName = "manila"
 	// ServiceNameV2 -
 	ServiceNameV2 = "manilav2"
-	// ServiceType -
-	ServiceType = "manila"
 	// ServiceTypeV2 -
 	ServiceTypeV2 = "sharev2"
 	// DatabaseName -
