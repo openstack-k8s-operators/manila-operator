@@ -68,11 +68,6 @@ var (
 			"name": manila.ServiceNameV2,
 			"desc": "Manila V2 Service",
 		},
-		{
-			"type": manila.ServiceType,
-			"name": manila.ServiceName,
-			"desc": "Manila V3 Service",
-		},
 	}
 )
 
@@ -363,56 +358,6 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	}
 	instance.Status.APIEndpoints[manila.ServiceNameV2] = apiEndpointsV2
 	// V2 - end
-
-	// V1 - Legacy
-	adminEndpointData = endpoint.Data{
-		Port: manila.ManilaAdminPort,
-		Path: "/v1/%(tenant_id)s",
-	}
-	publicEndpointData = endpoint.Data{
-		Port: manila.ManilaPublicPort,
-		Path: "/v1/%(tenant_id)s",
-	}
-	internalEndpointData = endpoint.Data{
-		Port: manila.ManilaInternalPort,
-		Path: "/v1/%(tenant_id)s",
-	}
-	data = map[endpoint.Endpoint]endpoint.Data{
-		endpoint.EndpointAdmin:    adminEndpointData,
-		endpoint.EndpointPublic:   publicEndpointData,
-		endpoint.EndpointInternal: internalEndpointData,
-	}
-
-	apiEndpointsV1, ctrlResult, err := endpoint.ExposeEndpoints(
-		ctx,
-		helper,
-		manila.ServiceName,
-		serviceLabels,
-		data,
-	)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.ExposeServiceReadyRunningMessage))
-		return ctrlResult, nil
-	}
-
-	//
-	// Update instance status with service endpoint url from route host information for v2
-	//
-	// TODO: need to support https default here
-	instance.Status.APIEndpoints[manila.ServiceName] = apiEndpointsV1
-	// V1 - end
 
 	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
 
