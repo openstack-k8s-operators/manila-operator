@@ -100,7 +100,7 @@ func StatefulSet(
 	envVars["MALLOC_MMAP_THRESHOLD_"] = env.SetValue("131072")
 	envVars["MALLOC_TRIM_THRESHOLD_"] = env.SetValue("262144")
 
-	volumeMounts := GetVolumeMounts()
+	volumeMounts := GetVolumeMounts(instance.Name, instance.Spec.ExtraMounts)
 
 	statefulset := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -152,7 +152,7 @@ func StatefulSet(
 			},
 		},
 	}
-	statefulset.Spec.Template.Spec.Volumes = GetVolumes(manila.GetOwningManilaName(instance), instance.Name)
+	statefulset.Spec.Template.Spec.Volumes = GetVolumes(manila.GetOwningManilaName(instance), instance.Name, instance.Spec.ExtraMounts)
 	// If possible two pods of the same service should not
 	// run on the same worker node. If this is not possible
 	// the get still created on the same worker node.
@@ -175,14 +175,14 @@ func StatefulSet(
 		OSPSecret:            instance.Spec.Secret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         GetInitVolumeMounts(),
+		VolumeMounts:         GetInitVolumeMounts(instance.Name, instance.Spec.ExtraMounts),
 		Debug:                instance.Spec.Debug.InitContainer,
 	}
 
 	statefulset.Spec.Template.Spec.InitContainers = manila.InitContainer(initContainerDetails)
 
 	// TODO: Clean up this hack
-	// Add custom config for the Volume Service
+	// Add custom config for the Share Service
 	envVars = map[string]env.Setter{}
 	envVars["CustomConf"] = env.SetValue(common.CustomServiceConfigFileName)
 	statefulset.Spec.Template.Spec.InitContainers[0].Env = env.MergeEnvs(statefulset.Spec.Template.Spec.InitContainers[0].Env, envVars)

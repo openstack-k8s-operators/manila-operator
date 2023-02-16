@@ -1,12 +1,15 @@
 package manilashare
 
 import (
+	"github.com/openstack-k8s-operators/lib-common/modules/storage"
+	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 	corev1 "k8s.io/api/core/v1"
+	"strings"
 )
 
 // GetVolumes -
-func GetVolumes(parentName string, name string) []corev1.Volume {
+func GetVolumes(parentName string, name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.Volume {
 	var config0640AccessMode int32 = 0640
 	var dirOrCreate = corev1.HostPathDirectoryOrCreate
 
@@ -33,11 +36,13 @@ func GetVolumes(parentName string, name string) []corev1.Volume {
 		},
 	}
 
-	return append(manila.GetVolumes(parentName), volumeVolumes...)
+	// Set the propagation levels for ManilaShare, including the backend name
+	propagation := append(manila.ManilaSharePropagation, storage.PropagationType(strings.TrimPrefix(name, "manila-share-")))
+	return append(manila.GetVolumes(parentName, extraVol, propagation), volumeVolumes...)
 }
 
 // GetInitVolumeMounts - Manila Share init task
-func GetInitVolumeMounts() []corev1.VolumeMount {
+func GetInitVolumeMounts(name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
 
 	customConfVolumeMount := corev1.VolumeMount{
 		Name:      "config-data-custom",
@@ -45,11 +50,13 @@ func GetInitVolumeMounts() []corev1.VolumeMount {
 		ReadOnly:  true,
 	}
 
-	return append(manila.GetInitVolumeMounts(), customConfVolumeMount)
+	// Set the propagation levels for ManilaShare, including the backend name
+	propagation := append(manila.ManilaSharePropagation, storage.PropagationType(strings.TrimPrefix(name, "manila-share-")))
+	return append(manila.GetInitVolumeMounts(extraVol, propagation), customConfVolumeMount)
 }
 
 // GetVolumeMounts - Manila Share VolumeMounts
-func GetVolumeMounts() []corev1.VolumeMount {
+func GetVolumeMounts(name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
 	volumeVolumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "var-lib-manila",
@@ -57,5 +64,7 @@ func GetVolumeMounts() []corev1.VolumeMount {
 		},
 	}
 
-	return append(manila.GetVolumeMounts(), volumeVolumeMounts...)
+	// Set the propagation levels for ManilaShare, including the backend name
+	propagation := append(manila.ManilaSharePropagation, storage.PropagationType(strings.TrimPrefix(name, "manila-share-")))
+	return append(manila.GetVolumeMounts(extraVol, propagation), volumeVolumeMounts...)
 }

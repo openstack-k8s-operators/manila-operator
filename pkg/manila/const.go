@@ -12,6 +12,10 @@ limitations under the License.
 
 package manila
 
+import (
+	"github.com/openstack-k8s-operators/lib-common/modules/storage"
+)
+
 const (
 	// ServiceName -
 	ServiceName = "manila"
@@ -33,4 +37,38 @@ const (
 
 	// KollaConfigDbSync -
 	KollaConfigDbSync = "/var/lib/config-data/merged/db-sync-config.json"
+
+	// ManilaExtraVolTypeUndefined can be used to label an extraMount which
+	// is not associated with a specific backend
+	ManilaExtraVolTypeUndefined storage.ExtraVolType = "Undefined"
+	// ManilaExtraVolTypeCeph can be used to label an extraMount which
+	// is associated to a Ceph backend
+	ManilaExtraVolTypeCeph storage.ExtraVolType = "Ceph"
+	// ManilaShare is the definition of the manila-share group
+	ManilaShare storage.PropagationType = "ManilaShare"
+	// ManilaScheduler is the definition of the manila-scheduler group
+	ManilaScheduler storage.PropagationType = "ManilaScheduler"
+	// ManilaAPI is the definition of the manila-api group
+	ManilaAPI storage.PropagationType = "ManilaAPI"
+	// Manila is the global ServiceType that refers to all the components deployed
+	// by the manila operator
+	Manila storage.PropagationType = "Manila"
 )
+
+// DbsyncPropagation keeps track of the DBSync Service Propagation Type
+var DbsyncPropagation = []storage.PropagationType{storage.DBSync}
+
+// ManilaSchedulerPropagation is the  definition of the ManilaScheduler propagation group
+// It allows the ManilaScheduler pod to mount volumes destined to Manila and ManilaScheduler
+// ServiceTypes
+var ManilaSchedulerPropagation = []storage.PropagationType{Manila, ManilaScheduler}
+
+// ManilaAPIPropagation is the  definition of the ManilaAPI propagation group
+// It allows the ManilaAPI pod to mount volumes destined to Manila and ManilaAPI
+// ServiceTypes
+var ManilaAPIPropagation = []storage.PropagationType{Manila, ManilaAPI}
+
+// ManilaSharePropagation is the  definition of the ManilaShare propagation group
+// It allows the ManilaShare pods to mount volumes destined to Manila and ManilaShare
+// ServiceTypes
+var ManilaSharePropagation = []storage.PropagationType{Manila, ManilaShare}

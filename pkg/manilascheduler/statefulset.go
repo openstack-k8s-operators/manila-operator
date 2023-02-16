@@ -89,7 +89,7 @@ func StatefulSet(
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 
-	volumeMounts := GetVolumeMounts()
+	volumeMounts := GetVolumeMounts(instance.Spec.ExtraMounts)
 
 	statefulset := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +140,7 @@ func StatefulSet(
 			},
 		},
 	}
-	statefulset.Spec.Template.Spec.Volumes = GetVolumes(manila.GetOwningManilaName(instance), instance.Name)
+	statefulset.Spec.Template.Spec.Volumes = GetVolumes(manila.GetOwningManilaName(instance), instance.Name, instance.Spec.ExtraMounts)
 	// If possible two pods of the same service should not
 	// run on the same worker node. If this is not possible
 	// the get still created on the same worker node.
@@ -163,7 +163,7 @@ func StatefulSet(
 		OSPSecret:            instance.Spec.Secret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         GetInitVolumeMounts(),
+		VolumeMounts:         GetInitVolumeMounts(instance.Spec.ExtraMounts),
 		Debug:                instance.Spec.Debug.InitContainer,
 	}
 

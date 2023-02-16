@@ -19,6 +19,7 @@ package v1beta1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/storage"
 )
 
 
@@ -91,6 +92,8 @@ type ManilaSpec struct {
 	// +kubebuilder:validation:Optional
 	// ManilaShares - Map of chosen names to spec definitions for the Share(s) service(s) of this Manila deployment
 	ManilaShares map[string]ManilaShareSpec `json:"manilaShares"`
+	// ExtraMounts containing conf files and credentials
+	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts"`
 }
 
 // ManilaStatus defines the observed state of Manila
@@ -155,4 +158,28 @@ func (instance Manila) IsReady() bool {
 	}
 
 	return ready
+}
+
+// ManilaExtraVolMounts exposes additional parameters processed by the manila-operator
+// and defines the common VolMounts structure provided by the main storage module
+type ManilaExtraVolMounts struct {
+	// +kubebuilder:validation:Optional
+	Name string `json:"name,omitempty"`
+	// +kubebuilder:validation:Optional
+	Region string `json:"region,omitempty"`
+	// +kubebuilder:validation:Required
+	VolMounts []storage.VolMounts `json:"extraVol"`
+}
+
+// Propagate is a function used to filter VolMounts according to the specified
+// PropagationType array
+func (c *ManilaExtraVolMounts) Propagate(svc []storage.PropagationType) []storage.VolMounts {
+
+	var vl []storage.VolMounts
+
+	for _, gv := range c.VolMounts {
+		vl = append(vl, gv.Propagate(svc)...)
+	}
+
+	return vl
 }

@@ -19,6 +19,8 @@ const (
 // DbSyncJob func
 func DbSyncJob(instance *manilav1.Manila, labels map[string]string) *batchv1.Job {
 
+	dbSyncExtraMounts := []manilav1.ManilaExtraVolMounts{}
+
 	args := []string{"-c"}
 	if instance.Spec.Debug.DBSync {
 		args = append(args, common.DebugCommand)
@@ -55,16 +57,14 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string) *batchv1.Job
 								RunAsUser: &runAsUser,
 							},
 							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts: GetVolumeMounts(),
+							VolumeMounts: GetVolumeMounts(dbSyncExtraMounts, DbsyncPropagation),
 						},
 					},
-					Volumes: GetVolumes(instance.Name),
+					Volumes: GetVolumes(instance.Name, dbSyncExtraMounts, DbsyncPropagation),
 				},
 			},
 		},
 	}
-
-	job.Spec.Template.Spec.Volumes = GetVolumes(ServiceName)
 
 	initContainerDetails := APIDetails{
 		ContainerImage:       instance.Spec.ManilaAPI.ContainerImage,
@@ -74,7 +74,7 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string) *batchv1.Job
 		OSPSecret:            instance.Spec.Secret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         GetInitVolumeMounts(),
+		VolumeMounts:         GetInitVolumeMounts(dbSyncExtraMounts, DbsyncPropagation),
 		Debug:                instance.Spec.Debug.DBInitContainer,
 	}
 	job.Spec.Template.Spec.InitContainers = InitContainer(initContainerDetails)

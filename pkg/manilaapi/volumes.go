@@ -1,12 +1,13 @@
 package manilaapi
 
 import (
+	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // GetVolumes -
-func GetVolumes(parentName string, name string) []corev1.Volume {
+func GetVolumes(parentName string, name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.Volume {
 	var config0640AccessMode int32 = 0640
 
 	backupVolumes := []corev1.Volume{
@@ -23,11 +24,11 @@ func GetVolumes(parentName string, name string) []corev1.Volume {
 		},
 	}
 
-	return append(manila.GetVolumes(parentName), backupVolumes...)
+	return append(manila.GetVolumes(parentName, extraVol, manila.ManilaAPIPropagation), backupVolumes...)
 }
 
 // GetInitVolumeMounts - ManilaAPI init task VolumeMounts
-func GetInitVolumeMounts() []corev1.VolumeMount {
+func GetInitVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
 
 	customConfVolumeMount := corev1.VolumeMount{
 		Name:      "config-data-custom",
@@ -35,10 +36,11 @@ func GetInitVolumeMounts() []corev1.VolumeMount {
 		ReadOnly:  true,
 	}
 
-	return append(manila.GetInitVolumeMounts(), customConfVolumeMount)
+	return append(manila.GetInitVolumeMounts(extraVol, manila.ManilaAPIPropagation), customConfVolumeMount)
+
 }
 
 // GetVolumeMounts - ManilaAPI VolumeMounts
-func GetVolumeMounts() []corev1.VolumeMount {
-	return manila.GetVolumeMounts()
+func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
+	return manila.GetVolumeMounts(extraVol, manila.ManilaAPIPropagation)
 }
