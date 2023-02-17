@@ -670,6 +670,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
 		deployment.Spec.Secret = instance.Spec.Secret
+		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -698,6 +699,7 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
 		deployment.Spec.Secret = instance.Spec.Secret
+		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -726,6 +728,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
 		deployment.Spec.Secret = instance.Spec.Secret
+		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {

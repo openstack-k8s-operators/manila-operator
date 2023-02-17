@@ -85,6 +85,10 @@ type ManilaSchedulerSpec struct {
 	// Resources - Compute Resources required by this service (Limits/Requests).
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// ExtraMounts containing conf files and credentials
+	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts"`
 }
 
 
