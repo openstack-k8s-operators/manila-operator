@@ -38,6 +38,12 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 
+VERIFY_TLS ?= true
+
+# GOWORK
+GOWORK ?= off
+export GOWORK := $(GOWORK)
+
 # USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
 # You can enable this value if you would like to use SHA Based Digests
 # To enable set flag to true
@@ -56,6 +62,20 @@ ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
+endif
+
+
+
+# Project is OpenShift centered, so we use oc instead of kubectl, but the
+# operator-sdk uses kubectl.
+# To avoid errors try to create a kubectl symlink to oc when there's no kubectl.
+# Won't create it if oc is in a dir requiring sudo to write.
+ifeq ($(shell which kubectl 2>/dev/null),)
+	ifeq ($(shell which oc 2>/dev/null),)
+		res := $(warning Command "oc" and "kubectl" missing, some targets may fail)
+	else
+		res := $(shell ln -s oc `dirname \`which oc\``/kubectl)
+	endif
 endif
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -87,7 +107,8 @@ help: ## Display this help.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd$(CRDDESC_OVERRIDE) webhook paths="./..." output:crd:artifacts:config=config/crd/bases && \
+	rm -f api/bases/* && cp -a config/crd/bases api/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -98,12 +119,22 @@ fmt: ## Run go fmt against code.
 	go fmt ./...
 
 .PHONY: vet
+vet: export GOWORK=
 vet: ## Run go vet against code.
 	go vet ./...
+	go vet ./api/..
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
+
+.PHONY: gowork
+gowork: export GOWORK=
+gowork: ## Generate go.work file to support our multi module repository
+	test -f go.work || go work init
+	go work use .
+	go work use ./api
+	go work sync
 
 ##@ Build
 
@@ -117,11 +148,14 @@ run: manifests generate fmt vet ## Run a controller from your host.
 
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
-	podman build -t ${IMG} .
+	podman build --build-arg GOWORK=$(GOWORK) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
-	podman push ${IMG}
+ifeq ($(IMG), $(DEFAULT_IMG))
+	$(error As a precaution this target cannot push the default image. If that's really your intentention you'll need to do it manually.)
+endif
+	podman push --tls-verify=${VERIFY_TLS} ${IMG}
 
 ##@ Deployment
 
@@ -130,14 +164,16 @@ ifndef ignore-not-found
 endif
 
 .PHONY: install
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+install: CRDDESC_OVERRIDE=:maxDescLen=0
+install: manifests kustomize ## Install CRDs and RBAC into the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/dev | kubectl apply -f -
 
 .PHONY: uninstall
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+uninstall: manifests kustomize ## Uninstall CRDs and RBAC from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/dev | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
+deploy: CRDDESC_OVERRIDE=:maxDescLen=0
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
@@ -166,6 +202,7 @@ KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/k
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
+	rm -f $(LOCALBIN)/kustomize || true
 	test -s $(LOCALBIN)/kustomize || { curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN); }
 
 .PHONY: controller-gen
@@ -252,19 +289,30 @@ get-ci-tools:
 # Run go fmt against code
 gofmt: get-ci-tools
 	   $(CI_TOOLS_REPO_DIR)/test-runner/gofmt.sh
+	   $(CI_TOOLS_REPO_DIR)/test-runner/gofmt.sh ./api
+
 
 # Run go vet against code
 govet: get-ci-tools
 	   $(CI_TOOLS_REPO_DIR)/test-runner/govet.sh
+	   $(CI_TOOLS_REPO_DIR)/test-runner/govet.sh ./api
 
 # Run go test against code
 gotest: get-ci-tools
 	   $(CI_TOOLS_REPO_DIR)/test-runner/gotest.sh
+	   $(CI_TOOLS_REPO_DIR)/test-runner/gotest.sh ./api
 
 # Run golangci-lint test against code
 golangci: get-ci-tools
 	   $(CI_TOOLS_REPO_DIR)/test-runner/golangci.sh
+	   $(CI_TOOLS_REPO_DIR)/test-runner/golangci.sh ./api
 
 # Run go lint against code
 golint: get-ci-tools
 	   PATH=$(GOBIN):$(PATH); $(CI_TOOLS_REPO_DIR)/test-runner/golint.sh
+	   PATH=$(GOBIN):$(PATH); $(CI_TOOLS_REPO_DIR)/test-runner/golint.sh ./api
+
+.PHONY: operator-lint
+operator-lint: $(LOCALBIN) gowork
+	GOBIN=$(LOCALBIN) go install github.com/gibizer/operator-lint@2ffa25b7f1c13fb2bdae5444a3dd1b5bbad5
+	go vet -vettool=$(LOCALBIN)/operator-lint ./... ./api/...
