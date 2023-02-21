@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-CLUSTER_BUNDLE_FILE="bundle/manifests/ironic-operator.clusterserviceversion.yaml"
+CLUSTER_BUNDLE_FILE="bundle/manifests/manila-operator.clusterserviceversion.yaml"
 
-echo "Creating ironic operator bundle"
+echo "Creating manila operator bundle"
 cd ..
 echo "${GITHUB_SHA}"
 echo "${BASE_IMAGE}"
@@ -12,8 +12,6 @@ skopeo --version
 echo "Calculating image digest for docker://${REGISTRY}/${BASE_IMAGE}:${GITHUB_SHA}"
 DIGEST=$(skopeo inspect docker://${REGISTRY}/${BASE_IMAGE}:${GITHUB_SHA} | jq '.Digest' -r)
 # Output:
-# Calculating image digest for docker://quay.io/openstack-k8s-operators/ironic-operator:d03f2c1c362c04fc5ef819f92a218f9ea59bbd0c
-# Digest: sha256:1d5b578fd212f8dbd03c0235f1913ef738721766f8c94236af5efecc6d8d8cb1
 echo "Digest: ${DIGEST}"
 
 RELEASE_VERSION=$(grep "^VERSION" Makefile | awk -F'?= ' '{ print $2 }')
