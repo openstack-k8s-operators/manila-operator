@@ -30,33 +30,29 @@ spec:
       kind: ManilaShare
       name: manilashares.manila.openstack.org
       version: v1beta1
-  description: manila
-  displayName: manila
-  icon:
-  - base64data: ""
-    mediatype: ""
+  description: Manila Operator
+  displayName: Manila Operator
   install:
     spec:
       deployments: null
     strategy: ""
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
-  - supported: false
+  - supported: true
     type: SingleNamespace
   - supported: false
     type: MultiNamespace
   - supported: true
     type: AllNamespaces
   keywords:
-  - manila
+  - openstack
+  - cn-openstack
   links:
   - name: Manila Operator
-    url: https://manila-operator.domain
-  maintainers:
-  - email: fpantano@redhat.com
-    name: fmount
+    url: https://github.com/openstack-k8s-operators/manila-operator
   maturity: alpha
   provider:
-    name: manila
+    name: Red Hat
+    url: https://redhat.com
   version: 0.0.0
