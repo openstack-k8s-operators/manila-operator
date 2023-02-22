@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/storage"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
 
 const (
 	// DbSyncHash hash
@@ -51,11 +50,17 @@ type ManilaSpec struct {
 	DatabaseUser string `json:"databaseUser"`
 
 	// +kubebuilder:validation:Required
+	// +kubebuilder:default=rabbitmq
+	// RabbitMQ instance name
+	// Needed to request a transportURL that is created and used in Cinder
+	RabbitMqClusterName string `json:"rabbitMqClusterName"`
+
+	// +kubebuilder:validation:Required
 	// Secret containing OpenStack password information for ManilaDatabasePassword, AdminPassword
 	Secret string `json:"secret,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	// PasswordSelectors - Selectors to identify the DB and AdminUser password and TransportURL from the Secret
+	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
+	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -106,6 +111,9 @@ type ManilaStatus struct {
 
 	// Manila Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
+
+	// TransportURLSecret - Secret containing RabbitMQ transportURL
+	TransportURLSecret string `json:"transportURLSecret,omitempty"`
 
 	// API endpoints
 	APIEndpoints map[string]map[string]string `json:"apiEndpoints,omitempty"`

@@ -173,6 +173,7 @@ func StatefulSet(
 		DatabaseUser:         instance.Spec.DatabaseUser,
 		DatabaseName:         manila.DatabaseName,
 		OSPSecret:            instance.Spec.Secret,
+		TransportURLSecret:   instance.Spec.TransportURLSecret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
 		VolumeMounts:         GetInitVolumeMounts(instance.Name, instance.Spec.ExtraMounts),

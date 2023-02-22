@@ -11,6 +11,7 @@ spec:
   databaseInstance: openstack
   secret: osp-secret
   databaseUser: manila
+  rabbitMqClusterName: rabbitmq
   manilaAPI:
     replicas: 1
     containerImage: quay.io/tripleozedcentos9/openstack-manila-api:current-tripleo

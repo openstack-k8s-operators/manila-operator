@@ -3853,12 +3853,15 @@ spec:
                       running the API service
                     type: object
                   passwordSelectors:
+                    default:
+                      database: ManilaDatabasePassword
+                      service: ManilaPassword
                     description: PasswordSelectors - Selectors to identify the DB
-                      and AdminUser password and TransportURL from the Secret
+                      and ServiceUser password from the Secret
                     properties:
                       admin:
                         default: ManilaPassword
-                        description: Database - Selector to get the manila service
+                        description: Service - Selector to get the manila service
                           password from the Secret
                         type: string
                       database:
@@ -3913,6 +3916,9 @@ spec:
                     default: manila
                     description: ServiceUser - optional username used for this service
                       to register in manila
+                    type: string
+                  transportURLSecret:
+                    description: Secret containing RabbitMq transport URL
                     type: string
                 type: object
               manilaScheduler:
@@ -5880,12 +5886,15 @@ spec:
                       running the Scheduler service
                     type: object
                   passwordSelectors:
+                    default:
+                      database: ManilaDatabasePassword
+                      service: ManilaPassword
                     description: PasswordSelectors - Selectors to identify the DB
-                      and TransportURL from the Secret
+                      and ServiceUser password from the Secret
                     properties:
                       admin:
                         default: ManilaPassword
-                        description: Database - Selector to get the manila service
+                        description: Service - Selector to get the manila service
                           password from the Secret
                         type: string
                       database:
@@ -5940,6 +5949,9 @@ spec:
                     default: manila
                     description: ServiceUser - optional username used for this service
                       to register in manila
+                    type: string
+                  transportURLSecret:
+                    description: Secret containing RabbitMq transport URL
                     type: string
                 type: object
               manilaShares:
@@ -7955,12 +7967,15 @@ spec:
                         running the Volume service
                       type: object
                     passwordSelectors:
+                      default:
+                        database: ManilaDatabasePassword
+                        service: ManilaPassword
                       description: PasswordSelectors - Selectors to identify the DB
-                        and TransportURL from the Secret
+                        and ServiceUser password from the Secret
                       properties:
                         admin:
                           default: ManilaPassword
-                          description: Database - Selector to get the manila service
+                          description: Service - Selector to get the manila service
                             password from the Secret
                           type: string
                         database:
@@ -8018,17 +8033,23 @@ spec:
                       description: ServiceUser - optional username used for this service
                         to register in manila
                       type: string
+                    transportURLSecret:
+                      description: Secret containing RabbitMq transport URL
+                      type: string
                   type: object
                 description: ManilaShares - Map of chosen names to spec definitions
                   for the Share(s) service(s) of this Manila deployment
                 type: object
               passwordSelectors:
+                default:
+                  database: ManilaDatabasePassword
+                  service: ManilaPassword
                 description: PasswordSelectors - Selectors to identify the DB and
-                  AdminUser password and TransportURL from the Secret
+                  ServiceUser password from the Secret
                 properties:
                   admin:
                     default: ManilaPassword
-                    description: Database - Selector to get the manila service password
+                    description: Service - Selector to get the manila service password
                       from the Secret
                     type: string
                   database:
@@ -8047,6 +8068,11 @@ spec:
                 description: PreserveJobs - do not delete jobs after they finished
                   e.g. to check logs
                 type: boolean
+              rabbitMqClusterName:
+                default: rabbitmq
+                description: RabbitMQ instance name Needed to request a transportURL
+                  that is created and used in Cinder
+                type: string
               secret:
                 description: Secret containing OpenStack password information for
                   ManilaDatabasePassword, AdminPassword
@@ -8060,6 +8086,7 @@ spec:
             - extraMounts
             - manilaAPI
             - manilaScheduler
+            - rabbitMqClusterName
             type: object
           status:
             description: ManilaStatus defines the observed state of Manila
@@ -8141,6 +8168,9 @@ spec:
                   type: string
                 description: ServiceIDs
                 type: object
+              transportURLSecret:
+                description: TransportURLSecret - Secret containing RabbitMQ transportURL
+                type: string
             type: object
         type: object
     served: true

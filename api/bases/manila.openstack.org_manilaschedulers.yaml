@@ -1888,12 +1888,15 @@ spec:
                   the Scheduler service
                 type: object
               passwordSelectors:
+                default:
+                  database: ManilaDatabasePassword
+                  service: ManilaPassword
                 description: PasswordSelectors - Selectors to identify the DB and
-                  TransportURL from the Secret
+                  ServiceUser password from the Secret
                 properties:
                   admin:
                     default: ManilaPassword
-                    description: Database - Selector to get the manila service password
+                    description: Service - Selector to get the manila service password
                       from the Secret
                     type: string
                   database:
@@ -1947,6 +1950,9 @@ spec:
                 default: manila
                 description: ServiceUser - optional username used for this service
                   to register in manila
+                type: string
+              transportURLSecret:
+                description: Secret containing RabbitMq transport URL
                 type: string
             type: object
           status:
