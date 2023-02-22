@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
@@ -46,7 +47,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // GetClient -
@@ -94,6 +98,8 @@ type ManilaReconciler struct {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch
+// +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch
+// +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile -
 func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
@@ -138,15 +144,15 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		return ctrl.Result{}, nil
 	}
 
-	//
 	// initialize status
-	//
+
 	if instance.Status.Conditions == nil {
 		instance.Status.Conditions = condition.Conditions{}
 		// initialize conditions used later as Status=Unknown
 		cl := condition.CreateList(
 			condition.UnknownCondition(condition.DBReadyCondition, condition.InitReason, condition.DBReadyInitMessage),
 			condition.UnknownCondition(condition.DBSyncReadyCondition, condition.InitReason, condition.DBSyncReadyInitMessage),
+			condition.UnknownCondition(manilav1beta1.ManilaRabbitMqTransportURLReadyCondition, condition.InitReason, manilav1beta1.ManilaRabbitMqTransportURLReadyInitMessage),
 			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaAPIReadyCondition, condition.InitReason, manilav1beta1.ManilaAPIReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaSchedulerReadyCondition, condition.InitReason, manilav1beta1.ManilaSchedulerReadyInitMessage),
@@ -180,15 +186,63 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// transportURLSecretFn - Watch for changes made to the secret associated with the RabbitMQ
+	// TransportURL created and used by Manila CRs. Watch functions return a list of namespace-scoped
+	// CRs that then get fed to the reconciler. Hence, in this case, we need to know the name of the
+	// Manila CR associated with the secret we are examining in the function. We could parse the name
+	// out of the "%s-manila-transport" secret label, which would be faster than getting the list of
+	// the Manila CRs and trying to match on each one. The downside there, however, is that technically
+	// someone could randomly label a secret "something-manila-transport" where "something" actually
+	// matches the name of an existing Manila CR. In that case changes to that secret would trigger
+	// reconciliation for a Manila CR that does not need it.
+	//
+	// TODO: We also need a watch func to monitor for changes to the secret referenced by Manila.Spec.Secret
+	transportURLSecretFn := func(o client.Object) []reconcile.Request {
+		result := []reconcile.Request{}
+
+		// get all Manila CRs
+		manilas := &manilav1beta1.ManilaList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(o.GetNamespace()),
+		}
+		if err := r.Client.List(context.Background(), manilas, listOpts...); err != nil {
+			r.Log.Error(err, "Unable to retrieve Manila CRs %v")
+			return nil
+		}
+
+		for _, ownerRef := range o.GetOwnerReferences() {
+			if ownerRef.Kind == "TransportURL" {
+				for _, cr := range manilas.Items {
+					if ownerRef.Name == fmt.Sprintf("%s-manila-transport", cr.Name) {
+						// return namespace and Name of CR
+						name := client.ObjectKey{
+							Namespace: o.GetNamespace(),
+							Name:      cr.Name,
+						}
+						r.Log.Info(fmt.Sprintf("TransportURL Secret %s belongs to TransportURL belonging to Manila CR %s", o.GetName(), cr.Name))
+						result = append(result, reconcile.Request{NamespacedName: name})
+					}
+				}
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+		return nil
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&manilav1beta1.Manila{}).
 		Owns(&mariadbv1.MariaDBDatabase{}).
 		Owns(&manilav1beta1.ManilaAPI{}).
 		Owns(&manilav1beta1.ManilaScheduler{}).
 		Owns(&manilav1beta1.ManilaShare{}).
+		Owns(&rabbitmqv1.TransportURL{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.Secret{}).
+		// Watch for TransportURL Secrets which belong to any TransportURLs created by Cinder CRs
+		Watches(&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(transportURLSecretFn)).
 		Complete(r)
 }
 
@@ -302,9 +356,6 @@ func (r *ManilaReconciler) reconcileInit(
 	}
 	if dbSyncjob.HasChanged() {
 		instance.Status.Hash[manilav1beta1.DbSyncHash] = dbSyncjob.GetHash()
-		if err := r.Client.Status().Update(ctx, instance); err != nil {
-			return ctrl.Result{}, err
-		}
 		r.Log.Info(fmt.Sprintf("Service '%s' - Job %s hash added - %s", instance.Name, jobDef.Name, instance.Status.Hash[manilav1beta1.DbSyncHash]))
 	}
 	instance.Status.Conditions.MarkTrue(condition.DBSyncReadyCondition, condition.DBSyncReadyMessage)
@@ -320,6 +371,42 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	// ConfigMap
 	configMapVars := make(map[string]env.Setter)
+
+	//
+	// create RabbitMQ transportURL CR and get the actual URL from the associated secret that is created
+	//
+
+	transportURL, op, err := r.transportURLCreateOrUpdate(instance)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			manilav1beta1.ManilaRabbitMqTransportURLReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			manilav1beta1.ManilaRabbitMqTransportURLReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("TransportURL %s successfully reconciled - operation: %s", transportURL.Name, string(op)))
+	}
+
+	instance.Status.TransportURLSecret = transportURL.Status.SecretName
+
+	if instance.Status.TransportURLSecret == "" {
+		r.Log.Info(fmt.Sprintf("Waiting for TransportURL %s secret to be created", transportURL.Name))
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			manilav1beta1.ManilaRabbitMqTransportURLReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			manilav1beta1.ManilaRabbitMqTransportURLReadyRunningMessage))
+		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
+	}
+
+	instance.Status.Conditions.MarkTrue(manilav1beta1.ManilaRabbitMqTransportURLReadyCondition, manilav1beta1.ManilaRabbitMqTransportURLReadyMessage)
+
+	// end transportURL
 
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
@@ -634,7 +721,7 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 	}
 	if hashMap, changed = util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		r.Log.Info(fmt.Sprintf("Service '%s' - Input maps hash %s - %s", instance.Name, common.InputHashName, hash))
+		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, changed, nil
 }
@@ -649,8 +736,6 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
 		deployment.Spec = instance.Spec.ManilaAPI
-		// Add in transfers from umbrella Manila (this instance) spec
-		// TODO: Add logic to determine when to set/overwrite, etc
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
@@ -659,6 +744,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
+		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -681,8 +767,6 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
 		deployment.Spec = instance.Spec.ManilaScheduler
-		// Add in transfers from umbrella Manila CR (this instance) spec
-		// TODO: Add logic to determine when to set/overwrite, etc
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
@@ -691,6 +775,7 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
+		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -713,8 +798,6 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
 		deployment.Spec = volume
-		// Add in transfers from umbrella Manila CR (this instance) spec
-		// TODO: Add logic to determine when to set/overwrite, etc
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
@@ -723,6 +806,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
+		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -733,4 +817,22 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 	})
 
 	return deployment, op, err
+}
+
+func (r *ManilaReconciler) transportURLCreateOrUpdate(instance *manilav1beta1.Manila) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
+	transportURL := &rabbitmqv1.TransportURL{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-manila-transport", instance.Name),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, transportURL, func() error {
+		transportURL.Spec.RabbitmqClusterName = instance.Spec.RabbitMqClusterName
+
+		err := controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
+		return err
+	})
+
+	return transportURL, op, err
 }

@@ -17,11 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/storage"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
 
 const (
 	// DbSyncHash hash
@@ -51,10 +50,17 @@ type ManilaSpec struct {
 	DatabaseUser string `json:"databaseUser"`
 
 	// +kubebuilder:validation:Required
-	// Secret containing OpenStack password information for ManilaDatabasePassword, AdminPassword
+	// +kubebuilder:default=rabbitmq
+	// RabbitMQ instance name
+	// Needed to request a transportURL that is created and used in Manila
+	RabbitMqClusterName string `json:"rabbitMqClusterName"`
+
+	// +kubebuilder:validation:Required
+	// Secret containing OpenStack password information for ManilaDatabasePassword, ManilaPassword
 	Secret string `json:"secret,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
 	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 
@@ -92,6 +98,8 @@ type ManilaSpec struct {
 	// +kubebuilder:validation:Optional
 	// ManilaShares - Map of chosen names to spec definitions for the Share(s) service(s) of this Manila deployment
 	ManilaShares map[string]ManilaShareSpec `json:"manilaShares"`
+
+	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
 	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts"`
 
@@ -112,6 +120,9 @@ type ManilaStatus struct {
 
 	// Manila Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
+
+	// TransportURLSecret - Secret containing RabbitMQ transportURL
+	TransportURLSecret string `json:"transportURLSecret,omitempty"`
 
 	// API endpoints
 	APIEndpoints map[string]map[string]string `json:"apiEndpoints,omitempty"`

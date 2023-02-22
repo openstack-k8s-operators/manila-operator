@@ -1889,22 +1889,20 @@ spec:
                   within the Manila CR.
                 type: object
               passwordSelectors:
+                default:
+                  database: ManilaDatabasePassword
+                  service: ManilaPassword
                 description: PasswordSelectors - Selectors to identify the DB and
                   ServiceUser password from the Secret
                 properties:
-                  admin:
-                    default: ManilaPassword
-                    description: Service - Selector to get the manila service password
-                      from the Secret
-                    type: string
                   database:
                     default: ManilaDatabasePassword
                     description: 'Database - Selector to get the manila database user
                       password from the Secret TODO: not used, need change in mariadb-operator'
                     type: string
-                  transportUrl:
-                    default: TransportURL
-                    description: Database - Selector to get the manila service password
+                  service:
+                    default: ManilaPassword
+                    description: Service - Selector to get the manila service password
                       from the Secret
                     type: string
                 type: object
@@ -1948,6 +1946,9 @@ spec:
                 default: manila
                 description: ServiceUser - optional username used for this service
                   to register in manila
+                type: string
+              transportURLSecret:
+                description: Secret containing RabbitMq transport URL
                 type: string
             type: object
           status:
