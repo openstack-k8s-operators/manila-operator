@@ -94,6 +94,12 @@ type ManilaSpec struct {
 	ManilaShares map[string]ManilaShareSpec `json:"manilaShares"`
 	// ExtraMounts containing conf files and credentials
 	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts"`
+
+	// +kubebuilder:validation:Optional
+	// NodeSelector to target subset of worker nodes running this service. Setting
+	// NodeSelector here acts as a default value and can be overridden by service
+	// specific NodeSelector Settings.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 }
 
 // ManilaStatus defines the observed state of Manila
