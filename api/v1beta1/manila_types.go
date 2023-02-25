@@ -59,7 +59,6 @@ type ManilaSpec struct {
 	// Secret containing OpenStack password information for ManilaDatabasePassword, AdminPassword
 	Secret string `json:"secret,omitempty"`
 
-	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
 	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 

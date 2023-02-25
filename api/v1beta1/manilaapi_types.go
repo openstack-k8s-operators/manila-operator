@@ -56,7 +56,6 @@ type ManilaAPISpec struct {
 	TransportURLSecret string `json:"transportURLSecret,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
 	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 

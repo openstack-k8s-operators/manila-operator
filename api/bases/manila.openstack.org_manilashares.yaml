@@ -1888,9 +1888,6 @@ spec:
                   the Volume service
                 type: object
               passwordSelectors:
-                default:
-                  database: ManilaDatabasePassword
-                  service: ManilaPassword
                 description: PasswordSelectors - Selectors to identify the DB and
                   ServiceUser password from the Secret
                 properties:

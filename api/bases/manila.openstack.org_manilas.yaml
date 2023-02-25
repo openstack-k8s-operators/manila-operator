@@ -3853,9 +3853,6 @@ spec:
                       running the API service
                     type: object
                   passwordSelectors:
-                    default:
-                      database: ManilaDatabasePassword
-                      service: ManilaPassword
                     description: PasswordSelectors - Selectors to identify the DB
                       and ServiceUser password from the Secret
                     properties:
@@ -5886,9 +5883,6 @@ spec:
                       running the Scheduler service
                     type: object
                   passwordSelectors:
-                    default:
-                      database: ManilaDatabasePassword
-                      service: ManilaPassword
                     description: PasswordSelectors - Selectors to identify the DB
                       and ServiceUser password from the Secret
                     properties:
@@ -7967,9 +7961,6 @@ spec:
                         running the Volume service
                       type: object
                     passwordSelectors:
-                      default:
-                        database: ManilaDatabasePassword
-                        service: ManilaPassword
                       description: PasswordSelectors - Selectors to identify the DB
                         and ServiceUser password from the Secret
                       properties:
@@ -8041,9 +8032,6 @@ spec:
                   for the Share(s) service(s) of this Manila deployment
                 type: object
               passwordSelectors:
-                default:
-                  database: ManilaDatabasePassword
-                  service: ManilaPassword
                 description: PasswordSelectors - Selectors to identify the DB and
                   ServiceUser password from the Secret
                 properties:

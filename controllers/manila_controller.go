@@ -81,21 +81,18 @@ type ManilaReconciler struct {
 	Scheme  *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilas,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilas/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=manila.openstack.org,resources=manilas/finalizers,verbs=update
+// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilas,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilas/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilas/finalizers,verbs=update
 // +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis/finalizers,verbs=update
 // +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=manila.openstack.org,resources=manilaschedulers/finalizers,verbs=update
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilabackups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilabackups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilabackups/finalizers,verbs=update
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilavolumes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilavolumes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilavolumes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;update;patch;delete;watch
