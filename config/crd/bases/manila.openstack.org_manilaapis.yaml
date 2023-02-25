@@ -1889,11 +1889,11 @@ spec:
                 type: object
               passwordSelectors:
                 description: PasswordSelectors - Selectors to identify the DB and
-                  AdminUser password and TransportURL from the Secret
+                  ServiceUser password from the Secret
                 properties:
                   admin:
                     default: ManilaPassword
-                    description: Database - Selector to get the manila service password
+                    description: Service - Selector to get the manila service password
                       from the Secret
                     type: string
                   database:
