@@ -25,7 +25,7 @@ type PasswordSelector struct {
 	Database string `json:"database,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="ManilaPassword"
-	// Database - Selector to get the manila service password from the Secret
+	// Service - Selector to get the manila service password from the Secret
 	Service string `json:"admin,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="TransportURL"
