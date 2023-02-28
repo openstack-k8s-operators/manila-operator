@@ -34,6 +34,7 @@ func StatefulSet(
 	instance *manilav1.ManilaShare,
 	configHash string,
 	labels map[string]string,
+	annotations map[string]string,
 ) *appsv1.StatefulSet {
 	trueVar := true
 	rootUser := int64(0)
@@ -114,7 +115,8 @@ func StatefulSet(
 			Replicas: &instance.Spec.Replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Annotations: annotations,
+					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: manila.ServiceAccount,

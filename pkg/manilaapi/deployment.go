@@ -35,6 +35,7 @@ func Deployment(
 	instance *manilav1.ManilaAPI,
 	configHash string,
 	labels map[string]string,
+	annotations map[string]string,
 ) *appsv1.Deployment {
 	runAsUser := int64(0)
 
@@ -90,7 +91,8 @@ func Deployment(
 			Replicas: &instance.Spec.Replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Annotations: annotations,
+					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: manila.ServiceAccount,
