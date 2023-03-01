@@ -32,3 +32,8 @@ config/manager/kustomization.yaml
 # Common CI tools repository
 CI_TOOLS_REPO
 
+# generated workspace file
+# go.work is not supported by our build tooling (cachito)
+# https://github.com/containerbuildsystem/cachito/commit/c7fbbb13eeb7d7edec3c01643eb5b24381027365
+go.work
+go.work.sum

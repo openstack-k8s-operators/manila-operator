@@ -335,7 +335,7 @@ golint: get-ci-tools
 .PHONY: operator-lint
 operator-lint: $(LOCALBIN) gowork
 	GOBIN=$(LOCALBIN) go install github.com/gibizer/operator-lint@2ffa25b7f1c13fb2bdae5444a3dd1b5bbad5
-	go vet -vettool=$(LOCALBIN)/operator-lint ./... ./api/...
+	go vet -vettool=$(LOCALBIN)/operator-lint ./... ./api/..
 
 .PHONY: tidy
 tidy: fmt
