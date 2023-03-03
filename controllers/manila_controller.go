@@ -98,7 +98,6 @@ type ManilaReconciler struct {
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch
-// +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch
 // +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile -
@@ -240,7 +239,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rabbitmqv1.TransportURL{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.ConfigMap{}).
-		// Watch for TransportURL Secrets which belong to any TransportURLs created by Cinder CRs
+		// Watch for TransportURL Secrets which belong to any TransportURLs created by Manila CRs
 		Watches(&source.Kind{Type: &corev1.Secret{}},
 			handler.EnqueueRequestsFromMapFunc(transportURLSecretFn)).
 		Complete(r)
