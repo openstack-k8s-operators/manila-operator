@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ManilaAPISpec defines the desired state of ManilaAPI
@@ -52,7 +52,11 @@ type ManilaAPISpec struct {
 	// Secret containing OpenStack password information for ManilaDatabasePassword, AdminPassword
 	Secret string `json:"secret,omitempty"`
 
+	// Secret containing RabbitMq transport URL
+	TransportURLSecret string `json:"transportURLSecret,omitempty"`
+
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
 	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 
@@ -133,5 +137,5 @@ func init() {
 
 // IsReady - returns true if service is ready to serve requests
 func (instance ManilaAPI) IsReady() bool {
-	return instance.Status.ReadyCount >=1
+	return instance.Status.ReadyCount >= 1
 }

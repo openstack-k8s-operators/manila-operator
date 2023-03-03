@@ -26,11 +26,7 @@ type PasswordSelector struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="ManilaPassword"
 	// Service - Selector to get the manila service password from the Secret
-	Service string `json:"admin,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="TransportURL"
-	// Database - Selector to get the manila service password from the Secret
-	TransportURL string `json:"transportUrl,omitempty"`
+	Service string `json:"service,omitempty"`
 }
 
 // ManilaDebug indicates whether certain stages of Manila deployment should

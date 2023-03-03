@@ -267,6 +267,30 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	// run check OpenStack secret - end
 
 	//
+	// check for required TransportURL secret holding transport URL string
+	//
+	transportURLSecret, hash, err := secret.GetSecret(ctx, helper, instance.Spec.TransportURLSecret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("TransportURL secret %s not found", instance.Spec.TransportURLSecret)
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
+	// run check TransportURL secret - end
+
+	//
 	// check for required Manila config maps that should have been created by parent Manila CR
 	//
 
@@ -486,7 +510,7 @@ func (r *ManilaShareReconciler) createHashOfInputHashes(
 	}
 	if hashMap, changed = util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		r.Log.Info(fmt.Sprintf("Service '%s' - Input maps hash %s - %s", instance.Name, common.InputHashName, hash))
+		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, changed, nil
 }
