@@ -248,6 +248,18 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ManilaReconciler) reconcileDelete(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
 
+	// remove db finalizer first
+	db, err := database.GetDatabaseByName(ctx, helper, instance.Name)
+	if err != nil && !k8s_errors.IsNotFound(err) {
+		return ctrl.Result{}, err
+	}
+
+	if !k8s_errors.IsNotFound(err) {
+		if err := db.DeleteFinalizer(ctx, helper); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Service is deleted so remove the finalizer.
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
