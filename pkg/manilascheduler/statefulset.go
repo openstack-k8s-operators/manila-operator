@@ -34,6 +34,7 @@ func StatefulSet(
 	instance *manilav1.ManilaScheduler,
 	configHash string,
 	labels map[string]string,
+	annotations map[string]string,
 ) *appsv1.StatefulSet {
 	rootUser := int64(0)
 	// manila's uid and gid magic numbers come from the 'manila-user' in
@@ -103,7 +104,8 @@ func StatefulSet(
 			Replicas: &instance.Spec.Replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Annotations: annotations,
+					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: manila.ServiceAccount,

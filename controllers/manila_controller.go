@@ -32,6 +32,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
+	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	"github.com/openstack-k8s-operators/lib-common/modules/database"
@@ -99,6 +100,7 @@ type ManilaReconciler struct {
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch
 // +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
 
 // Reconcile -
 func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
@@ -272,6 +274,7 @@ func (r *ManilaReconciler) reconcileInit(
 	instance *manilav1beta1.Manila,
 	helper *helper.Helper,
 	serviceLabels map[string]string,
+	serviceAnnotations map[string]string,
 ) (ctrl.Result, error) {
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
 
@@ -330,13 +333,16 @@ func (r *ManilaReconciler) reconcileInit(
 	// update Status.DatabaseHostname, used to config the service
 	instance.Status.DatabaseHostname = db.GetDatabaseHostname()
 	instance.Status.Conditions.MarkTrue(condition.DBReadyCondition, condition.DBReadyMessage)
+
+	// when job passed, mark NetworkAttachmentsReadyCondition ready
+	instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 	// create service DB - end
 
 	//
 	// run manila db sync
 	//
 	dbSyncHash := instance.Status.Hash[manilav1beta1.DbSyncHash]
-	jobDef := manila.DbSyncJob(instance, serviceLabels)
+	jobDef := manila.DbSyncJob(instance, serviceLabels, serviceAnnotations)
 	dbSyncjob := job.NewJob(
 		jobDef,
 		manilav1beta1.DbSyncHash,
@@ -496,8 +502,37 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		common.AppSelector: manila.ServiceName,
 	}
 
+	// networks to attach to
+	for _, netAtt := range instance.Spec.ManilaAPI.NetworkAttachments {
+		_, err := nad.GetNADWithName(ctx, helper, netAtt, instance.Namespace)
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				instance.Status.Conditions.Set(condition.FalseCondition(
+					condition.NetworkAttachmentsReadyCondition,
+					condition.RequestedReason,
+					condition.SeverityInfo,
+					condition.NetworkAttachmentsReadyWaitingMessage,
+					netAtt))
+				return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("network-attachment-definition %s not found", netAtt)
+			}
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+	}
+
+	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.ManilaAPI.NetworkAttachments)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
+			instance.Spec.ManilaAPI.NetworkAttachments, err)
+	}
+
 	// Handle service init
-	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels)
+	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels, serviceAnnotations)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
