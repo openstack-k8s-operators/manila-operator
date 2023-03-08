@@ -43,7 +43,7 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string) *batchv1.Job
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy:      "OnFailure",
+					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ServiceAccountName: ServiceAccount,
 					Containers: []corev1.Container{
 						{
