@@ -46,7 +46,7 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:      "OnFailure",
+					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ServiceAccountName: ServiceAccount,
 					Containers: []corev1.Container{
 						{
