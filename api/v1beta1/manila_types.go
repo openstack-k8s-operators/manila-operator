@@ -101,7 +101,7 @@ type ManilaSpec struct {
 
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
-	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts"`
+	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// NodeSelector to target subset of worker nodes running this service. Setting
