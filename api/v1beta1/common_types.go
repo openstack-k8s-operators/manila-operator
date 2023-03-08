@@ -83,5 +83,5 @@ type MetalLBConfig struct {
 
 	// +kubebuilder:validation:Optional
 	// LoadBalancerIPs, request given IPs from the pool if available. Using a list to allow dual stack (IPv4/IPv6) support
-	LoadBalancerIPs []string `json:"loadBalancerIPs"`
+	LoadBalancerIPs []string `json:"loadBalancerIPs,omitempty"`
 }
