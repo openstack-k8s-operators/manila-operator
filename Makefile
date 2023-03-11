@@ -44,6 +44,8 @@ VERIFY_TLS ?= true
 GOWORK ?= off
 export GOWORK := $(GOWORK)
 
+
+GOLINT_TIMEOUT = 100s
 # USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
 # You can enable this value if you would like to use SHA Based Digests
 # To enable set flag to true
@@ -107,6 +109,7 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
+manifests: CRDDESC_OVERRIDE=:maxDescLen=0
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd$(CRDDESC_OVERRIDE) webhook paths="./..." output:crd:artifacts:config=config/crd/bases && \
 	rm -f api/bases/* && cp -a config/crd/bases api/
@@ -346,5 +349,5 @@ tidy: fmt
 
 .PHONY: golangci-lint
 golangci-lint:
-	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.51.2
-	$(LOCALBIN)/golangci-lint run --fix
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.51.2
+	$(LOCALBIN)/golangci-lint run --fix --timeout $(GOLINT_TIMEOUT)
