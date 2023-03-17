@@ -640,7 +640,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		// Could also check the overall ReadyCondition of the manilaShare.
 		if !manilaShare.IsReady() {
 			c = manilaShare.Status.Conditions.Mirror(manilav1beta1.ManilaShareReadyCondition)
-			// Get the condition with higher priority for volumeCondition.
+			// Get the condition with higher priority for shareCondition.
 			shareCondition = condition.GetHigherPrioCondition(c, shareCondition).DeepCopy()
 		}
 	}
@@ -773,6 +773,7 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 }
 
 func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
+
 	deployment := &manilav1beta1.ManilaAPI{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-api", instance.Name),
@@ -780,13 +781,17 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 		},
 	}
 
+	apiSpec := manilav1beta1.ManilaAPISpec{
+		ManilaTemplate:     instance.Spec.ManilaTemplate,
+		ManilaAPITemplate:  instance.Spec.ManilaAPI,
+		ExtraMounts:        instance.Spec.ExtraMounts,
+		DatabaseHostname:   instance.Status.DatabaseHostname,
+		TransportURLSecret: instance.Status.TransportURLSecret,
+	}
+
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
-		deployment.Spec = instance.Spec.ManilaAPI
-		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
-		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
-		deployment.Spec.Secret = instance.Spec.Secret
-		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
+		deployment.Spec = apiSpec
+
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
@@ -811,13 +816,17 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 		},
 	}
 
+	schedulerSpec := manilav1beta1.ManilaSchedulerSpec{
+		ManilaTemplate:          instance.Spec.ManilaTemplate,
+		ManilaSchedulerTemplate: instance.Spec.ManilaScheduler,
+		ExtraMounts:             instance.Spec.ExtraMounts,
+		DatabaseHostname:        instance.Status.DatabaseHostname,
+		TransportURLSecret:      instance.Status.TransportURLSecret,
+	}
+
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
-		deployment.Spec = instance.Spec.ManilaScheduler
-		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
-		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
-		deployment.Spec.Secret = instance.Spec.Secret
-		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
+		deployment.Spec = schedulerSpec
+
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
@@ -834,7 +843,7 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1.Manila, name string, volume manilav1beta1.ManilaShareSpec) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1.Manila, name string, share manilav1beta1.ManilaShareTemplate) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaShare{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-share-%s", instance.Name, name),
@@ -842,13 +851,17 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 		},
 	}
 
+	shareSpec := manilav1beta1.ManilaShareSpec{
+		ManilaTemplate:      instance.Spec.ManilaTemplate,
+		ManilaShareTemplate: share,
+		ExtraMounts:         instance.Spec.ExtraMounts,
+		DatabaseHostname:    instance.Status.DatabaseHostname,
+		TransportURLSecret:  instance.Status.TransportURLSecret,
+	}
+
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
-		deployment.Spec = volume
-		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
-		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
-		deployment.Spec.Secret = instance.Spec.Secret
-		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
+		deployment.Spec = shareSpec
+
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
