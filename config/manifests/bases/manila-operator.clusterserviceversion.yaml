@@ -46,8 +46,9 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - openstack
-  - cn-openstack
+  - OpenStack
+  - Share
+  - Manila
   links:
   - name: Manila Operator
     url: https://github.com/openstack-k8s-operators/manila-operator
