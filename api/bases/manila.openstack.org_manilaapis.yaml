@@ -906,6 +906,8 @@ spec:
                 type: string
               transportURLSecret:
                 type: string
+            required:
+            - containerImage
             type: object
           status:
             properties:

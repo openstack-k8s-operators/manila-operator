@@ -147,7 +147,9 @@ build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
 .PHONY: run
+run: export ENABLES_WEBHOOKS?=false
 run: manifests generate fmt vet ## Run a controller from your host.
+	/bin/bash hack/clean_local_webhook.sh
 	go run ./main.go
 
 .PHONY: docker-build
@@ -351,3 +353,19 @@ tidy: fmt
 golangci-lint:
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.51.2
 	$(LOCALBIN)/golangci-lint run --fix --timeout $(GOLINT_TIMEOUT)
+
+# Used for webhook testing
+# Please ensure the manila-controller-manager deployment and
+# webhook definitions are removed from the csv before running
+# this. Also, cleanup the webhook configuration for local testing
+# before deplying with olm again.
+# $oc delete -n openstack validatingwebhookconfiguration/vmanila.kb.io
+# $oc delete -n openstack mutatingwebhookconfiguration/mmanila.kb.io
+SKIP_CERT ?=false
+.PHONY: run-with-webhook
+run-with-webhook: export MANILA_API_IMAGE_URL_DEFAULT=quay.io/tripleozedcentos9/openstack-manila-api:current-tripleo
+run-with-webhook: export MANILA_SCHEDULER_IMAGE_URL_DEFAULT=quay.io/tripleozedcentos9/openstack-manila-scheduler:current-tripleo
+run-with-webhook: export MANILA_SHARE_IMAGE_URL_DEFAULT=quay.io/tripleozedcentos9/openstack-manila-share:current-tripleo
+run-with-webhook: manifests generate fmt vet ## Run a controller from your host.
+	/bin/bash hack/configure_local_webhook.sh
+	go run ./main.go

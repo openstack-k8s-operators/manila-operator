@@ -1681,6 +1681,8 @@ spec:
                     type: string
                   transportURLSecret:
                     type: string
+                required:
+                - containerImage
                 type: object
               manilaScheduler:
                 properties:
@@ -2525,6 +2527,8 @@ spec:
                     type: string
                   transportURLSecret:
                     type: string
+                required:
+                - containerImage
                 type: object
               manilaShares:
                 additionalProperties:
@@ -3371,6 +3375,8 @@ spec:
                       type: string
                     transportURLSecret:
                       type: string
+                  required:
+                  - containerImage
                   type: object
                 type: object
               nodeSelector:

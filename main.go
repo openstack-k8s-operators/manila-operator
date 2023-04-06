@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -146,6 +147,24 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ManilaShare")
 		os.Exit(1)
 	}
+
+	// Acquire environmental defaults and initialize Manila defaults with them
+	manilaDefaults := manilav1beta1.ManilaDefaults{
+		APIContainerImageURL:       os.Getenv("MANILA_API_IMAGE_URL_DEFAULT"),
+		SchedulerContainerImageURL: os.Getenv("MANILA_SCHEDULER_IMAGE_URL_DEFAULT"),
+		ShareContainerImageURL:     os.Getenv("MANILA_SHARE_IMAGE_URL_DEFAULT"),
+	}
+
+	manilav1beta1.SetupManilaDefaults(manilaDefaults)
+
+	// Setup webhooks if requested
+	if strings.ToLower(os.Getenv("ENABLE_WEBHOOKS")) != "false" {
+		if err = (&manilav1beta1.Manila{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Manila")
+			os.Exit(1)
+		}
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

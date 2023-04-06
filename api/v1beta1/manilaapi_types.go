@@ -29,9 +29,9 @@ type ManilaAPISpec struct {
 	// ServiceUser - optional username used for this service to register in manila
 	ServiceUser string `json:"serviceUser"`
 
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Required
 	// ContainerImage - Manila API Container Image URL
-	ContainerImage string `json:"containerImage,omitempty"`
+	ContainerImage string `json:"containerImage"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=1
