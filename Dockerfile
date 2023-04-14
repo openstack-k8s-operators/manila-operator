@@ -40,7 +40,7 @@ ARG IMAGE_COMPONENT="manila-operator-container"
 ARG IMAGE_NAME="manila-operator"
 ARG IMAGE_VERSION="1.0.0"
 ARG IMAGE_SUMMARY="Manila Operator"
-ARG IMAGE_DESC="This image includes the manil-operator"
+ARG IMAGE_DESC="This image includes the manila-operator"
 ARG IMAGE_TAGS="cn-openstack openstack"
 
 ### DO NOT EDIT LINES BELOW
