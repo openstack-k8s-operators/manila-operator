@@ -28,8 +28,6 @@ const (
 	// ServiceAccount -
 	ServiceAccount = "manila-operator-manila"
 
-	// ManilaAdminPort -
-	ManilaAdminPort int32 = 8786
 	// ManilaPublicPort -
 	ManilaPublicPort int32 = 8786
 	// ManilaInternalPort -

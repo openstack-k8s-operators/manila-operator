@@ -22,8 +22,6 @@ const (
 	// DatabaseName -
 	DatabaseName = "manila"
 
-	// ManilaAdminPort -
-	ManilaAdminPort int32 = 8786
 	// ManilaPublicPort -
 	ManilaPublicPort int32 = 8786
 	// ManilaInternalPort -
