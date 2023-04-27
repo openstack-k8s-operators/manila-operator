@@ -25,8 +25,6 @@ const (
 	ServiceTypeV2 = "sharev2"
 	// DatabaseName -
 	DatabaseName = "manila"
-	// ServiceAccount -
-	ServiceAccount = "manila-operator-manila"
 
 	// ManilaAdminPort -
 	ManilaAdminPort int32 = 8786

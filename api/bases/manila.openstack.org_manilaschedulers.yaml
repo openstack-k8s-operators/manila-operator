@@ -876,6 +876,8 @@ spec:
                 type: object
               secret:
                 type: string
+              serviceAccount:
+                type: string
               serviceUser:
                 default: manila
                 type: string
@@ -883,6 +885,7 @@ spec:
                 type: string
             required:
             - containerImage
+            - serviceAccount
             type: object
           status:
             properties:

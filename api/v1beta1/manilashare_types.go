@@ -55,6 +55,10 @@ type ManilaShareSpec struct {
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
 	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// ServiceAccount - service account name used internally to provide the default SA name
+	ServiceAccount string `json:"serviceAccount"`
 }
 
 // ManilaShareStatus defines the observed state of ManilaShare

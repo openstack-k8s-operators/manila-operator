@@ -108,7 +108,7 @@ func StatefulSet(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: manila.ServiceAccount,
+					ServiceAccountName: instance.Spec.ServiceAccount,
 					Containers: []corev1.Container{
 						{
 							Name: manila.ServiceName + "-scheduler",

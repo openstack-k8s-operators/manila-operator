@@ -33,6 +33,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
+	common_rbac "github.com/openstack-k8s-operators/lib-common/modules/common/rbac"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	"github.com/openstack-k8s-operators/lib-common/modules/database"
@@ -41,6 +42,7 @@ import (
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -102,6 +104,14 @@ type ManilaReconciler struct {
 // +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
 
+// service account, role, rolebinding
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=roles,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;update
+// service account permissions that are needed to grant permission to the above
+// +kubebuilder:rbac:groups="security.openshift.io",resourceNames=anyuid;privileged,resources=securitycontextconstraints,verbs=use
+// +kubebuilder:rbac:groups="",resources=pods,verbs=create;delete;get;list;patch;update;watch
+
 // Reconcile -
 func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
 	_ = log.FromContext(ctx)
@@ -159,6 +169,10 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 			condition.UnknownCondition(manilav1beta1.ManilaSchedulerReadyCondition, condition.InitReason, manilav1beta1.ManilaSchedulerReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaShareReadyCondition, condition.InitReason, manilav1beta1.ManilaShareReadyInitMessage),
 			condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
+			// service account, role, rolebinding conditions
+			condition.UnknownCondition(condition.ServiceAccountReadyCondition, condition.InitReason, condition.ServiceAccountReadyInitMessage),
+			condition.UnknownCondition(condition.RoleReadyCondition, condition.InitReason, condition.RoleReadyInitMessage),
+			condition.UnknownCondition(condition.RoleBindingReadyCondition, condition.InitReason, condition.RoleBindingReadyInitMessage),
 		)
 
 		instance.Status.Conditions.Init(&cl)
@@ -385,6 +399,27 @@ func (r *ManilaReconciler) reconcileInit(
 
 func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
+
+	// Service account, role, binding
+	rbacRules := []rbacv1.PolicyRule{
+		{
+			APIGroups:     []string{"security.openshift.io"},
+			ResourceNames: []string{"anyuid", "privileged"},
+			Resources:     []string{"securitycontextconstraints"},
+			Verbs:         []string{"use"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		},
+	}
+	rbacResult, err := common_rbac.ReconcileRbac(ctx, helper, instance, rbacRules)
+	if err != nil {
+		return rbacResult, err
+	} else if (rbacResult != ctrl.Result{}) {
+		return rbacResult, nil
+	}
 
 	// ConfigMap
 	configMapVars := make(map[string]env.Setter)
@@ -787,6 +822,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 		ExtraMounts:        instance.Spec.ExtraMounts,
 		DatabaseHostname:   instance.Status.DatabaseHostname,
 		TransportURLSecret: instance.Status.TransportURLSecret,
+		ServiceAccount:     instance.RbacResourceName(),
 	}
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
@@ -822,6 +858,7 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 		ExtraMounts:             instance.Spec.ExtraMounts,
 		DatabaseHostname:        instance.Status.DatabaseHostname,
 		TransportURLSecret:      instance.Status.TransportURLSecret,
+		ServiceAccount:          instance.RbacResourceName(),
 	}
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
@@ -857,6 +894,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 		ExtraMounts:         instance.Spec.ExtraMounts,
 		DatabaseHostname:    instance.Status.DatabaseHostname,
 		TransportURLSecret:  instance.Status.TransportURLSecret,
+		ServiceAccount:      instance.RbacResourceName(),
 	}
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
