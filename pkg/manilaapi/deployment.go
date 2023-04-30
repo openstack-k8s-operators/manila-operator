@@ -119,7 +119,12 @@ func Deployment(
 			},
 		},
 	}
-	deployment.Spec.Template.Spec.Volumes = GetVolumes(manila.GetOwningManilaName(instance), instance.Name, instance.Spec.ExtraMounts)
+	deployment.Spec.Template.Spec.Volumes = GetVolumes(
+		manila.GetOwningManilaName(instance),
+		instance.Name,
+		instance.Spec.CustomServiceConfigSecrets,
+		instance.Spec.ExtraMounts,
+	)
 	// If possible two pods of the same service should not
 	// run on the same worker node. If this is not possible
 	// the get still created on the same worker node.
@@ -143,8 +148,11 @@ func Deployment(
 		TransportURLSecret:   instance.Spec.TransportURLSecret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         GetInitVolumeMounts(instance.Spec.ExtraMounts),
-		Debug:                instance.Spec.Debug.InitContainer,
+		VolumeMounts: GetInitVolumeMounts(
+			instance.Spec.CustomServiceConfigSecrets,
+			instance.Spec.ExtraMounts,
+		),
+		Debug: instance.Spec.Debug.InitContainer,
 	}
 	deployment.Spec.Template.Spec.InitContainers = manila.InitContainer(initContainerDetails)
 

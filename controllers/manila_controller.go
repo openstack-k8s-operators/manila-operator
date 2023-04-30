@@ -727,12 +727,11 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	cms := []util.Template{
 		// ScriptsConfigMap
 		{
-			Name:               fmt.Sprintf("%s-scripts", instance.Name),
-			Namespace:          instance.Namespace,
-			Type:               util.TemplateTypeScripts,
-			InstanceType:       instance.Kind,
-			AdditionalTemplate: map[string]string{"common.sh": "/common/common.sh"},
-			Labels:             cmLabels,
+			Name:         fmt.Sprintf("%s-scripts", instance.Name),
+			Namespace:    instance.Namespace,
+			Type:         util.TemplateTypeScripts,
+			InstanceType: instance.Kind,
+			Labels:       cmLabels,
 		},
 		// ConfigMap
 		{

@@ -23,42 +23,72 @@ export DB=${DatabaseName:-"manila"}
 export DBHOST=${DatabaseHost:?"Please specify a DatabaseHost variable."}
 export DBUSER=${DatabaseUser:-"manila"}
 export DBPASSWORD=${DatabasePassword:?"Please specify a DatabasePassword variable."}
-export MANILAPASSWORD=${ManilaPassword:?"Please specify a ManilaPassword variable."}
+export PASSWORD=${ManilaPassword:?"Please specify a ManilaPassword variable."}
 export TRANSPORTURL=${TransportURL:-""}
 
 export CUSTOMCONF=${CustomConf:-""}
 
+DEFAULT_DIR=/var/lib/config-data/default
+CUSTOM_DIR=/var/lib/config-data/custom
+MERGED_DIR=/var/lib/config-data/merged
 SVC_CFG=/etc/manila/manila.conf
 SVC_CFG_MERGED=/var/lib/config-data/merged/manila.conf
+SVC_CFG_MERGED_DIR=${MERGED_DIR}/manila.conf.d
 
-# expect that the common.sh is in the same dir as the calling script
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-. ${SCRIPTPATH}/common.sh --source-only
+mkdir -p ${SVC_CFG_MERGED_DIR}
 
-# Copy default service config from container image as base
-cp -a ${SVC_CFG} ${SVC_CFG_MERGED}
+cp ${DEFAULT_DIR}/* ${MERGED_DIR}
 
-# Merge all templates from config-data defaults first, then custom
-# NOTE: custom.conf files (for both the umbrella Manila CR in config-data/defaults
-#       and each custom.conf for each sub-service in config-data/custom) still need
-#       to be handled separately below because the "merge_config_dir" function will
-#       not merge custom.conf into manila.conf (because the files obviously have
-#       different names)
-for dir in /var/lib/config-data/default /var/lib/config-data/custom; do
-    merge_config_dir ${dir}
-done
+# Save the default service config from container image as manila.conf.sample,
+# and create a small manila.conf file that directs people to files in
+# manila.conf.d.
+cp -a ${SVC_CFG} ${SVC_CFG_MERGED}.sample
+cat <<EOF > ${SVC_CFG_MERGED}
+# Service configuration snippets are stored in the manila.conf.d subdirectory.
+EOF
 
-echo merging /var/lib/config-data/default/custom.conf into ${SVC_CFG_MERGED}
-crudini --merge ${SVC_CFG_MERGED} < /var/lib/config-data/default/custom.conf
+cp ${DEFAULT_DIR}/manila.conf ${SVC_CFG_MERGED_DIR}/00-default.conf
 
-if [ -n "$CUSTOMCONF" ]; then
-    echo merging /var/lib/config-data/custom/${CUSTOMCONF} into ${SVC_CFG_MERGED}
-    crudini --merge ${SVC_CFG_MERGED} < /var/lib/config-data/custom/${CUSTOMCONF}
-fi
-
-# set secrets
+# Generate 01-deployment-secrets.conf
+DEPLOYMENT_SECRETS=${SVC_CFG_MERGED_DIR}/01-deployment-secrets.conf
 if [ -n "$TRANSPORTURL" ]; then
-    crudini --set ${SVC_CFG_MERGED} DEFAULT transport_url $TRANSPORTURL
+    cat <<EOF > ${DEPLOYMENT_SECRETS}
+[DEFAULT]
+transport_url = ${TRANSPORTURL}
+
+EOF
 fi
-crudini --set ${SVC_CFG_MERGED} database connection mysql+pymysql://${DBUSER}:${DBPASSWORD}@${DBHOST}/${DB}
-crudini --set ${SVC_CFG_MERGED} keystone_authtoken password $MANILAPASSWORD
+
+# TODO: service token
+cat <<EOF >> ${DEPLOYMENT_SECRETS}
+[database]
+connection = mysql+pymysql://${DBUSER}:${DBPASSWORD}@${DBHOST}/${DB}
+
+[keystone_authtoken]
+password = ${PASSWORD}
+
+[nova]
+password = ${PASSWORD}
+
+[service_user]
+password = ${PASSWORD}
+EOF
+
+if [ -f ${DEFAULT_DIR}/custom.conf ]; then
+    cp ${DEFAULT_DIR}/custom.conf ${SVC_CFG_MERGED_DIR}/02-global.conf
+fi
+
+if [ -f ${CUSTOM_DIR}/custom.conf ]; then
+    cp ${CUSTOM_DIR}/custom.conf ${SVC_CFG_MERGED_DIR}/03-service.conf
+fi
+
+SECRET_FILES="$(ls /var/lib/config-data/secret-*/* 2>/dev/null || true)"
+if [ -n "${SECRET_FILES}" ]; then
+    cat ${SECRET_FILES} > ${SVC_CFG_MERGED_DIR}/04-secrets.conf
+fi
+
+# Probes cannot run kolla_set_configs because it uses the 'manila' uid
+# and gid and doesn't have permission to make files be owned by root.
+# This means the probe must use files in the "merged" location, and the
+# files must be readable by 'manila'.
+chown -R :manila ${SVC_CFG_MERGED_DIR}

@@ -1,11 +1,11 @@
 {
-  "command": "/usr/bin/manila-scheduler --config-file /usr/share/manila/manila-dist.conf --config-file /etc/manila/manila.conf",
+  "command": "/usr/bin/manila-scheduler --config-dir /etc/manila/manila.conf.d",
   "config_files": [
     {
-      "source": "/var/lib/config-data/merged/manila.conf",
-      "dest": "/etc/manila/manila.conf",
+      "source": "/var/lib/config-data/merged/manila.conf.d",
+      "dest": "/etc/manila/manila.conf.d",
       "owner": "root:manila",
-      "perm": "0640"
+      "perm": "0750"
     }
   ]
 }

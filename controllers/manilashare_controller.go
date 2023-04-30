@@ -169,6 +169,39 @@ func (r *ManilaShareReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
+	// Watch for changes to any CustomServiceConfigSecrets. Global secrets
+	// (e.g. TransportURLSecret) are handled by the top Manila controller.
+	svcSecretFn := func(o client.Object) []reconcile.Request {
+		var namespace string = o.GetNamespace()
+		var secretName string = o.GetName()
+		result := []reconcile.Request{}
+
+		// get all API CRs
+		apis := &manilav1beta1.ManilaShareList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(namespace),
+		}
+		if err := r.Client.List(context.Background(), apis, listOpts...); err != nil {
+			r.Log.Error(err, "Unable to retrieve API CRs %v")
+			return nil
+		}
+		for _, cr := range apis.Items {
+			for _, v := range cr.Spec.CustomServiceConfigSecrets {
+				if v == secretName {
+					name := client.ObjectKey{
+						Namespace: namespace,
+						Name:      cr.Name,
+					}
+					r.Log.Info(fmt.Sprintf("Secret %s is used by Manila CR %s", secretName, cr.Name))
+					result = append(result, reconcile.Request{NamespacedName: name})
+				}
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+		return nil
+	}
 	// watch for configmap where the CM owner label AND the CR.Spec.ManagingCrName label matches
 	configMapFn := func(o client.Object) []reconcile.Request {
 		result := []reconcile.Request{}
@@ -210,6 +243,9 @@ func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&manilav1beta1.ManilaShare{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Secret{}).
+		// watch the secrets we don't own
+		Watches(&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(svcSecretFn)).
 		// watch the config CMs we don't own
 		Watches(&source.Kind{Type: &corev1.ConfigMap{}},
 			handler.EnqueueRequestsFromMapFunc(configMapFn)).
