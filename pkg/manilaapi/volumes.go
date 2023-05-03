@@ -7,10 +7,10 @@ import (
 )
 
 // GetVolumes -
-func GetVolumes(parentName string, name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.Volume {
+func GetVolumes(parentName string, name string, secretNames []string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.Volume {
 	var config0640AccessMode int32 = 0640
 
-	backupVolumes := []corev1.Volume{
+	apiVolumes := []corev1.Volume{
 		{
 			Name: "config-data-custom",
 			VolumeSource: corev1.VolumeSource{
@@ -24,19 +24,31 @@ func GetVolumes(parentName string, name string, extraVol []manilav1.ManilaExtraV
 		},
 	}
 
-	return append(manila.GetVolumes(parentName, extraVol, manila.ManilaAPIPropagation), backupVolumes...)
+	// Mount secrets passed using the `customConfigServiceSecret` parameter
+	// and they will be rendered as part of the service config
+	secretConfig, _ := manila.GetConfigSecretVolumes(secretNames)
+	apiVolumes = append(apiVolumes, secretConfig...)
+
+	return append(manila.GetVolumes(parentName, extraVol, manila.ManilaAPIPropagation), apiVolumes...)
 }
 
 // GetInitVolumeMounts - ManilaAPI init task VolumeMounts
-func GetInitVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
+func GetInitVolumeMounts(secretNames []string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
 
-	customConfVolumeMount := corev1.VolumeMount{
-		Name:      "config-data-custom",
-		MountPath: "/var/lib/config-data/custom",
-		ReadOnly:  true,
+	initConfVolumeMount := []corev1.VolumeMount{
+		{
+			Name:      "config-data-custom",
+			MountPath: "/var/lib/config-data/custom",
+			ReadOnly:  true,
+		},
 	}
 
-	return append(manila.GetInitVolumeMounts(extraVol, manila.ManilaAPIPropagation), customConfVolumeMount)
+	// Mount secrets passed using the `customConfigServiceSecret` parameter
+	// and they will be rendered as part of the service config
+	_, secretConfig := manila.GetConfigSecretVolumes(secretNames)
+	initConfVolumeMount = append(initConfVolumeMount, secretConfig...)
+
+	return append(manila.GetInitVolumeMounts(extraVol, manila.ManilaAPIPropagation), initConfVolumeMount...)
 
 }
 

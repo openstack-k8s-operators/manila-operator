@@ -1,4 +1,5 @@
-#!/bin//bash
+#!/bin/bash
+
 #
 # Copyright 2022 Red Hat Inc.
 #
@@ -18,13 +19,13 @@ set -e
 
 function merge_config_dir {
     echo merge config dir $1
-    for conf in $(find $1 -type f); do
+    for conf in $(find $1 -type f);do
         conf_base=$(basename $conf)
 
         # If CFG already exist in ../merged and is not a json file,
         # we expect for now it can be merged using crudini.
         # Else, just copy the full file.
-        if [[ -f /var/lib/config-data/merged/${conf_base} && ${conf_base} != *.json ]]; then
+        if [[ -f /var/lib/config-data/merged/${conf_base} && ${conf_base} != *.json && ${conf_base} != nfs_shares ]]; then
             echo merging ${conf} into /var/lib/config-data/merged/${conf_base}
             crudini --merge /var/lib/config-data/merged/${conf_base} < ${conf}
         else

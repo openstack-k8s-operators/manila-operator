@@ -45,6 +45,10 @@ spec:
               customServiceConfig:
                 default: '# add your customization here'
                 type: string
+              customServiceConfigSecrets:
+                items:
+                  type: string
+                type: array
               databaseHostname:
                 type: string
               databaseUser:

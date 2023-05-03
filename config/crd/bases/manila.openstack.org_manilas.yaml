@@ -820,6 +820,10 @@ spec:
                   customServiceConfig:
                     default: '# add your customization here'
                     type: string
+                  customServiceConfigSecrets:
+                    items:
+                      type: string
+                    type: array
                   debug:
                     properties:
                       initContainer:
@@ -911,6 +915,10 @@ spec:
                   customServiceConfig:
                     default: '# add your customization here'
                     type: string
+                  customServiceConfigSecrets:
+                    items:
+                      type: string
+                    type: array
                   debug:
                     properties:
                       initContainer:
@@ -978,6 +986,10 @@ spec:
                     customServiceConfig:
                       default: '# add your customization here'
                       type: string
+                    customServiceConfigSecrets:
+                      items:
+                        type: string
+                      type: array
                     debug:
                       properties:
                         initContainer:
