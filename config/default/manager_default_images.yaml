@@ -12,8 +12,8 @@ spec:
       - name: manager
         env:
         - name: MANILA_API_IMAGE_URL_DEFAULT
-          value: quay.io/tripleozedcentos9/openstack-manila-api:current-tripleo
+          value: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
         - name: MANILA_SCHEDULER_IMAGE_URL_DEFAULT
-          value: quay.io/tripleozedcentos9/openstack-manila-scheduler:current-tripleo
+          value: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
         - name: MANILA_SHARE_IMAGE_URL_DEFAULT
-          value: quay.io/tripleozedcentos9/openstack-manila-share:current-tripleo
+          value: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified

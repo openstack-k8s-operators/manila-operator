@@ -361,9 +361,9 @@ golangci-lint:
 # $oc delete -n openstack mutatingwebhookconfiguration/mmanila.kb.io
 SKIP_CERT ?=false
 .PHONY: run-with-webhook
-run-with-webhook: export MANILA_API_IMAGE_URL_DEFAULT=quay.io/tripleozedcentos9/openstack-manila-api:current-tripleo
-run-with-webhook: export MANILA_SCHEDULER_IMAGE_URL_DEFAULT=quay.io/tripleozedcentos9/openstack-manila-scheduler:current-tripleo
-run-with-webhook: export MANILA_SHARE_IMAGE_URL_DEFAULT=quay.io/tripleozedcentos9/openstack-manila-share:current-tripleo
+run-with-webhook: export MANILA_API_IMAGE_URL_DEFAULT=quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
+run-with-webhook: export MANILA_SCHEDULER_IMAGE_URL_DEFAULT=quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
+run-with-webhook: export MANILA_SHARE_IMAGE_URL_DEFAULT=quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
 run-with-webhook: manifests generate fmt vet ## Run a controller from your host.
 	/bin/bash hack/configure_local_webhook.sh
 	go run ./main.go
