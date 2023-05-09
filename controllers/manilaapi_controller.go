@@ -69,6 +69,12 @@ var (
 			"name": manila.ServiceNameV2,
 			"desc": "Manila V2 Service",
 		},
+		{
+			// This is deprecated, will be removed after all dependencies are removed upstream
+			"type": manila.ServiceType,
+			"name": manila.ServiceName,
+			"desc": "Manila V1 Service",
+		},
 	}
 )
 
@@ -342,7 +348,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	// expose the service (create service, route and return the created endpoint URLs)
 	//
 
-	// V2
+	// V2 (Supported micro-versioned API endpoint)
 	publicEndpointData := endpoint.Data{
 		Port: manila.ManilaPublicPort,
 		Path: "/v2",
@@ -351,6 +357,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		Port: manila.ManilaInternalPort,
 		Path: "/v2",
 	}
+
 	data := map[endpoint.Endpoint]endpoint.Data{
 		endpoint.EndpointPublic:   publicEndpointData,
 		endpoint.EndpointInternal: internalEndpointData,
@@ -403,6 +410,66 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	}
 	instance.Status.APIEndpoints[manila.ServiceNameV2] = apiEndpointsV2
 	// V2 - end
+
+	// V1 (Deprected, non micro-versioned API endpoint, here for legacy users)
+	// will be removed when the upstream service (and dependencies) drop it
+	v1publicEndpointData := endpoint.Data{
+		Port: manila.ManilaPublicPort,
+		Path: "/v1/%(project_id)s",
+	}
+	v1internalEndpointData := endpoint.Data{
+		Port: manila.ManilaInternalPort,
+		Path: "/v1/%(project_id)s",
+	}
+
+	v1data := map[endpoint.Endpoint]endpoint.Data{
+		endpoint.EndpointPublic:   v1publicEndpointData,
+		endpoint.EndpointInternal: v1internalEndpointData,
+	}
+
+	for _, metallbcfg := range instance.Spec.ExternalEndpoints {
+		portCfg := v1data[metallbcfg.Endpoint]
+
+		portCfg.MetalLB = &endpoint.MetalLBData{
+			IPAddressPool:   metallbcfg.IPAddressPool,
+			SharedIP:        metallbcfg.SharedIP,
+			SharedIPKey:     metallbcfg.SharedIPKey,
+			LoadBalancerIPs: metallbcfg.LoadBalancerIPs,
+		}
+
+		v1data[metallbcfg.Endpoint] = portCfg
+	}
+
+	apiEndpointsV1, ctrlResult, err := endpoint.ExposeEndpoints(
+		ctx,
+		helper,
+		manila.ServiceName,
+		serviceLabels,
+		v1data,
+		time.Duration(5)*time.Second,
+	)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ExposeServiceReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ExposeServiceReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ExposeServiceReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.ExposeServiceReadyRunningMessage))
+		return ctrlResult, nil
+	}
+
+	//
+	// Update instance status with service endpoint url from route host information for v1 endpoints
+	//
+	instance.Status.APIEndpoints[manila.ServiceName] = apiEndpointsV1
+	// V1 - end
 
 	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
 
