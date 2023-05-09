@@ -176,15 +176,15 @@ func (r *ManilaSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		result := []reconcile.Request{}
 
 		// get all API CRs
-		apis := &manilav1beta1.ManilaSchedulerList{}
+		schedulers := &manilav1beta1.ManilaSchedulerList{}
 		listOpts := []client.ListOption{
 			client.InNamespace(namespace),
 		}
-		if err := r.Client.List(context.Background(), apis, listOpts...); err != nil {
+		if err := r.Client.List(context.Background(), schedulers, listOpts...); err != nil {
 			r.Log.Error(err, "Unable to retrieve API CRs %v")
 			return nil
 		}
-		for _, cr := range apis.Items {
+		for _, cr := range schedulers.Items {
 			for _, v := range cr.Spec.CustomServiceConfigSecrets {
 				if v == secretName {
 					name := client.ObjectKey{

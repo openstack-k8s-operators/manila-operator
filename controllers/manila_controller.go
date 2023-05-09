@@ -428,7 +428,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// create RabbitMQ transportURL CR and get the actual URL from the associated secret that is created
 	//
 
-	transportURL, op, err := r.transportURLCreateOrUpdate(instance)
+	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance)
 
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -595,7 +595,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	//
 
 	// deploy manila-api
-	manilaAPI, op, err := r.apiDeploymentCreateOrUpdate(instance)
+	manilaAPI, op, err := r.apiDeploymentCreateOrUpdate(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaAPIReadyCondition,
@@ -622,7 +622,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	// TODO: These will not work without rabbit yet
 	// deploy manila-scheduler
-	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(instance)
+	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaSchedulerReadyCondition,
@@ -649,7 +649,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// deploy manila-share
 	var shareCondition *condition.Condition
 	for name, share := range instance.Spec.ManilaShares {
-		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(instance, name, share)
+		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				manilav1beta1.ManilaShareReadyCondition,
@@ -806,7 +806,7 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 	return hash, changed, nil
 }
 
-func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
 
 	deployment := &manilav1beta1.ManilaAPI{
 		ObjectMeta: metav1.ObjectMeta{
@@ -824,7 +824,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 		ServiceAccount:     instance.RbacResourceName(),
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = apiSpec
 
 		if len(deployment.Spec.NodeSelector) == 0 {
@@ -843,7 +843,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1beta1.Manila) (*manilav1beta1.ManilaScheduler, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaScheduler, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaScheduler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-scheduler", instance.Name),
@@ -860,7 +860,7 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 		ServiceAccount:          instance.RbacResourceName(),
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = schedulerSpec
 
 		if len(deployment.Spec.NodeSelector) == 0 {
@@ -879,7 +879,7 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1.Manila, name string, share manilav1beta1.ManilaShareTemplate) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila, name string, share manilav1beta1.ManilaShareTemplate) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaShare{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-share-%s", instance.Name, name),
@@ -896,7 +896,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 		ServiceAccount:      instance.RbacResourceName(),
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = shareSpec
 
 		if len(deployment.Spec.NodeSelector) == 0 {
@@ -915,7 +915,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) transportURLCreateOrUpdate(instance *manilav1beta1.Manila) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) transportURLCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
 	transportURL := &rabbitmqv1.TransportURL{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-manila-transport", instance.Name),
@@ -923,7 +923,7 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(instance *manilav1beta1.Ma
 		},
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, transportURL, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, transportURL, func() error {
 		transportURL.Spec.RabbitmqClusterName = instance.Spec.RabbitMqClusterName
 
 		err := controllerutil.SetControllerReference(instance, transportURL, r.Scheme)

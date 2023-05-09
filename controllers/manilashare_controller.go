@@ -177,15 +177,15 @@ func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		result := []reconcile.Request{}
 
 		// get all API CRs
-		apis := &manilav1beta1.ManilaShareList{}
+		shares := &manilav1beta1.ManilaShareList{}
 		listOpts := []client.ListOption{
 			client.InNamespace(namespace),
 		}
-		if err := r.Client.List(context.Background(), apis, listOpts...); err != nil {
+		if err := r.Client.List(context.Background(), shares, listOpts...); err != nil {
 			r.Log.Error(err, "Unable to retrieve API CRs %v")
 			return nil
 		}
-		for _, cr := range apis.Items {
+		for _, cr := range shares.Items {
 			for _, v := range cr.Spec.CustomServiceConfigSecrets {
 				if v == secretName {
 					name := client.ObjectKey{
