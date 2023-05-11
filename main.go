@@ -148,14 +148,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Acquire environmental defaults and initialize Manila defaults with them
-	manilaDefaults := manilav1beta1.ManilaDefaults{
-		APIContainerImageURL:       os.Getenv("MANILA_API_IMAGE_URL_DEFAULT"),
-		SchedulerContainerImageURL: os.Getenv("MANILA_SCHEDULER_IMAGE_URL_DEFAULT"),
-		ShareContainerImageURL:     os.Getenv("MANILA_SHARE_IMAGE_URL_DEFAULT"),
-	}
-
-	manilav1beta1.SetupManilaDefaults(manilaDefaults)
+	// Acquire environmental defaults and initialize operator defaults with them
+	manilav1beta1.SetupDefaults()
 
 	// Setup webhooks if requested
 	if strings.ToLower(os.Getenv("ENABLE_WEBHOOKS")) != "false" {
