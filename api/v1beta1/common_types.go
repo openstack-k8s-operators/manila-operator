@@ -18,7 +18,19 @@ package v1beta1
 
 import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	corev1 "k8s.io/api/core/v1"
+)
+
+const (
+	// Container image fall-back defaults
+
+	// ManilaAPIContainerImage is the fall-back container image for ManilaAPI
+	ManilaAPIContainerImage = "quay.io/podified-antelope-centos9/openstack-manila-api:current-podified"
+	// ManilaSchedulerContainerImage is the fall-back container image for ManilaScheduler
+	ManilaSchedulerContainerImage = "quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified"
+	// ManilaShareContainerImage is the fall-back container image for ManilaShare
+	ManilaShareContainerImage = "quay.io/podified-antelope-centos9/openstack-manila-share:current-podified"
 )
 
 // ManilaTemplate defines common input parameters used by all Manila services
@@ -156,4 +168,16 @@ type MetalLBConfig struct {
 	// +kubebuilder:validation:Optional
 	// LoadBalancerIPs, request given IPs from the pool if available. Using a list to allow dual stack (IPv4/IPv6) support
 	LoadBalancerIPs []string `json:"loadBalancerIPs,omitempty"`
+}
+
+// SetupDefaults - initializes any CRD field defaults based on environment variables (the defaulting mechanism itself is implemented via webhooks)
+func SetupDefaults() {
+	// Acquire environmental defaults and initialize Manila defaults with them
+	manilaDefaults := ManilaDefaults{
+		APIContainerImageURL:       util.GetEnvVar("MANILA_API_IMAGE_URL_DEFAULT", ManilaAPIContainerImage),
+		SchedulerContainerImageURL: util.GetEnvVar("MANILA_SCHEDULER_IMAGE_URL_DEFAULT", ManilaSchedulerContainerImage),
+		ShareContainerImageURL:     util.GetEnvVar("MANILA_SHARE_IMAGE_URL_DEFAULT", ManilaShareContainerImage),
+	}
+
+	SetupManilaDefaults(manilaDefaults)
 }
