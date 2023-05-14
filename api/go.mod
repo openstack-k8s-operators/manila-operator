@@ -1,6 +1,6 @@
 module github.com/openstack-k8s-operators/manila-operator/api
 
-go 1.18
+go 1.19
 
 require (
 	github.com/onsi/ginkgo/v2 v2.9.5

@@ -12,6 +12,8 @@ require (
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20230524134507-696d321a942e
 	github.com/openstack-k8s-operators/lib-common/modules/database v0.0.0-20230524134507-696d321a942e
 	github.com/openstack-k8s-operators/lib-common/modules/storage v0.0.0-20230524134507-696d321a942e
+	github.com/openstack-k8s-operators/lib-common/modules/test v0.0.0-20230526163116-6df6d982a172
+	github.com/openstack-k8s-operators/lib-common/modules/test-operators v0.0.0-20230524134507-696d321a942e
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-20230520063611-fec955b90e5e
 	github.com/openstack-k8s-operators/mariadb-operator/api v0.0.0-20230523102317-8b60f83b1d1f
 	k8s.io/api v0.26.3
@@ -23,6 +25,7 @@ require (
 require (
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
+	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
 )
 
@@ -43,12 +46,12 @@ require (
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.0
 	github.com/gophercloud/gophercloud v1.2.0 // indirect
 	github.com/imdario/mergo v0.3.15 // indirect; indirect // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0 // indirect
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

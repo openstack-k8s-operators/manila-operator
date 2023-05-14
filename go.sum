@@ -246,6 +246,10 @@ github.com/openstack-k8s-operators/lib-common/modules/openstack v0.0.0-202305241
 github.com/openstack-k8s-operators/lib-common/modules/openstack v0.0.0-20230524134507-696d321a942e/go.mod h1:1Ka9t16pCIdnb/tgjYtL6xeIcN8GFAUxyz6x5UzzDbU=
 github.com/openstack-k8s-operators/lib-common/modules/storage v0.0.0-20230524134507-696d321a942e h1:lMLJWoateBlsprYOldJ93tPXMtd8GRLcfsm41JL2uqs=
 github.com/openstack-k8s-operators/lib-common/modules/storage v0.0.0-20230524134507-696d321a942e/go.mod h1:7sbo6DydOwpl8Ex1atTbXIrWYvZ++eSOJ0Z6RphJJ44=
+github.com/openstack-k8s-operators/lib-common/modules/test v0.0.0-20230526163116-6df6d982a172 h1:BbyJtAvQ1GykScc40GTbRDLTz4QaIME0zsj+DlfLnPo=
+github.com/openstack-k8s-operators/lib-common/modules/test v0.0.0-20230526163116-6df6d982a172/go.mod h1:+wDo6Im6eTo5C1cFHnNadwxl/RSx/fwcYaPISqB0CVo=
+github.com/openstack-k8s-operators/lib-common/modules/test-operators v0.0.0-20230524134507-696d321a942e h1:8AkA9/9rXIkP+35eJWDCmJGUlzQIz1HcXx8CuhW/MHY=
+github.com/openstack-k8s-operators/lib-common/modules/test-operators v0.0.0-20230524134507-696d321a942e/go.mod h1:pUhJ4PZP+Af6el8TsevHNUBAZ6ci2Dynv4ZHkJI4nJQ=
 github.com/openstack-k8s-operators/mariadb-operator/api v0.0.0-20230523102317-8b60f83b1d1f h1:RljVu7USKBTSL6Y3wbn6TKYUddk09T8MquvqbBjaJ74=
 github.com/openstack-k8s-operators/mariadb-operator/api v0.0.0-20230523102317-8b60f83b1d1f/go.mod h1:YRgmQI2Z0IbQnDrU1jqvZqntSBmCmBU9CSbzoqPjrPw=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
@@ -366,6 +370,7 @@ golang.org/x/mod v0.1.1-0.20191107180719-034126e5016b/go.mod h1:QqPTAvyqsEbceGzB
 golang.org/x/mod v0.2.0/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
 golang.org/x/mod v0.3.0/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
 golang.org/x/mod v0.10.0 h1:lFO9qtOdlre5W1jxS3r/4szv2/6iXxScdzjoBMXNhYk=
+golang.org/x/mod v0.10.0/go.mod h1:iBbtSCu2XBx23ZKBPSOrRkjjQPZFPuis4dIYUhu/chs=
 golang.org/x/net v0.0.0-20180724234803-3673e40ba225/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20180826012351-8a410e7b638d/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20181114220301-adae6a3d119a/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
