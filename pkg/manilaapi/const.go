@@ -13,22 +13,6 @@ limitations under the License.
 package manilaapi
 
 const (
-	// ServiceName -
-	ServiceName = "manila"
-	// ServiceAccount -
-	ServiceAccount = "manila-operator-manila"
-	// ServiceType -
-	ServiceType = "manila"
-	// DatabaseName -
-	DatabaseName = "manila"
-
-	// ManilaAdminPort -
-	ManilaAdminPort int32 = 8786
-	// ManilaPublicPort -
-	ManilaPublicPort int32 = 8786
-	// ManilaInternalPort -
-	ManilaInternalPort int32 = 8786
-
 	// KollaConfig -
 	KollaConfig = "/var/lib/config-data/merged/manila-api-config.json"
 )
