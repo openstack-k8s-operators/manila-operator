@@ -873,6 +873,8 @@ spec:
                   replicas:
                     default: 1
                     format: int32
+                    maximum: 32
+                    minimum: 0
                     type: integer
                   resources:
                     properties:
@@ -943,6 +945,8 @@ spec:
                   replicas:
                     default: 1
                     format: int32
+                    maximum: 32
+                    minimum: 0
                     type: integer
                   resources:
                     properties:
@@ -1014,6 +1018,8 @@ spec:
                     replicas:
                       default: 1
                       format: int32
+                      maximum: 32
+                      minimum: 0
                       type: integer
                     resources:
                       properties:
