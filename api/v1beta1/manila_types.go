@@ -79,7 +79,7 @@ type ManilaSpec struct {
 
 	// +kubebuilder:validation:Optional
 	// ManilaShares - Map of chosen names to spec definitions for the Share(s) service(s) of this Manila deployment
-	ManilaShares map[string]ManilaShareTemplate `json:"manilaShares"`
+	ManilaShares map[string]ManilaShareTemplate `json:"manilaShares,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
