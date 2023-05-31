@@ -106,7 +106,7 @@ func init() {
 	SchemeBuilder.Register(&ManilaScheduler{}, &ManilaSchedulerList{})
 }
 
-// IsReady - returns true if service is ready to serve requests
+// IsReady - returns true if ManilaScheduler is reconciled successfully
 func (instance ManilaScheduler) IsReady() bool {
-	return instance.Status.ReadyCount >= 1
+	return instance.Status.Conditions.IsTrue(condition.ReadyCondition)
 }
