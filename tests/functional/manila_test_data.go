@@ -44,6 +44,7 @@ type ManilaTestData struct {
 	ManilaScheduler        types.NamespacedName
 	ManilaShares           []types.NamespacedName
 	InternalAPINAD         types.NamespacedName
+	ContainerImage         string
 }
 
 // GetManilaTestData is a function that initialize the ManilaTestData
@@ -124,5 +125,6 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		// Password used for both db and service
 		ManilaPassword:    "12345678",
 		ManilaServiceUser: "manila",
+		ContainerImage:    "test://manila",
 	}
 }

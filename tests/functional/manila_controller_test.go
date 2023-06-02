@@ -198,7 +198,9 @@ var _ = Describe("Manila controller", func() {
 	})
 	When("Manila CR is created without container images defined", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			// ManilaEmptySpec is used to provide a standard Manila CR where no
+			// field is customized
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaEmptySpec()))
 		})
 		It("has the expected container image defaults", func() {
 			manilaDefault := GetManila(manilaTest.Instance)
