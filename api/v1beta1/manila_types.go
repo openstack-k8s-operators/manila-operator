@@ -149,16 +149,9 @@ func init() {
 	SchemeBuilder.Register(&Manila{}, &ManilaList{})
 }
 
-// IsReady - returns true if service is ready to serve requests
+// IsReady - returns true if Manila is reconciled successfully
 func (instance Manila) IsReady() bool {
-	ready := instance.Status.ManilaAPIReadyCount > 0 &&
-		instance.Status.ManilaSchedulerReadyCount > 0
-
-	for name := range instance.Spec.ManilaShares {
-		ready = ready && instance.Status.ManilaSharesReadyCounts[name] > 0
-	}
-
-	return ready
+	return instance.Status.Conditions.IsTrue(condition.ReadyCondition)
 }
 
 // ManilaExtraVolMounts exposes additional parameters processed by the manila-operator
