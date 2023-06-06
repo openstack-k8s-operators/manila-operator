@@ -697,6 +697,11 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		instance.Status.Conditions.MarkTrue(manilav1beta1.ManilaShareReadyCondition, condition.DeploymentReadyMessage)
 	}
 
+	err = r.shareCleanup(ctx, instance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	return ctrl.Result{}, nil
 }
@@ -938,4 +943,41 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(ctx context.Context, insta
 	})
 
 	return transportURL, op, err
+}
+
+// ShareCleanup - Delete the manila share instance if it no longer appears
+// in the spec.
+func (r *ManilaReconciler) shareCleanup(ctx context.Context, instance *manilav1beta1.Manila) error {
+	// Generate a list of share CRs
+	volumes := &manilav1beta1.ManilaShareList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+	}
+	if err := r.Client.List(ctx, volumes, listOpts...); err != nil {
+		r.Log.Error(err, "Unable to retrieve Manila Share CRs %v")
+		return nil
+	}
+
+	prefixLen := len(instance.Name + "-share-")
+	for _, share := range volumes.Items {
+		// Skip volumes that we don't own
+		if manila.GetOwningManilaName(&share) != instance.Name {
+			continue
+		}
+
+		// specName is the volume's name as it would appear in the CinderVolumes spec
+		specName := share.Name[prefixLen:]
+
+		// Delete the volume if it's no longer in the spec
+		_, exists := instance.Spec.ManilaShares[specName]
+		if !exists && share.DeletionTimestamp.IsZero() {
+			err := r.Client.Delete(ctx, &share)
+			if err != nil && !k8s_errors.IsNotFound(err) {
+				err = fmt.Errorf("Error cleaning up %s: %w", share.Name, err)
+				return err
+			}
+		}
+	}
+
+	return nil
 }
