@@ -58,6 +58,13 @@ func CreateUnstructured(rawObj map[string]interface{}) *unstructured.Unstructure
 	return unstructuredObj
 }
 
+func GetManilaEmptySpec() map[string]interface{} {
+	return map[string]interface{}{
+		"databaseInstance": "openstack",
+		"secret":           SecretName,
+	}
+}
+
 func GetDefaultManilaSpec() map[string]interface{} {
 	return map[string]interface{}{
 		"databaseInstance": "openstack",
@@ -72,7 +79,7 @@ func GetDefaultManilaAPISpec() map[string]interface{} {
 	return map[string]interface{}{
 		"secret":         SecretName,
 		"replicas":       1,
-		"containerImage": manilav1.ManilaAPIContainerImage,
+		"containerImage": manilaTest.ContainerImage,
 		"serviceAccount": manilaTest.ManilaSA.Name,
 	}
 }
@@ -81,7 +88,7 @@ func GetDefaultManilaSchedulerSpec() map[string]interface{} {
 	return map[string]interface{}{
 		"secret":         SecretName,
 		"replicas":       1,
-		"containerImage": manilav1.ManilaSchedulerContainerImage,
+		"containerImage": manilaTest.ContainerImage,
 		"serviceAccount": manilaTest.ManilaSA.Name,
 	}
 }
@@ -90,7 +97,7 @@ func GetDefaultManilaShareSpec() map[string]interface{} {
 	return map[string]interface{}{
 		"secret":         SecretName,
 		"replicas":       1,
-		"containerImage": manilav1.ManilaShareContainerImage,
+		"containerImage": manilaTest.ContainerImage,
 		"serviceAccount": manilaTest.ManilaSA.Name,
 	}
 }

@@ -17,6 +17,9 @@ package functional
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
+	"net"
 	"path/filepath"
 	"testing"
 	"time"
@@ -39,6 +42,7 @@ import (
 	networkv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	manila "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
@@ -117,10 +121,10 @@ var _ = BeforeSuite(func() {
 			},
 		},
 		ErrorIfCRDPathMissing: true,
-		/*WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "config", "webhook")},
+		WebhookInstallOptions: envtest.WebhookInstallOptions{
+			Paths:            []string{filepath.Join("..", "..", "config", "webhook")},
 			LocalServingHost: "127.0.0.1",
-		},*/
+		},
 	}
 
 	// cfg is defined in this file globally.
@@ -144,6 +148,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = networkv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	err = admissionv1beta1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	logger = ctrl.Log.WithName("---Test---")
 	//+kubebuilder:scaffold:scheme
@@ -154,10 +160,23 @@ var _ = BeforeSuite(func() {
 	th = NewTestHelper(ctx, k8sClient, timeout, interval, logger)
 	Expect(th).NotTo(BeNil())
 
+	webhookInstallOptions := &testEnv.WebhookInstallOptions
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
+		// NOTE(gibi): disable metrics reporting in test to allow
+		// parallel test execution. Otherwise each instance would like to
+		// bind to the same port
+		MetricsBindAddress: "0",
+		Host:               webhookInstallOptions.LocalServingHost,
+		Port:               webhookInstallOptions.LocalServingPort,
+		CertDir:            webhookInstallOptions.LocalServingCertDir,
+		LeaderElection:     false,
 	})
+
 	Expect(err).ToNot(HaveOccurred())
+
+	// Acquire environmental defaults and initialize operator defaults with them
+	manila.SetupDefaults()
 
 	kclient, err := kubernetes.NewForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred(), "failed to create kclient")
@@ -167,7 +186,11 @@ var _ = BeforeSuite(func() {
 		Kclient: kclient,
 		Log:     ctrl.Log.WithName("controllers").WithName("Manila"),
 	}).SetupWithManager(k8sManager)
+
 	Expect(err).ToNot(HaveOccurred())
+
+	err = (&manila.Manila{}).SetupWebhookWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
 
 	err = (&controllers.ManilaAPIReconciler{
 		Client:  k8sManager.GetClient(),
@@ -199,6 +222,17 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
 
+	// wait for the webhook server to get ready
+	dialer := &net.Dialer{Timeout: time.Duration(10) * time.Second}
+	addrPort := fmt.Sprintf("%s:%d", webhookInstallOptions.LocalServingHost, webhookInstallOptions.LocalServingPort)
+	Eventually(func() error {
+		conn, err := tls.DialWithDialer(dialer, "tcp", addrPort, &tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			return err
+		}
+		conn.Close()
+		return nil
+	}).Should(Succeed())
 })
 
 var _ = AfterSuite(func() {

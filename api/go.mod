@@ -3,20 +3,17 @@ module github.com/openstack-k8s-operators/manila-operator/api
 go 1.19
 
 require (
-	github.com/onsi/ginkgo/v2 v2.9.7
-	github.com/onsi/gomega v1.27.7
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20230524134507-696d321a942e
 	github.com/openstack-k8s-operators/lib-common/modules/storage v0.0.0-20230524134507-696d321a942e
 	k8s.io/api v0.26.3
 	k8s.io/apimachinery v0.26.3
-	k8s.io/client-go v0.26.3
 	sigs.k8s.io/controller-runtime v0.14.6
 )
 
 require (
-	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
-	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
-	golang.org/x/tools v0.9.1 // indirect
+	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
+	github.com/onsi/gomega v1.27.7 // indirect
+	k8s.io/client-go v0.26.3 // indirect
 )
 
 require (
@@ -27,7 +24,6 @@ require (
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect; indirect // indirect
-	github.com/go-logr/zapr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.1 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
@@ -53,9 +49,6 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1 // indirect
 	golang.org/x/sys v0.8.0 // indirect
