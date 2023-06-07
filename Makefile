@@ -61,7 +61,7 @@ IMG ?= $(DEFAULT_IMG)
 ENVTEST_K8S_VERSION = 1.25.0
 GINKGO ?= $(LOCALBIN)/ginkgo
 
-PROCS?=$(shell expr $(shell nproc --ignore 2) / 2)
+PROCS ?=$(shell expr $(shell nproc --ignore 2) / 4)
 PROC_CMD = --procs ${PROCS}
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
