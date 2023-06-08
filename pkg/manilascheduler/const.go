@@ -15,4 +15,6 @@ package manilascheduler
 const (
 	// KollaConfig -
 	KollaConfig = "/var/lib/config-data/merged/manila-scheduler-config.json"
+	// Component -
+	Component = "manila-scheduler"
 )

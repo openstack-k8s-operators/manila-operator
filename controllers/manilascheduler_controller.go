@@ -370,11 +370,14 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	//
 	// Create ConfigMaps required as input for the Service and calculate an overall hash of hashes
 	//
-
+	serviceLabels := map[string]string{
+		common.AppSelector:       manila.ServiceName,
+		common.ComponentSelector: manilascheduler.Component,
+	}
 	//
 	// create custom Configmap for this manila-scheduler service
 	//
-	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars)
+	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars, serviceLabels)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -410,10 +413,6 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
 	//
-
-	serviceLabels := map[string]string{
-		common.AppSelector: manila.ServiceName,
-	}
 
 	// networks to attach to
 	for _, netAtt := range instance.Spec.NetworkAttachments {
@@ -497,10 +496,22 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	}
 	instance.Status.ReadyCount = ss.GetStatefulSet().Status.ReadyReplicas
 
-	// verify if network attachment matches expectations
-	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(ctx, helper, instance.Spec.NetworkAttachments, serviceLabels, instance.Status.ReadyCount)
-	if err != nil {
-		return ctrl.Result{}, err
+	networkReady := false
+	networkAttachmentStatus := map[string][]string{}
+	if instance.Spec.Replicas > 0 {
+		// verify if network attachment matches expectations
+		networkReady, networkAttachmentStatus, err = nad.VerifyNetworkStatusFromAnnotation(
+			ctx,
+			helper,
+			instance.Spec.NetworkAttachments,
+			serviceLabels,
+			instance.Status.ReadyCount,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		networkReady = true
 	}
 
 	instance.Status.NetworkAttachments = networkAttachmentStatus
@@ -554,13 +565,14 @@ func (r *ManilaSchedulerReconciler) generateServiceConfigMaps(
 	h *helper.Helper,
 	instance *manilav1beta1.ManilaScheduler,
 	envVars *map[string]env.Setter,
+	serviceLabels map[string]string,
 ) error {
 	//
 	// create custom Configmap for manila-scheduler-specific config input
 	// - %-config-data configmap holding custom config for the service's manila.conf
 	//
 
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), map[string]string{})
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
 	// customData hold any customization for the service.
 	// custom.conf is going to be merged into /etc/manila/manila.conf

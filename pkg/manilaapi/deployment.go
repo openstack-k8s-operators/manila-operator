@@ -83,6 +83,7 @@ func Deployment(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      manila.ServiceName,
 			Namespace: instance.Namespace,
+			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
