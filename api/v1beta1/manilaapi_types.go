@@ -69,17 +69,11 @@ type ManilaAPIStatus struct {
 	// Map of hashes to track e.g. job status
 	Hash map[string]string `json:"hash,omitempty"`
 
-	// API endpoints
-	APIEndpoints map[string]map[string]string `json:"apiEndpoints,omitempty"`
-
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 
 	// ReadyCount of Manila API instances
 	ReadyCount int32 `json:"readyCount,omitempty"`
-
-	// ServiceIDs
-	ServiceIDs map[string]string `json:"serviceIDs,omitempty"`
 
 	// NetworkAttachments status of the deployment pods
 	NetworkAttachments map[string][]string `json:"networkAttachments,omitempty"`

@@ -190,9 +190,6 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	if instance.Status.Hash == nil {
 		instance.Status.Hash = map[string]string{}
 	}
-	if instance.Status.APIEndpoints == nil {
-		instance.Status.APIEndpoints = map[string]map[string]string{}
-	}
 	if instance.Status.ManilaSharesReadyCounts == nil {
 		instance.Status.ManilaSharesReadyCounts = map[string]int32{}
 	}
@@ -616,9 +613,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
-	// Mirror ManilaAPI status' APIEndpoints and ReadyCount to this parent CR
-	instance.Status.APIEndpoints = manilaAPI.Status.APIEndpoints
-	instance.Status.ServiceIDs = manilaAPI.Status.ServiceIDs
+	// Mirror ManilaAPI status' ReadyCount to this parent CR
 	instance.Status.ManilaAPIReadyCount = manilaAPI.Status.ReadyCount
 
 	// Mirror ManilaAPI's condition status
