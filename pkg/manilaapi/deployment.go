@@ -153,7 +153,8 @@ func Deployment(
 			instance.Spec.CustomServiceConfigSecrets,
 			instance.Spec.ExtraMounts,
 		),
-		Debug: instance.Spec.Debug.InitContainer,
+		Debug:       instance.Spec.Debug.InitContainer,
+		LoggingConf: false,
 	}
 	deployment.Spec.Template.Spec.InitContainers = manila.InitContainer(initContainerDetails)
 

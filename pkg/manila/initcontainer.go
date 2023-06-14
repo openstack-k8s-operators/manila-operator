@@ -16,6 +16,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 
 	corev1 "k8s.io/api/core/v1"
+	"strconv"
 )
 
 // APIDetails information
@@ -31,6 +32,7 @@ type APIDetails struct {
 	VolumeMounts         []corev1.VolumeMount
 	Privileged           bool
 	Debug                bool
+	LoggingConf          bool
 }
 
 const (
@@ -66,6 +68,7 @@ func InitContainer(init APIDetails) []corev1.Container {
 	envVars["DatabaseHost"] = env.SetValue(init.DatabaseHost)
 	envVars["DatabaseUser"] = env.SetValue(init.DatabaseUser)
 	envVars["DatabaseName"] = env.SetValue(init.DatabaseName)
+	envVars["LoggingConf"] = env.SetValue(strconv.FormatBool(init.LoggingConf))
 
 	envs := []corev1.EnvVar{
 		{
