@@ -1,0 +1,52 @@
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+metadata:
+  name: openstack
+spec:
+  secret: osp-secret
+  storageClass: ""
+  manila:
+    enabled: true
+    template:
+      manilaAPI:
+        customServiceConfig: |
+          [DEFAULT]
+          debug = true
+          enabled_share_protocols=cephfs
+        replicas: 1
+      manilaScheduler:
+        replicas: 1
+      manilaShares:
+        share1:
+          customServiceConfig: |
+              [DEFAULT]
+              enabled_share_backends=cephfs
+              [cephfs]
+              driver_handles_share_servers=False
+              share_backend_name=cephfs
+              share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+              cephfs_conf_path=/etc/ceph/ceph.conf
+              cephfs_auth_id=openstack
+              cephfs_cluster_name=ceph
+              cephfs_enable_snapshots=True
+              cephfs_ganesha_server_is_remote=False
+              cephfs_volume_mode=0755
+              cephfs_protocol_helper_type=CEPHFS
+          replicas: 1
+  extraMounts:
+    - name: v1
+      region: r1
+      extraVol:
+        - propagation:
+          - Manila
+          extraVolType: Ceph
+          volumes:
+          - name: ceph
+            projected:
+              sources:
+              - secret:
+                  name: ceph-conf-files
+          mounts:
+          - name: ceph
+            mountPath: "/etc/ceph"
+            readOnly: true
