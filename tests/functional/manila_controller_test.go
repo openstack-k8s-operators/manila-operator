@@ -369,7 +369,7 @@ var _ = Describe("Manila controller", func() {
 		})
 		It("Check the resulting endpoints of the generated sub-CRs", func() {
 			th.SimulateDeploymentReadyWithPods(
-				manilaTest.Instance,
+				manilaTest.ManilaAPI,
 				map[string][]string{manilaName.Namespace + "/internalapi": {"10.0.0.1"}},
 			)
 			th.SimulateStatefulSetReplicaReadyWithPods(

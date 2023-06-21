@@ -81,7 +81,7 @@ func Deployment(
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      manila.ServiceName,
+			Name:      instance.Name,
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
