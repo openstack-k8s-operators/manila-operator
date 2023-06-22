@@ -38,7 +38,6 @@ var _ = Describe("Manila controller", func() {
 				g.Expect(glance.Status.Conditions).To(HaveLen(12))
 
 				g.Expect(glance.Status.DatabaseHostname).To(Equal(""))
-				g.Expect(glance.Status.APIEndpoints).To(BeEmpty())
 			}, timeout*2, interval).Should(Succeed())
 		})
 
@@ -62,7 +61,6 @@ var _ = Describe("Manila controller", func() {
 			Expect(Manila.Status.Hash).To(BeEmpty())
 			Expect(Manila.Status.DatabaseHostname).To(Equal(""))
 			Expect(Manila.Status.TransportURLSecret).To(Equal(""))
-			Expect(Manila.Status.APIEndpoints).To(BeEmpty())
 			Expect(Manila.Status.ManilaAPIReadyCount).To(Equal(int32(0)))
 			Expect(Manila.Status.ManilaSchedulerReadyCount).To(Equal(int32(0)))
 		})

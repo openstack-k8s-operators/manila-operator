@@ -920,12 +920,6 @@ spec:
             type: object
           status:
             properties:
-              apiEndpoints:
-                additionalProperties:
-                  additionalProperties:
-                    type: string
-                  type: object
-                type: object
               conditions:
                 items:
                   properties:
@@ -961,10 +955,6 @@ spec:
               readyCount:
                 format: int32
                 type: integer
-              serviceIDs:
-                additionalProperties:
-                  type: string
-                type: object
             type: object
         type: object
     served: true
