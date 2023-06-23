@@ -22,14 +22,6 @@ func GetVolumes(name string, extraVol []manilav1.ManilaExtraVolMounts, svc []sto
 			},
 		},
 		{
-			Name: "etc-localtime",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/etc/localtime",
-				},
-			},
-		},
-		{
 			Name: "scripts",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
@@ -102,11 +94,6 @@ func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts, svc []storage.Pro
 		{
 			Name:      "etc-machine-id",
 			MountPath: "/etc/machine-id",
-			ReadOnly:  true,
-		},
-		{
-			Name:      "etc-localtime",
-			MountPath: "/etc/localtime",
 			ReadOnly:  true,
 		},
 		{
