@@ -9,11 +9,11 @@ import (
 )
 
 // GetVolumes -
-func GetVolumes(parentName string, name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.Volume {
+func GetVolumes(parentName string, name string, secretNames []string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.Volume {
 	var config0640AccessMode int32 = 0640
 	var dirOrCreate = corev1.HostPathDirectoryOrCreate
 
-	volumeVolumes := []corev1.Volume{
+	shareVolumes := []corev1.Volume{
 		{
 			Name: "var-lib-manila",
 			VolumeSource: corev1.VolumeSource{
@@ -36,28 +36,40 @@ func GetVolumes(parentName string, name string, extraVol []manilav1.ManilaExtraV
 		},
 	}
 
+	// Mount secrets passed using the `customConfigServiceSecret` parameter
+	// and they will be rendered as part of the service config
+	secretConfig, _ := manila.GetConfigSecretVolumes(secretNames)
+	shareVolumes = append(shareVolumes, secretConfig...)
+
 	// Set the propagation levels for ManilaShare, including the backend name
 	propagation := append(manila.ManilaSharePropagation, storage.PropagationType(strings.TrimPrefix(name, "manila-share-")))
-	return append(manila.GetVolumes(parentName, extraVol, propagation), volumeVolumes...)
+	return append(manila.GetVolumes(parentName, extraVol, propagation), shareVolumes...)
 }
 
 // GetInitVolumeMounts - Manila Share init task
-func GetInitVolumeMounts(name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
+func GetInitVolumeMounts(name string, secretNames []string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
 
-	customConfVolumeMount := corev1.VolumeMount{
-		Name:      "config-data-custom",
-		MountPath: "/var/lib/config-data/custom",
-		ReadOnly:  true,
+	initVolumeMount := []corev1.VolumeMount{
+		{
+			Name:      "config-data-custom",
+			MountPath: "/var/lib/config-data/custom",
+			ReadOnly:  true,
+		},
 	}
+
+	// Mount secrets passed using the `customConfigServiceSecret` parameter
+	// and they will be rendered as part of the service config
+	_, secretConfig := manila.GetConfigSecretVolumes(secretNames)
+	initVolumeMount = append(initVolumeMount, secretConfig...)
 
 	// Set the propagation levels for ManilaShare, including the backend name
 	propagation := append(manila.ManilaSharePropagation, storage.PropagationType(strings.TrimPrefix(name, "manila-share-")))
-	return append(manila.GetInitVolumeMounts(extraVol, propagation), customConfVolumeMount)
+	return append(manila.GetInitVolumeMounts(extraVol, propagation), initVolumeMount...)
 }
 
 // GetVolumeMounts - Manila Share VolumeMounts
-func GetVolumeMounts(name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
-	volumeVolumeMounts := []corev1.VolumeMount{
+func GetVolumeMounts(name string, secretNames []string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
+	shareVolumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "var-lib-manila",
 			MountPath: "/var/lib/manila",
@@ -66,5 +78,5 @@ func GetVolumeMounts(name string, extraVol []manilav1.ManilaExtraVolMounts) []co
 
 	// Set the propagation levels for ManilaShare, including the backend name
 	propagation := append(manila.ManilaSharePropagation, storage.PropagationType(strings.TrimPrefix(name, "manila-share-")))
-	return append(manila.GetVolumeMounts(extraVol, propagation), volumeVolumeMounts...)
+	return append(manila.GetVolumeMounts(extraVol, propagation), shareVolumeMounts...)
 }

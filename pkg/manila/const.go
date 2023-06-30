@@ -17,19 +17,17 @@ import (
 )
 
 const (
-	// ServiceName -
+	// ServiceName - API V1 service name, deprecated
 	ServiceName = "manila"
-	// ServiceNameV2 -
+	// ServiceType - API V1 service type, deprecated
+	ServiceType = "share"
+	// ServiceNameV2 - API V2 service name, supported
 	ServiceNameV2 = "manilav2"
-	// ServiceTypeV2 -
+	// ServiceTypeV2 - API V2 service type, supported
 	ServiceTypeV2 = "sharev2"
 	// DatabaseName -
 	DatabaseName = "manila"
-	// ServiceAccount -
-	ServiceAccount = "manila-operator-manila"
 
-	// ManilaAdminPort -
-	ManilaAdminPort int32 = 8786
 	// ManilaPublicPort -
 	ManilaPublicPort int32 = 8786
 	// ManilaInternalPort -

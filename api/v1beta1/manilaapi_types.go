@@ -18,86 +18,50 @@ package v1beta1
 
 import (
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ManilaAPISpec defines the desired state of ManilaAPI
-type ManilaAPISpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=manila
-	// ServiceUser - optional username used for this service to register in manila
-	ServiceUser string `json:"serviceUser"`
+// ManilaAPITemplate defines the input parameter for the ManilaAPI service
+type ManilaAPITemplate struct {
 
-	// +kubebuilder:validation:Required
-	// ContainerImage - Manila API Container Image URL
-	ContainerImage string `json:"containerImage"`
+	// Common input parameters collected in the ManilaServiceTemplate
+	ManilaServiceTemplate `json:",inline"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=1
+	// +kubebuilder:validation:Maximum=32
+	// +kubebuilder:validation:Minimum=0
 	// Replicas - Manila API Replicas
 	Replicas int32 `json:"replicas"`
+
+	// +kubebuilder:validation:Optional
+	// ExternalEndpoints, expose a VIP via MetalLB on the pre-created address pool
+	ExternalEndpoints []MetalLBConfig `json:"externalEndpoints,omitempty"`
+}
+
+// ManilaAPISpec defines the desired state of ManilaAPI
+type ManilaAPISpec struct {
+
+	// Common input parameters for all Manila services
+	ManilaTemplate `json:",inline"`
+
+	// Input parameters for the ManilaAPI service
+	ManilaAPITemplate `json:",inline"`
 
 	// +kubebuilder:validation:Optional
 	// DatabaseHostname - Manila Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=manila
-	// DatabaseUser - optional username used for manila DB, defaults to manila
-	// TODO: -> implement needs work in mariadb-operator, right now only manila
-	DatabaseUser string `json:"databaseUser,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// Secret containing OpenStack password information for ManilaDatabasePassword, AdminPassword
-	Secret string `json:"secret,omitempty"`
-
 	// Secret containing RabbitMq transport URL
 	TransportURLSecret string `json:"transportURLSecret,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
-	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
-	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// NodeSelector to target subset of worker nodes running this service. Setting here overrides
-	// any global NodeSelector settings within the Manila CR.
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
-	// actual action pod gets started with sleep infinity
-	Debug ManilaServiceDebug `json:"debug,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="# add your customization here"
-	// CustomServiceConfig - customize the service config using this parameter to change service defaults,
-	// or overwrite rendered information using raw OpenStack config format. The content gets added to
-	// to /etc/<service>/<service>.conf.d directory as custom.conf file.
-	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// ConfigOverwrite - interface to overwrite default config files like e.g. policy.json.
-	// But can also be used to add additional files. Those get added to the service config dir in /etc/<service> .
-	DefaultConfigOverwrite map[string]string `json:"defaultConfigOverwrite,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// Resources - Compute Resources required by this service (Limits/Requests).
-	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
 	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	// NetworkAttachments is a list of NetworkAttachment resource names to expose the services to the given network
-	NetworkAttachments []string `json:"networkAttachments,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// ExternalEndpoints, expose a VIP via MetalLB on the pre-created address pool
-	ExternalEndpoints []MetalLBConfig `json:"externalEndpoints,omitempty"`
+	// +kubebuilder:validation:Required
+	// ServiceAccount - service account name used internally to provide the default SA name
+	ServiceAccount string `json:"serviceAccount"`
 }
 
 // ManilaAPIStatus defines the observed state of ManilaAPI
@@ -105,17 +69,11 @@ type ManilaAPIStatus struct {
 	// Map of hashes to track e.g. job status
 	Hash map[string]string `json:"hash,omitempty"`
 
-	// API endpoints
-	APIEndpoints map[string]map[string]string `json:"apiEndpoints,omitempty"`
-
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 
 	// ReadyCount of Manila API instances
 	ReadyCount int32 `json:"readyCount,omitempty"`
-
-	// ServiceIDs
-	ServiceIDs map[string]string `json:"serviceIDs,omitempty"`
 
 	// NetworkAttachments status of the deployment pods
 	NetworkAttachments map[string][]string `json:"networkAttachments,omitempty"`
@@ -149,7 +107,7 @@ func init() {
 	SchemeBuilder.Register(&ManilaAPI{}, &ManilaAPIList{})
 }
 
-// IsReady - returns true if service is ready to serve requests
+// IsReady - returns true if ManilaAPI is reconciled successfully
 func (instance ManilaAPI) IsReady() bool {
-	return instance.Status.ReadyCount >= 1
+	return instance.Status.Conditions.IsTrue(condition.ReadyCondition)
 }

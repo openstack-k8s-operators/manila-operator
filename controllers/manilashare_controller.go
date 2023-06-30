@@ -119,11 +119,18 @@ func (r *ManilaShareReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Always patch the instance status when exiting this function so we can persist any changes.
 	defer func() {
-		// update the overall status condition if service is ready
-		if instance.IsReady() {
-			instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
+		// update the Ready condition based on the sub conditions
+		if instance.Status.Conditions.AllSubConditionIsTrue() {
+			instance.Status.Conditions.MarkTrue(
+				condition.ReadyCondition, condition.ReadyMessage)
+		} else {
+			// something is not ready so reset the Ready condition
+			instance.Status.Conditions.MarkUnknown(
+				condition.ReadyCondition, condition.InitReason, condition.ReadyInitMessage)
+			// and recalculate it based on the state of the rest of the conditions
+			instance.Status.Conditions.Set(
+				instance.Status.Conditions.Mirror(condition.ReadyCondition))
 		}
-
 		err := helper.PatchInstance(ctx, instance)
 		if err != nil {
 			_err = err
@@ -146,6 +153,7 @@ func (r *ManilaShareReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 			condition.UnknownCondition(condition.ServiceConfigReadyCondition, condition.InitReason, condition.ServiceConfigReadyInitMessage),
 			condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
+			condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
 		)
 
 		instance.Status.Conditions.Init(&cl)
@@ -169,6 +177,39 @@ func (r *ManilaShareReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
+	// Watch for changes to any CustomServiceConfigSecrets. Global secrets
+	// (e.g. TransportURLSecret) are handled by the top Manila controller.
+	svcSecretFn := func(o client.Object) []reconcile.Request {
+		var namespace string = o.GetNamespace()
+		var secretName string = o.GetName()
+		result := []reconcile.Request{}
+
+		// get all API CRs
+		shares := &manilav1beta1.ManilaShareList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(namespace),
+		}
+		if err := r.Client.List(context.Background(), shares, listOpts...); err != nil {
+			r.Log.Error(err, "Unable to retrieve API CRs %v")
+			return nil
+		}
+		for _, cr := range shares.Items {
+			for _, v := range cr.Spec.CustomServiceConfigSecrets {
+				if v == secretName {
+					name := client.ObjectKey{
+						Namespace: namespace,
+						Name:      cr.Name,
+					}
+					r.Log.Info(fmt.Sprintf("Secret %s is used by Manila CR %s", secretName, cr.Name))
+					result = append(result, reconcile.Request{NamespacedName: name})
+				}
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+		return nil
+	}
 	// watch for configmap where the CM owner label AND the CR.Spec.ManagingCrName label matches
 	configMapFn := func(o client.Object) []reconcile.Request {
 		result := []reconcile.Request{}
@@ -210,6 +251,9 @@ func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&manilav1beta1.ManilaShare{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Secret{}).
+		// watch the secrets we don't own
+		Watches(&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(svcSecretFn)).
 		// watch the config CMs we don't own
 		Watches(&source.Kind{Type: &corev1.ConfigMap{}},
 			handler.EnqueueRequestsFromMapFunc(configMapFn)).
@@ -327,11 +371,14 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	//
 	// Create ConfigMaps required as input for the Service and calculate an overall hash of hashes
 	//
-
+	serviceLabels := map[string]string{
+		common.AppSelector:       manila.ServiceName,
+		common.ComponentSelector: manilashare.Component,
+	}
 	//
 	// create custom Configmap for this manila-share service
 	//
-	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars)
+	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars, serviceLabels)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -367,10 +414,6 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
 	//
-
-	serviceLabels := map[string]string{
-		common.AppSelector: manila.ServiceName,
-	}
 
 	// networks to attach to
 	for _, netAtt := range instance.Spec.NetworkAttachments {
@@ -455,9 +498,22 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	instance.Status.ReadyCount = ss.GetStatefulSet().Status.ReadyReplicas
 
 	// verify if network attachment matches expectations
-	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(ctx, helper, instance.Spec.NetworkAttachments, serviceLabels, instance.Status.ReadyCount)
-	if err != nil {
-		return ctrl.Result{}, err
+	networkReady := false
+	networkAttachmentStatus := map[string][]string{}
+	if instance.Spec.Replicas > 0 {
+		// verify if network attachment matches expectations
+		networkReady, networkAttachmentStatus, err = nad.VerifyNetworkStatusFromAnnotation(
+			ctx,
+			helper,
+			instance.Spec.NetworkAttachments,
+			serviceLabels,
+			instance.Status.ReadyCount,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		networkReady = true
 	}
 
 	instance.Status.NetworkAttachments = networkAttachmentStatus
@@ -511,13 +567,14 @@ func (r *ManilaShareReconciler) generateServiceConfigMaps(
 	h *helper.Helper,
 	instance *manilav1beta1.ManilaShare,
 	envVars *map[string]env.Setter,
+	serviceLabels map[string]string,
 ) error {
 	//
 	// create custom Configmap for manila-share-specific config input
 	// - %-config-data configmap holding custom config for the service's manila.conf
 	//
 
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), map[string]string{})
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
 	// customData hold any customization for the service.
 	// custom.conf is going to be merged into /etc/manila/manila.conf

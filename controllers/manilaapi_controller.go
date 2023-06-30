@@ -69,6 +69,12 @@ var (
 			"name": manila.ServiceNameV2,
 			"desc": "Manila V2 Service",
 		},
+		{
+			// This is deprecated, will be removed after all dependencies are removed upstream
+			"type": manila.ServiceType,
+			"name": manila.ServiceName,
+			"desc": "Manila V1 Service",
+		},
 	}
 )
 
@@ -136,11 +142,18 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Always patch the instance status when exiting this function so we can persist any changes.
 	defer func() {
-		// update the overall status condition if service is ready
-		if instance.IsReady() {
-			instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
+		// update the Ready condition based on the sub conditions
+		if instance.Status.Conditions.AllSubConditionIsTrue() {
+			instance.Status.Conditions.MarkTrue(
+				condition.ReadyCondition, condition.ReadyMessage)
+		} else {
+			// something is not ready so reset the Ready condition
+			instance.Status.Conditions.MarkUnknown(
+				condition.ReadyCondition, condition.InitReason, condition.ReadyInitMessage)
+			// and recalculate it based on the state of the rest of the conditions
+			instance.Status.Conditions.Set(
+				instance.Status.Conditions.Mirror(condition.ReadyCondition))
 		}
-
 		err := helper.PatchInstance(ctx, instance)
 		if err != nil {
 			_err = err
@@ -178,12 +191,6 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if instance.Status.Hash == nil {
 		instance.Status.Hash = map[string]string{}
 	}
-	if instance.Status.APIEndpoints == nil {
-		instance.Status.APIEndpoints = map[string]map[string]string{}
-	}
-	if instance.Status.ServiceIDs == nil {
-		instance.Status.ServiceIDs = map[string]string{}
-	}
 	if instance.Status.NetworkAttachments == nil {
 		instance.Status.NetworkAttachments = map[string][]string{}
 	}
@@ -200,6 +207,39 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
+	// Watch for changes to any CustomServiceConfigSecrets. Global secrets
+	// (e.g. TransportURLSecret) are handled by the top Manila controller.
+	svcSecretFn := func(o client.Object) []reconcile.Request {
+		var namespace string = o.GetNamespace()
+		var secretName string = o.GetName()
+		result := []reconcile.Request{}
+
+		// get all API CRs
+		apis := &manilav1beta1.ManilaAPIList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(namespace),
+		}
+		if err := r.Client.List(context.Background(), apis, listOpts...); err != nil {
+			r.Log.Error(err, "Unable to retrieve API CRs %v")
+			return nil
+		}
+		for _, cr := range apis.Items {
+			for _, v := range cr.Spec.CustomServiceConfigSecrets {
+				if v == secretName {
+					name := client.ObjectKey{
+						Namespace: namespace,
+						Name:      cr.Name,
+					}
+					r.Log.Info(fmt.Sprintf("Secret %s is used by Manila CR %s", secretName, cr.Name))
+					result = append(result, reconcile.Request{NamespacedName: name})
+				}
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+		return nil
+	}
 	// watch for configmap where the CM owner label AND the CR.Spec.ManagingCrName label matches
 	configMapFn := func(o client.Object) []reconcile.Request {
 		result := []reconcile.Request{}
@@ -244,6 +284,9 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&routev1.Route{}).
 		Owns(&corev1.Service{}).
+		// watch the secrets we don't own
+		Watches(&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(svcSecretFn)).
 		// watch the config CMs we don't own
 		Watches(&source.Kind{Type: &corev1.ConfigMap{}},
 			handler.EnqueueRequestsFromMapFunc(configMapFn)).
@@ -253,37 +296,34 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ManilaAPIReconciler) reconcileDelete(ctx context.Context, instance *manilav1beta1.ManilaAPI, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
 
-	// It's possible to get here before the endpoints have been set in the status, so check for this
-	if instance.Status.APIEndpoints != nil {
-		for _, ksSvc := range keystoneServices {
+	for _, ksSvc := range keystoneServices {
 
-			// Remove the finalizer from our KeystoneEndpoint CR
-			keystoneEndpoint, err := keystonev1.GetKeystoneEndpointWithName(ctx, helper, ksSvc["name"], instance.Namespace)
-			if err != nil && !k8s_errors.IsNotFound(err) {
+		// Remove the finalizer from our KeystoneEndpoint CR
+		keystoneEndpoint, err := keystonev1.GetKeystoneEndpointWithName(ctx, helper, ksSvc["name"], instance.Namespace)
+		if err != nil && !k8s_errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
+
+		if err == nil {
+			controllerutil.RemoveFinalizer(keystoneEndpoint, helper.GetFinalizer())
+			if err = helper.GetClient().Update(ctx, keystoneEndpoint); err != nil && !k8s_errors.IsNotFound(err) {
 				return ctrl.Result{}, err
 			}
+			util.LogForObject(helper, "Removed finalizer from our KeystoneEndpoint", instance)
+		}
 
-			if err == nil {
-				controllerutil.RemoveFinalizer(keystoneEndpoint, helper.GetFinalizer())
-				if err = helper.GetClient().Update(ctx, keystoneEndpoint); err != nil && !k8s_errors.IsNotFound(err) {
-					return ctrl.Result{}, err
-				}
-				util.LogForObject(helper, "Removed finalizer from our KeystoneEndpoint", instance)
-			}
+		// Remove the finalizer from our KeystoneService CR
+		keystoneService, err := keystonev1.GetKeystoneServiceWithName(ctx, helper, ksSvc["name"], instance.Namespace)
+		if err != nil && !k8s_errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 
-			// Remove the finalizer from our KeystoneService CR
-			keystoneService, err := keystonev1.GetKeystoneServiceWithName(ctx, helper, ksSvc["name"], instance.Namespace)
-			if err != nil && !k8s_errors.IsNotFound(err) {
+		if err == nil {
+			controllerutil.RemoveFinalizer(keystoneService, helper.GetFinalizer())
+			if err = helper.GetClient().Update(ctx, keystoneService); err != nil && !k8s_errors.IsNotFound(err) {
 				return ctrl.Result{}, err
 			}
-
-			if err == nil {
-				controllerutil.RemoveFinalizer(keystoneService, helper.GetFinalizer())
-				if err = helper.GetClient().Update(ctx, keystoneService); err != nil && !k8s_errors.IsNotFound(err) {
-					return ctrl.Result{}, err
-				}
-				util.LogForObject(helper, "Removed finalizer from our KeystoneService", instance)
-			}
+			util.LogForObject(helper, "Removed finalizer from our KeystoneService", instance)
 		}
 	}
 
@@ -306,7 +346,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	// expose the service (create service, route and return the created endpoint URLs)
 	//
 
-	// V2
+	// V2 (Supported micro-versioned API endpoint)
 	publicEndpointData := endpoint.Data{
 		Port: manila.ManilaPublicPort,
 		Path: "/v2",
@@ -315,6 +355,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		Port: manila.ManilaInternalPort,
 		Path: "/v2",
 	}
+
 	data := map[endpoint.Endpoint]endpoint.Data{
 		endpoint.EndpointPublic:   publicEndpointData,
 		endpoint.EndpointInternal: internalEndpointData,
@@ -358,16 +399,68 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		return ctrlResult, nil
 	}
 
-	//
-	// Update instance status with service endpoint url from route host information for v2
-	//
-	// TODO: need to support https default here
-	if instance.Status.APIEndpoints == nil {
-		instance.Status.APIEndpoints = map[string]map[string]string{}
-	}
-	instance.Status.APIEndpoints[manila.ServiceNameV2] = apiEndpointsV2
 	// V2 - end
 
+	// V1 (Deprected, non micro-versioned API endpoint, here for legacy users)
+	// will be removed when the upstream service (and dependencies) drop it
+	v1publicEndpointData := endpoint.Data{
+		Port: manila.ManilaPublicPort,
+		Path: "/v1/%(project_id)s",
+	}
+	v1internalEndpointData := endpoint.Data{
+		Port: manila.ManilaInternalPort,
+		Path: "/v1/%(project_id)s",
+	}
+
+	v1data := map[endpoint.Endpoint]endpoint.Data{
+		endpoint.EndpointPublic:   v1publicEndpointData,
+		endpoint.EndpointInternal: v1internalEndpointData,
+	}
+
+	for _, metallbcfg := range instance.Spec.ExternalEndpoints {
+		portCfg := v1data[metallbcfg.Endpoint]
+
+		portCfg.MetalLB = &endpoint.MetalLBData{
+			IPAddressPool:   metallbcfg.IPAddressPool,
+			SharedIP:        metallbcfg.SharedIP,
+			SharedIPKey:     metallbcfg.SharedIPKey,
+			LoadBalancerIPs: metallbcfg.LoadBalancerIPs,
+		}
+
+		v1data[metallbcfg.Endpoint] = portCfg
+	}
+
+	apiEndpointsV1, ctrlResult, err := endpoint.ExposeEndpoints(
+		ctx,
+		helper,
+		manila.ServiceName,
+		serviceLabels,
+		v1data,
+		time.Duration(5)*time.Second,
+	)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ExposeServiceReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ExposeServiceReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ExposeServiceReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.ExposeServiceReadyRunningMessage))
+		return ctrlResult, nil
+	}
+
+	// V1 - end
+
+	apiEndpoints := map[string]map[string]string{
+		manila.ServiceNameV2: apiEndpointsV2,
+		manila.ServiceName:   apiEndpointsV1,
+	}
 	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
 
 	// expose service - end
@@ -375,10 +468,6 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	//
 	// create service and user in keystone - - https://docs.openstack.org/manila/ocata/adminref/quick_start.html
 	//
-	if instance.Status.ServiceIDs == nil {
-		instance.Status.ServiceIDs = map[string]string{}
-	}
-
 	for _, ksSvc := range keystoneServices {
 		ksSvcSpec := keystonev1.KeystoneServiceSpec{
 			ServiceType:        ksSvc["type"],
@@ -407,11 +496,9 @@ func (r *ManilaAPIReconciler) reconcileInit(
 			return ctrlResult, nil
 		}
 
-		instance.Status.ServiceIDs[ksSvc["name"]] = ksSvcObj.GetServiceID()
-
 		ksEndptSpec := keystonev1.KeystoneEndpointSpec{
 			ServiceName: ksSvc["name"],
-			Endpoints:   instance.Status.APIEndpoints[ksSvc["name"]],
+			Endpoints:   apiEndpoints[ksSvc["name"]],
 		}
 
 		ksEndptObj := keystonev1.NewKeystoneEndpoint(
@@ -531,10 +618,15 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	// Create ConfigMaps required as input for the Service and calculate an overall hash of hashes
 	//
 
+	serviceLabels := map[string]string{
+		common.AppSelector:       manila.ServiceName,
+		common.ComponentSelector: manilaapi.Component,
+	}
+
 	//
 	// create custom Configmap for this manila-api service
 	//
-	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars)
+	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars, serviceLabels)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -570,10 +662,6 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
 	//
-
-	serviceLabels := map[string]string{
-		common.AppSelector: manila.ServiceName,
-	}
 
 	// networks to attach to
 	for _, netAtt := range instance.Spec.NetworkAttachments {
@@ -657,10 +745,22 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	}
 	instance.Status.ReadyCount = depl.GetDeployment().Status.ReadyReplicas
 
-	// verify if network attachment matches expectations
-	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(ctx, helper, instance.Spec.NetworkAttachments, serviceLabels, instance.Status.ReadyCount)
-	if err != nil {
-		return ctrl.Result{}, err
+	networkReady := false
+	networkAttachmentStatus := map[string][]string{}
+	if instance.Spec.Replicas > 0 {
+		// verify if network attachment matches expectations
+		networkReady, networkAttachmentStatus, err = nad.VerifyNetworkStatusFromAnnotation(
+			ctx,
+			helper,
+			instance.Spec.NetworkAttachments,
+			serviceLabels,
+			instance.Status.ReadyCount,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		networkReady = true
 	}
 
 	instance.Status.NetworkAttachments = networkAttachmentStatus
@@ -714,13 +814,14 @@ func (r *ManilaAPIReconciler) generateServiceConfigMaps(
 	h *helper.Helper,
 	instance *manilav1beta1.ManilaAPI,
 	envVars *map[string]env.Setter,
+	serviceLabels map[string]string,
 ) error {
 	//
 	// create custom Configmap for manila-api-specific config input
 	// - %-config-data configmap holding custom config for the service's manila.conf
 	//
 
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), map[string]string{})
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
 	// customData hold any customization for the service.
 	// custom.conf is going to be merged into /etc/manila/manila.conf

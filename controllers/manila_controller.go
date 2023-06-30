@@ -33,6 +33,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
+	common_rbac "github.com/openstack-k8s-operators/lib-common/modules/common/rbac"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	"github.com/openstack-k8s-operators/lib-common/modules/database"
@@ -41,6 +42,7 @@ import (
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -102,6 +104,14 @@ type ManilaReconciler struct {
 // +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
 
+// service account, role, rolebinding
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=roles,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;update
+// service account permissions that are needed to grant permission to the above
+// +kubebuilder:rbac:groups="security.openshift.io",resourceNames=anyuid;privileged,resources=securitycontextconstraints,verbs=use
+// +kubebuilder:rbac:groups="",resources=pods,verbs=create;delete;get;list;patch;update;watch
+
 // Reconcile -
 func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
 	_ = log.FromContext(ctx)
@@ -128,11 +138,18 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 
 	// Always patch the instance status when exiting this function so we can persist any changes.
 	defer func() {
-		// update the overall status condition if service is ready
-		if instance.IsReady() {
-			instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
+		// update the Ready condition based on the sub conditions
+		if instance.Status.Conditions.AllSubConditionIsTrue() {
+			instance.Status.Conditions.MarkTrue(
+				condition.ReadyCondition, condition.ReadyMessage)
+		} else {
+			// something is not ready so reset the Ready condition
+			instance.Status.Conditions.MarkUnknown(
+				condition.ReadyCondition, condition.InitReason, condition.ReadyInitMessage)
+			// and recalculate it based on the state of the rest of the conditions
+			instance.Status.Conditions.Set(
+				instance.Status.Conditions.Mirror(condition.ReadyCondition))
 		}
-
 		err := helper.PatchInstance(ctx, instance)
 		if err != nil {
 			_err = err
@@ -158,7 +175,11 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 			condition.UnknownCondition(manilav1beta1.ManilaAPIReadyCondition, condition.InitReason, manilav1beta1.ManilaAPIReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaSchedulerReadyCondition, condition.InitReason, manilav1beta1.ManilaSchedulerReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaShareReadyCondition, condition.InitReason, manilav1beta1.ManilaShareReadyInitMessage),
-			condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
+			condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
+			// service account, role, rolebinding conditions
+			condition.UnknownCondition(condition.ServiceAccountReadyCondition, condition.InitReason, condition.ServiceAccountReadyInitMessage),
+			condition.UnknownCondition(condition.RoleReadyCondition, condition.InitReason, condition.RoleReadyInitMessage),
+			condition.UnknownCondition(condition.RoleBindingReadyCondition, condition.InitReason, condition.RoleBindingReadyInitMessage),
 		)
 
 		instance.Status.Conditions.Init(&cl)
@@ -168,9 +189,6 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	}
 	if instance.Status.Hash == nil {
 		instance.Status.Hash = map[string]string{}
-	}
-	if instance.Status.APIEndpoints == nil {
-		instance.Status.APIEndpoints = map[string]map[string]string{}
 	}
 	if instance.Status.ManilaSharesReadyCounts == nil {
 		instance.Status.ManilaSharesReadyCounts = map[string]int32{}
@@ -386,6 +404,27 @@ func (r *ManilaReconciler) reconcileInit(
 func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
 
+	// Service account, role, binding
+	rbacRules := []rbacv1.PolicyRule{
+		{
+			APIGroups:     []string{"security.openshift.io"},
+			ResourceNames: []string{"anyuid", "privileged"},
+			Resources:     []string{"securitycontextconstraints"},
+			Verbs:         []string{"use"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+			Verbs:     []string{"create", "get", "list", "watch", "update", "patch", "delete"},
+		},
+	}
+	rbacResult, err := common_rbac.ReconcileRbac(ctx, helper, instance, rbacRules)
+	if err != nil {
+		return rbacResult, err
+	} else if (rbacResult != ctrl.Result{}) {
+		return rbacResult, nil
+	}
+
 	// ConfigMap
 	configMapVars := make(map[string]env.Setter)
 
@@ -393,7 +432,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// create RabbitMQ transportURL CR and get the actual URL from the associated secret that is created
 	//
 
-	transportURL, op, err := r.transportURLCreateOrUpdate(instance)
+	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance)
 
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -454,14 +493,16 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	//
 	// Create ConfigMaps and Secrets required as input for the Service and calculate an overall hash of hashes
 	//
-
+	serviceLabels := map[string]string{
+		common.AppSelector: manila.ServiceName,
+	}
 	//
 	// create Configmap required for manila input
 	// - %-scripts configmap holding scripts to e.g. bootstrap the service
 	// - %-config configmap holding minimal manila config required to get the service up, user can add additional files to be added to the service
 	// - parameters which has passwords gets added from the OpenStack secret via the init container
 	//
-	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars)
+	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars, serviceLabels)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -497,10 +538,6 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
 	//
-
-	serviceLabels := map[string]string{
-		common.AppSelector: manila.ServiceName,
-	}
 
 	// networks to attach to
 	for _, netAtt := range instance.Spec.ManilaAPI.NetworkAttachments {
@@ -560,7 +597,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	//
 
 	// deploy manila-api
-	manilaAPI, op, err := r.apiDeploymentCreateOrUpdate(instance)
+	manilaAPI, op, err := r.apiDeploymentCreateOrUpdate(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaAPIReadyCondition,
@@ -574,9 +611,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
-	// Mirror ManilaAPI status' APIEndpoints and ReadyCount to this parent CR
-	instance.Status.APIEndpoints = manilaAPI.Status.APIEndpoints
-	instance.Status.ServiceIDs = manilaAPI.Status.ServiceIDs
+	// Mirror ManilaAPI status' ReadyCount to this parent CR
 	instance.Status.ManilaAPIReadyCount = manilaAPI.Status.ReadyCount
 
 	// Mirror ManilaAPI's condition status
@@ -587,7 +622,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	// TODO: These will not work without rabbit yet
 	// deploy manila-scheduler
-	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(instance)
+	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaSchedulerReadyCondition,
@@ -614,7 +649,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// deploy manila-share
 	var shareCondition *condition.Condition
 	for name, share := range instance.Spec.ManilaShares {
-		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(instance, name, share)
+		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				manilav1beta1.ManilaShareReadyCondition,
@@ -640,7 +675,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		// Could also check the overall ReadyCondition of the manilaShare.
 		if !manilaShare.IsReady() {
 			c = manilaShare.Status.Conditions.Mirror(manilav1beta1.ManilaShareReadyCondition)
-			// Get the condition with higher priority for volumeCondition.
+			// Get the condition with higher priority for shareCondition.
 			shareCondition = condition.GetHigherPrioCondition(c, shareCondition).DeepCopy()
 		}
 	}
@@ -686,6 +721,7 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	h *helper.Helper,
 	instance *manilav1beta1.Manila,
 	envVars *map[string]env.Setter,
+	serviceLabels map[string]string,
 ) error {
 	//
 	// create Configmap/Secret required for manila input
@@ -694,7 +730,7 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	// - parameters which has passwords gets added from the ospSecret via the init container
 	//
 
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), map[string]string{})
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
 	// customData hold any customization for the service.
 	// custom.conf is going to /etc/<service>/<service>.conf.d
@@ -727,12 +763,11 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	cms := []util.Template{
 		// ScriptsConfigMap
 		{
-			Name:               fmt.Sprintf("%s-scripts", instance.Name),
-			Namespace:          instance.Namespace,
-			Type:               util.TemplateTypeScripts,
-			InstanceType:       instance.Kind,
-			AdditionalTemplate: map[string]string{"common.sh": "/common/common.sh"},
-			Labels:             cmLabels,
+			Name:         fmt.Sprintf("%s-scripts", instance.Name),
+			Namespace:    instance.Namespace,
+			Type:         util.TemplateTypeScripts,
+			InstanceType: instance.Kind,
+			Labels:       cmLabels,
 		},
 		// ConfigMap
 		{
@@ -772,7 +807,8 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 	return hash, changed, nil
 }
 
-func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
+
 	deployment := &manilav1beta1.ManilaAPI{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-api", instance.Name),
@@ -780,13 +816,18 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 		},
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
-		deployment.Spec = instance.Spec.ManilaAPI
-		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
-		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
-		deployment.Spec.Secret = instance.Spec.Secret
-		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
+	apiSpec := manilav1beta1.ManilaAPISpec{
+		ManilaTemplate:     instance.Spec.ManilaTemplate,
+		ManilaAPITemplate:  instance.Spec.ManilaAPI,
+		ExtraMounts:        instance.Spec.ExtraMounts,
+		DatabaseHostname:   instance.Status.DatabaseHostname,
+		TransportURLSecret: instance.Status.TransportURLSecret,
+		ServiceAccount:     instance.RbacResourceName(),
+	}
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
+		deployment.Spec = apiSpec
+
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
@@ -803,7 +844,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(instance *manilav1beta1.M
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1beta1.Manila) (*manilav1beta1.ManilaScheduler, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaScheduler, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaScheduler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-scheduler", instance.Name),
@@ -811,13 +852,18 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 		},
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
-		deployment.Spec = instance.Spec.ManilaScheduler
-		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
-		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
-		deployment.Spec.Secret = instance.Spec.Secret
-		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
+	schedulerSpec := manilav1beta1.ManilaSchedulerSpec{
+		ManilaTemplate:          instance.Spec.ManilaTemplate,
+		ManilaSchedulerTemplate: instance.Spec.ManilaScheduler,
+		ExtraMounts:             instance.Spec.ExtraMounts,
+		DatabaseHostname:        instance.Status.DatabaseHostname,
+		TransportURLSecret:      instance.Status.TransportURLSecret,
+		ServiceAccount:          instance.RbacResourceName(),
+	}
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
+		deployment.Spec = schedulerSpec
+
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
@@ -834,7 +880,7 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(instance *manilav1b
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1.Manila, name string, volume manilav1beta1.ManilaShareSpec) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila, name string, share manilav1beta1.ManilaShareTemplate) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaShare{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-share-%s", instance.Name, name),
@@ -842,13 +888,18 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 		},
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
-		deployment.Spec = volume
-		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
-		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
-		deployment.Spec.Secret = instance.Spec.Secret
-		deployment.Spec.ExtraMounts = instance.Spec.ExtraMounts
+	shareSpec := manilav1beta1.ManilaShareSpec{
+		ManilaTemplate:      instance.Spec.ManilaTemplate,
+		ManilaShareTemplate: share,
+		ExtraMounts:         instance.Spec.ExtraMounts,
+		DatabaseHostname:    instance.Status.DatabaseHostname,
+		TransportURLSecret:  instance.Status.TransportURLSecret,
+		ServiceAccount:      instance.RbacResourceName(),
+	}
+
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
+		deployment.Spec = shareSpec
+
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
@@ -865,7 +916,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(instance *manilav1beta1
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) transportURLCreateOrUpdate(instance *manilav1beta1.Manila) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) transportURLCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
 	transportURL := &rabbitmqv1.TransportURL{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-manila-transport", instance.Name),
@@ -873,7 +924,7 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(instance *manilav1beta1.Ma
 		},
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, transportURL, func() error {
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, transportURL, func() error {
 		transportURL.Spec.RabbitmqClusterName = instance.Spec.RabbitMqClusterName
 
 		err := controllerutil.SetControllerReference(instance, transportURL, r.Scheme)

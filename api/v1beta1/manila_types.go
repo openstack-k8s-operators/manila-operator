@@ -32,10 +32,7 @@ const (
 
 // ManilaSpec defines the desired state of Manila
 type ManilaSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=manila
-	// ServiceUser - optional username used for this service to register in manila
-	ServiceUser string `json:"serviceUser"`
+	ManilaTemplate `json:",inline"`
 
 	// +kubebuilder:validation:Required
 	// MariaDB instance name
@@ -43,26 +40,11 @@ type ManilaSpec struct {
 	// Might not be required in future
 	DatabaseInstance string `json:"databaseInstance,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=manila
-	// DatabaseUser - optional username used for manila DB, defaults to manila
-	// TODO: -> implement needs work in mariadb-operator, right now only manila
-	DatabaseUser string `json:"databaseUser"`
-
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=rabbitmq
 	// RabbitMQ instance name
 	// Needed to request a transportURL that is created and used in Manila
 	RabbitMqClusterName string `json:"rabbitMqClusterName"`
-
-	// +kubebuilder:validation:Required
-	// Secret containing OpenStack password information for ManilaDatabasePassword, ManilaPassword
-	Secret string `json:"secret,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
-	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
-	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
@@ -89,15 +71,15 @@ type ManilaSpec struct {
 
 	// +kubebuilder:validation:Required
 	// ManilaAPI - Spec definition for the API service of this Manila deployment
-	ManilaAPI ManilaAPISpec `json:"manilaAPI"`
+	ManilaAPI ManilaAPITemplate `json:"manilaAPI"`
 
 	// +kubebuilder:validation:Required
 	// ManilaScheduler - Spec definition for the Scheduler service of this Manila deployment
-	ManilaScheduler ManilaSchedulerSpec `json:"manilaScheduler"`
+	ManilaScheduler ManilaSchedulerTemplate `json:"manilaScheduler"`
 
 	// +kubebuilder:validation:Optional
 	// ManilaShares - Map of chosen names to spec definitions for the Share(s) service(s) of this Manila deployment
-	ManilaShares map[string]ManilaShareSpec `json:"manilaShares"`
+	ManilaShares map[string]ManilaShareTemplate `json:"manilaShares,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
@@ -123,12 +105,6 @@ type ManilaStatus struct {
 
 	// TransportURLSecret - Secret containing RabbitMQ transportURL
 	TransportURLSecret string `json:"transportURLSecret,omitempty"`
-
-	// API endpoints
-	APIEndpoints map[string]map[string]string `json:"apiEndpoints,omitempty"`
-
-	// ServiceIDs
-	ServiceIDs map[string]string `json:"serviceIDs,omitempty"`
 
 	// ReadyCount of Manila API instance
 	ManilaAPIReadyCount int32 `json:"manilaAPIReadyCount,omitempty"`
@@ -167,16 +143,9 @@ func init() {
 	SchemeBuilder.Register(&Manila{}, &ManilaList{})
 }
 
-// IsReady - returns true if service is ready to serve requests
+// IsReady - returns true if Manila is reconciled successfully
 func (instance Manila) IsReady() bool {
-	ready := instance.Status.ManilaAPIReadyCount > 0 &&
-		instance.Status.ManilaSchedulerReadyCount > 0
-
-	for name := range instance.Spec.ManilaShares {
-		ready = ready && instance.Status.ManilaSharesReadyCounts[name] > 0
-	}
-
-	return ready
+	return instance.Status.Conditions.IsTrue(condition.ReadyCondition)
 }
 
 // ManilaExtraVolMounts exposes additional parameters processed by the manila-operator
@@ -201,4 +170,19 @@ func (c *ManilaExtraVolMounts) Propagate(svc []storage.PropagationType) []storag
 	}
 
 	return vl
+}
+
+// RbacConditionsSet - set the conditions for the rbac object
+func (instance Manila) RbacConditionsSet(c *condition.Condition) {
+	instance.Status.Conditions.Set(c)
+}
+
+// RbacNamespace - return the namespace
+func (instance Manila) RbacNamespace() string {
+	return instance.Namespace
+}
+
+// RbacResourceName - return the name to be used for rbac objects (serviceaccount, role, rolebinding)
+func (instance Manila) RbacResourceName() string {
+	return "manila-" + instance.Name
 }

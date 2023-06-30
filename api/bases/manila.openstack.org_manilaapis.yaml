@@ -45,6 +45,10 @@ spec:
               customServiceConfig:
                 default: '# add your customization here'
                 type: string
+              customServiceConfigSecrets:
+                items:
+                  type: string
+                type: array
               databaseHostname:
                 type: string
               databaseUser:
@@ -867,6 +871,8 @@ spec:
               replicas:
                 default: 1
                 format: int32
+                maximum: 32
+                minimum: 0
                 type: integer
               resources:
                 properties:
@@ -901,6 +907,8 @@ spec:
                 type: object
               secret:
                 type: string
+              serviceAccount:
+                type: string
               serviceUser:
                 default: manila
                 type: string
@@ -908,15 +916,10 @@ spec:
                 type: string
             required:
             - containerImage
+            - serviceAccount
             type: object
           status:
             properties:
-              apiEndpoints:
-                additionalProperties:
-                  additionalProperties:
-                    type: string
-                  type: object
-                type: object
               conditions:
                 items:
                   properties:
@@ -952,10 +955,6 @@ spec:
               readyCount:
                 format: int32
                 type: integer
-              serviceIDs:
-                additionalProperties:
-                  type: string
-                type: object
             type: object
         type: object
     served: true

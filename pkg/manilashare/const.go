@@ -15,4 +15,6 @@ package manilashare
 const (
 	// KollaConfig -
 	KollaConfig = "/var/lib/config-data/merged/manila-share-config.json"
+	// Component -
+	Component = "manila-share"
 )

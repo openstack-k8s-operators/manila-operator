@@ -81,8 +81,9 @@ func Deployment(
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      manila.ServiceName,
+			Name:      instance.Name,
 			Namespace: instance.Namespace,
+			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
@@ -95,7 +96,7 @@ func Deployment(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: manila.ServiceAccount,
+					ServiceAccountName: instance.Spec.ServiceAccount,
 					Containers: []corev1.Container{
 						{
 							Name: manila.ServiceName + "-api",
@@ -119,7 +120,12 @@ func Deployment(
 			},
 		},
 	}
-	deployment.Spec.Template.Spec.Volumes = GetVolumes(manila.GetOwningManilaName(instance), instance.Name, instance.Spec.ExtraMounts)
+	deployment.Spec.Template.Spec.Volumes = GetVolumes(
+		manila.GetOwningManilaName(instance),
+		instance.Name,
+		instance.Spec.CustomServiceConfigSecrets,
+		instance.Spec.ExtraMounts,
+	)
 	// If possible two pods of the same service should not
 	// run on the same worker node. If this is not possible
 	// the get still created on the same worker node.
@@ -143,8 +149,11 @@ func Deployment(
 		TransportURLSecret:   instance.Spec.TransportURLSecret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         GetInitVolumeMounts(instance.Spec.ExtraMounts),
-		Debug:                instance.Spec.Debug.InitContainer,
+		VolumeMounts: GetInitVolumeMounts(
+			instance.Spec.CustomServiceConfigSecrets,
+			instance.Spec.ExtraMounts,
+		),
+		Debug: instance.Spec.Debug.InitContainer,
 	}
 	deployment.Spec.Template.Spec.InitContainers = manila.InitContainer(initContainerDetails)
 

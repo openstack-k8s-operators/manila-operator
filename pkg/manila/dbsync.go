@@ -47,7 +47,7 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ServiceAccountName: ServiceAccount,
+					ServiceAccountName: instance.RbacResourceName(),
 					Containers: []corev1.Container{
 						{
 							Name: instance.Name + "-db-sync",
