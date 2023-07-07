@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 #
 # Check for:
 #
@@ -8,29 +6,18 @@
 # - 3 manilaShares
 # - 4 extraMounts
 
->>>>>>> ed5cfe1245b3622220058042be006414bb13c14d
 apiVersion: manila.openstack.org/v1beta1
 kind: Manila
 metadata:
    name: manila
    namespace: openstack
 spec:
-<<<<<<< HEAD
-=======
    storageClass: local-storage
->>>>>>> ed5cfe1245b3622220058042be006414bb13c14d
    serviceUser: manila
    customServiceConfig: |
       [DEFAULT]
       debug = true
    databaseInstance: openstack
-<<<<<<< HEAD
-   databaseUser: manila
-   rabbitMqClusterName: rabbitmq
-   manilaAPI:
-      replicas: 1
-      containerImage: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
-=======
    secret: osp-secret
    databaseUser: manila
    rabbitMqClusterName: rabbitmq
@@ -53,174 +40,13 @@ spec:
          customServiceConfig:|
          [DEFAULT]
          enabled_share_protocols=cephfs
->>>>>>> ed5cfe1245b3622220058042be006414bb13c14d
    manilaScheduler:
       replicas: 1
       containerImage: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
    manilaShares:
       share1:
-<<<<<<< HEAD
         containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
         replicas: 1
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-   name: manila
-   namespace: openstack
-   ownerReferences:
-      - apiVersion: manila.openstack.org/v1beta1
-        blockOwnerDeletion: true
-        controller: true
-        kind: ManilaAPI
-        name: manila-api
-spec:
-   progressDeadlineSeconds: 600
-   replicas: 1
-   revisionHistoryLimit: 10
-   selector:
-      matchLabels:
-         service: manila
-   strategy:
-      rollingUpdate:
-         maxSurge: 25%
-         maxUnavailable: 25%
-      type: RollingUpdate
-   template:
-      metadata:
-         creationTimestamp: null
-         labels:
-            service: manila
-      spec:
-         affinity:
-            podAntiAffinity:
-               preferredDuringSchedulingIgnoredDuringExecution:
-                  - podAffinityTerm:
-                       labelSelector:
-                          matchExpressions:
-                             - key: service
-                               operator: In
-                               values:
-                                  - manila
-                       topologyKey: kubernetes.io/hostname
-                    weight: 1
-         containers:
-            - args:
-                 - -c
-                 - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
-              command:
-                 - /bin/bash
-              image: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
-              imagePullPolicy: IfNotPresent
-              livenessProbe:
-                 failureThreshold: 3
-                 httpGet:
-                    path: /healthcheck
-                    port: 8786
-                    scheme: HTTP
-                 initialDelaySeconds: 5
-                 periodSeconds: 3
-                 successThreshold: 1
-                 timeoutSeconds: 5
-              name: manila-api
-              readinessProbe:
-                 failureThreshold: 3
-                 httpGet:
-                    path: /healthcheck
-                    port: 8786
-                    scheme: HTTP
-                 initialDelaySeconds: 5
-                 periodSeconds: 5
-                 successThreshold: 1
-                 timeoutSeconds: 5
-              resources: {}
-              securityContext:
-                 runAsUser: 0
-              terminationMessagePath: /dev/termination-log
-              terminationMessagePolicy: File
-         dnsPolicy: ClusterFirst
-         initContainers:
-            - args:
-                 - -c
-                 - /usr/local/bin/container-scripts/init.sh
-              command:
-                 - /bin/bash
-              env:
-                 - name: DatabasePassword
-                   valueFrom:
-                      secretKeyRef:
-                         key: ManilaDatabasePassword
-                         name: osp-secret
-                 - name: ManilaPassword
-                   valueFrom:
-                      secretKeyRef:
-                         key: ManilaPassword
-                         name: osp-secret
-                 - name: TransportURL
-                   valueFrom:
-                      secretKeyRef:
-                         key: transport_url
-                         name: rabbitmq-transport-url-manila-manila-transport
-                 - name: DatabaseHost
-                   value: openstack
-                 - name: DatabaseName
-                   value: manila
-                 - name: DatabaseUser
-                   value: manila
-                 - name: CustomConf
-                   value: custom.conf
-              image: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
-              imagePullPolicy: IfNotPresent
-              name: init
-              resources: {}
-              securityContext:
-                 runAsUser: 0
-              terminationMessagePath: /dev/termination-log
-              terminationMessagePolicy: File
-              volumeMounts:
-                 - mountPath: /usr/local/bin/container-scripts
-                   name: scripts
-                   readOnly: true
-                 - mountPath: /var/lib/config-data/default
-                   name: config-data
-                   readOnly: true
-                 - mountPath: /var/lib/config-data/merged
-                   name: config-data-merged
-                 - mountPath: /var/lib/config-data/custom
-                   name: config-data-custom
-                   readOnly: true
-         restartPolicy: Always
-         serviceAccount: manila-manila
-         serviceAccountName: manila-manila
-         volumes:
-            - hostPath:
-                 path: /etc/machine-id
-                 type: ""
-              name: etc-machine-id
-            - hostPath:
-                 path: /etc/localtime
-                 type: ""
-              name: etc-localtime
-            - configMap:
-                 defaultMode: 493
-                 name: manila-scripts
-              name: scripts
-            - configMap:
-                 defaultMode: 416
-                 name: manila-config-data
-              name: config-data
-            - emptyDir: {}
-              name: config-data-merged
-            - configMap:
-                 defaultMode: 416
-                 name: manila-api-config-data
-              name: config-data-custom
-status:
-   availableReplicas: 1
-   replicas: 1
-=======
-         replicas: 1
-         containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
    extraMounts:
       - name: v1
         region: r1
@@ -238,4 +64,3 @@ status:
              - name: ceph
                mountPath: "/etc/ceph"
                readOnly: true
->>>>>>> ed5cfe1245b3622220058042be006414bb13c14d

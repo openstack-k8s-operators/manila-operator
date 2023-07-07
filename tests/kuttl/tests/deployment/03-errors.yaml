@@ -1,27 +1,10 @@
 #
 # Check for:
 #
-<<<<<<< HEAD
-# No ManilaAPI CR
-# No Deployment for ManilaAPI CR
-# No Pods in manila Deployment
-# No Manila Services
-# No Manila Routes
-=======
 # No Manila CR
->>>>>>> ed5cfe1245b3622220058042be006414bb13c14d
 #
 apiVersion: manila.openstack.org/v1beta1
 kind: Manila
 metadata:
    name: manila
    namespace: openstack
-<<<<<<< HEAD
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-   name: manila
-   namespace: openstack
-=======
->>>>>>> ed5cfe1245b3622220058042be006414bb13c14d
