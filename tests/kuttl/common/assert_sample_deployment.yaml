@@ -9,58 +9,58 @@
 apiVersion: manila.openstack.org/v1beta1
 kind: Manila
 metadata:
-   name: manila
-   namespace: openstack
+    name: manila
+    namespace: openstack
 spec:
-   storageClass: local-storage
-   serviceUser: manila
-   customServiceConfig: |
-      [DEFAULT]
-      debug = true
-   databaseInstance: openstack
-   secret: osp-secret
-   databaseUser: manila
-   rabbitMqClusterName: rabbitmq
-   template:
-      customServiceConfig:|
-      [ DEFAULT ]
-      enable_share_backends=ceph
-      [cephfs]
-      driver_handles_share_servers=False
-      share_backend_name=cephfs
-      share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
-      cephfs_conf_path=/etc/ceph/ceph.conf
-      cephfs_auth_id=openstack
-      cephfs_cluster_name=ceph
-      cephfs_volume_mode=0755
-      cephfs_protocol_helper_type=CEPHFS
-   manilaAPI:
-      replicas: 1
-      containerImage: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
-         customServiceConfig:|
-         [DEFAULT]
-         enabled_share_protocols=cephfs
-   manilaScheduler:
-      replicas: 1
-      containerImage: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
-   manilaShares:
-      share1:
-        containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
+    storageClass: local-storage
+    serviceUser: manila
+    customServiceConfig: |
+        [ DEFAULT ]
+        debug = true
+    databaseInstance: openstack
+    secret: osp-secret
+    databaseUser: manila
+    rabbitMqClusterName: rabbitmq
+    template:
+        customServiceConfig:|
+        [ DEFAULT ]
+        enable_share_backends=ceph
+        [cephfs]
+        driver_handles_share_servers=False
+        share_backend_name=cephfs
+        share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+        cephfs_conf_path=/etc/ceph/ceph.conf
+        cephfs_auth_id=openstack
+        cephfs_cluster_name=ceph
+        cephfs_volume_mode=0755
+        cephfs_protocol_helper_type=CEPHFS
+    manilaAPI:
         replicas: 1
-   extraMounts:
-      - name: v1
-        region: r1
-        extraVol:
-           - propagation:
-             - Manila
-             extraVolType: Ceph
-             volumes:
-             - name: ceph
-               projected:
-                 sources:
-                 - secret:
-                     name: ceph-conf-files
-             mounts:
-             - name: ceph
-               mountPath: "/etc/ceph"
-               readOnly: true
+        containerImage: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
+            customServiceConfig:|
+            [DEFAULT]
+            enabled_share_protocols=cephfs
+    manilaScheduler:
+        replicas: 1
+        containerImage: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
+    manilaShares:
+        share1:
+            containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
+            replicas: 1
+    extraMounts:
+        - name: v1
+          region: r1
+          extraVol:
+              - propagation:
+                    - Manila
+                extraVolType: Ceph
+                volumes:
+                    - name: ceph
+                      projected:
+                          sources:
+                              - secret:
+                                    name: ceph-conf-files
+                mounts:
+                    - name: ceph
+                      mountPath: "/etc/ceph"
+                      readOnly: true

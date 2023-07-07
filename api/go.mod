@@ -12,7 +12,7 @@ require (
 
 require (
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
-	github.com/onsi/gomega v1.27.7 // indirect
+	github.com/onsi/gomega v1.27.8 // indirect
 	k8s.io/client-go v0.26.3 // indirect
 )
 

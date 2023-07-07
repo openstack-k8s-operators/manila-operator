@@ -79,6 +79,7 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
 		VolumeMounts:         GetInitVolumeMounts(dbSyncExtraMounts, DbsyncPropagation),
 		Debug:                instance.Spec.Debug.DBInitContainer,
+		LoggingConf:          false,
 	}
 	job.Spec.Template.Spec.InitContainers = InitContainer(initContainerDetails)
 

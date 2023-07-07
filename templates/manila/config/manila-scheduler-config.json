@@ -6,6 +6,12 @@
       "dest": "/etc/manila/manila.conf.d",
       "owner": "root:manila",
       "perm": "0750"
+    },
+    {
+      "source": "/var/lib/config-data/merged/logging.conf",
+      "dest": "/etc/manila/logging.conf",
+      "owner": "root:manila",
+      "perm": "0600"
     }
   ]
 }

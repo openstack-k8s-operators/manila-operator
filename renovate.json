@@ -32,13 +32,13 @@
     },
     {
       "groupName": "misc",
-      "matchPackagePatterns": ["^github.com/operator-framework/api", "^github.com/ghodss", "^github.com/go-logr/logr", "^github.com/imdario/mergo", "^go.uber.org/zap"],
+      "matchPackagePatterns": ["^github.com/operator-framework/api", "^github.com/ghodss", "^github.com/go-logr/logr", "^go.uber.org/zap"],
       "enabled": true
     }
   ],
   "postUpgradeTasks": {
     "commands": ["make gowork", "make tidy", "make manifests generate"],
-    "fileFilters": ["go.mod", "go.sum", "**/*.go", "**/*.yaml"],
+    "fileFilters": ["**/go.mod", "**/go.sum", "**/*.go", "**/*.yaml"],
     "executionMode": "update"
   }
 }
