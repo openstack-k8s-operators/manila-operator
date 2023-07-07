@@ -25,6 +25,7 @@ export DBUSER=${DatabaseUser:-"manila"}
 export DBPASSWORD=${DatabasePassword:?"Please specify a DatabasePassword variable."}
 export PASSWORD=${ManilaPassword:?"Please specify a ManilaPassword variable."}
 export TRANSPORTURL=${TransportURL:-""}
+export LOGGINGCONF=${LoggingConf:-"false"}
 
 export CUSTOMCONF=${CustomConf:-""}
 
@@ -34,6 +35,7 @@ MERGED_DIR=/var/lib/config-data/merged
 SVC_CFG=/etc/manila/manila.conf
 SVC_CFG_MERGED=/var/lib/config-data/merged/manila.conf
 SVC_CFG_MERGED_DIR=${MERGED_DIR}/manila.conf.d
+SVC_CFG_LOGGING=/etc/manila/logging.conf
 
 mkdir -p ${SVC_CFG_MERGED_DIR}
 
@@ -80,6 +82,14 @@ fi
 
 if [ -f ${CUSTOM_DIR}/custom.conf ]; then
     cp ${CUSTOM_DIR}/custom.conf ${SVC_CFG_MERGED_DIR}/03-service.conf
+fi
+
+if [ "$LOGGINGCONF" == "true" ]; then
+cat <<EOF >> ${SVC_CFG_MERGED_DIR}/03-service.conf
+
+[DEFAULT]
+log_config_append=${SVC_CFG_LOGGING}
+EOF
 fi
 
 SECRET_FILES="$(ls /var/lib/config-data/secret-*/* 2>/dev/null || true)"

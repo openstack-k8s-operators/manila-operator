@@ -193,7 +193,8 @@ func StatefulSet(
 			instance.Spec.CustomServiceConfigSecrets,
 			instance.Spec.ExtraMounts,
 		),
-		Debug: instance.Spec.Debug.InitContainer,
+		Debug:       instance.Spec.Debug.InitContainer,
+		LoggingConf: true,
 	}
 
 	statefulset.Spec.Template.Spec.InitContainers = manila.InitContainer(initContainerDetails)
