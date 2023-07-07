@@ -2,5 +2,9 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
    -  script: |
+<<<<<<< HEAD
          oc apply -n openstack -f ../../../../config/samples/heat_v1beta1_heat.yaml
  
+=======
+         oc apply -n openstack -f ../../../../config/samples/manila_v1beta1_manila.yaml
+>>>>>>> ed5cfe1245b3622220058042be006414bb13c14d

@@ -1,6 +1,14 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
+<<<<<<< HEAD
 commands:
    -  script: |
          oc kustomize deploy | oc delete -n openstack -f -
          rm deploy/manila_v1beta1_manila.yaml
+=======
+delete:
+- apiVersion: manila.openstack.org/v1beta1
+  kind: Manila
+  name: manila
+  namespace: openstack
+>>>>>>> ed5cfe1245b3622220058042be006414bb13c14d
