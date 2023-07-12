@@ -3,8 +3,8 @@ module github.com/openstack-k8s-operators/manila-operator/api
 go 1.19
 
 require (
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20230524134507-696d321a942e
-	github.com/openstack-k8s-operators/lib-common/modules/storage v0.0.0-20230524134507-696d321a942e
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20230712082535-db7193b646f2
+	github.com/openstack-k8s-operators/lib-common/modules/storage v0.0.0-20230712082535-db7193b646f2
 	k8s.io/api v0.26.3
 	k8s.io/apimachinery v0.26.3
 	sigs.k8s.io/controller-runtime v0.14.6
