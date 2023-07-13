@@ -12,10 +12,7 @@ spec:
   secret: osp-secret
   databaseUser: manila
   rabbitMqClusterName: rabbitmq
-  manilaAPI:
-    containerImage: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
-  manilaScheduler:
-    containerImage: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
+  manilaAPI: {}
+  manilaScheduler: {}
   manilaShares:
-    share1:
-      containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
+    share1: {}
