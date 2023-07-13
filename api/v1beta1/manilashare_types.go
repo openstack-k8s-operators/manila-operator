@@ -35,7 +35,7 @@ type ManilaShareTemplate struct {
 	// +kubebuilder:validation:Maximum=32
 	// +kubebuilder:validation:Minimum=0
 	// Replicas - Manila API Replicas
-	Replicas int32 `json:"replicas"`
+	Replicas *int32 `json:"replicas"`
 }
 
 // ManilaShareSpec defines the desired state of ManilaShare
