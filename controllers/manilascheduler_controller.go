@@ -498,7 +498,7 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 
 	networkReady := false
 	networkAttachmentStatus := map[string][]string{}
-	if instance.Spec.Replicas > 0 {
+	if *(instance.Spec.Replicas) > 0 {
 		// verify if network attachment matches expectations
 		networkReady, networkAttachmentStatus, err = nad.VerifyNetworkStatusFromAnnotation(
 			ctx,
