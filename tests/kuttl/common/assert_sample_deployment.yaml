@@ -13,37 +13,23 @@ metadata:
    namespace: openstack
 spec:
    customServiceConfig: |
-      [ DEFAULT ]
+      [DEFAULT]
       debug = true
    databaseInstance: openstack
    databaseUser: manila
    debug:
       dbInitContainer: false
       dbSync: false
-   extraMounts:
-      -  name: v1
-         region: r1
-         extraVol:
-            -  propagation:
-                  - Manila
-               extraVolType: Ceph
-               volumes:
-                  -  name: ceph
-                     projected:
-                        sources:
-                           -  secret:
-                                 name: ceph-conf-files
-               mounts:
-                  -  name: ceph
-                     mountPath: "/etc/ceph"
-                     readOnly: true
    manilaAPI:
       containerImage: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
-      customServiceConfig: '# add your customization here'
+      customServiceConfig: |
+         [DEFAULT]
+         enabled_share_protocols = cephfs
       debug:
          initContainer: false
          service: false
       replicas: 1
+      resources: {}
    manilaScheduler:
       containerImage: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
       customServiceConfig: '# add your customization here'
@@ -51,13 +37,15 @@ spec:
          initContainer: false
          service: false
       replicas: 1
+      resources: {}
    manilaShares:
       share1:
          containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
          replicas: 1
+         resources: {}
          customServiceConfig: |
-            [ DEFAULT ]
-            enabled_share_backends=cephfs
+            [DEFAULT]
+            enabled_share_backends = cephfs
             [cephfs]
             driver_handles_share_servers=False
             share_backend_name=cephfs
@@ -65,9 +53,10 @@ spec:
             cephfs_conf_path=/etc/ceph/ceph.conf
             cephfs_auth_id=openstack
             cephfs_cluster_name=ceph
-            cephfs_enable_snapshots=True
-            cephfs_volume_mode=0755
             cephfs_protocol_helper_type=CEPHFS
+         debug:
+            initContainer: false
+            service: false
    passwordSelectors:
       database: ManilaDatabasePassword
       service: ManilaPassword

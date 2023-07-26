@@ -9,20 +9,17 @@ spec:
     enabled: true
     template:
       manilaAPI:
-        containerImage: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
         customServiceConfig: |
-          [ DEFAULT ]
+          [DEFAULT]
           debug = true
           enabled_share_protocols=cephfs
         replicas: 1
       manilaScheduler:
         replicas: 1
-        containerImage: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
       manilaShares:
         share1:
-          containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
           customServiceConfig: |
-              [ DEFAULT ]
+              [DEFAULT]
               enabled_share_backends=cephfs
               [cephfs]
               driver_handles_share_servers=False

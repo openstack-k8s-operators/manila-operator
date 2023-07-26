@@ -9,3 +9,5 @@ patches:
           value: osp-secret
      target:
         kind: Manila
+patchesStrategicMerge:
+   - configure_manila_share_backend.yaml
