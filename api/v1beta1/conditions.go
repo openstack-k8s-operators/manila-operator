@@ -19,9 +19,6 @@ import (
 // Manila Condition Types used by API objects.
 const (
 
-	// ManilaRabbitMqTransportURLReadyCondition Status=True condition which indicates if the RabbitMQ TransportURLUrl is ready
-	ManilaRabbitMqTransportURLReadyCondition condition.Type = "ManilaRabbitMqTransportURLReady"
-
 	// ManilaAPIReadyCondition Status=True condition which indicates if the ManilaAPI is configured and operational
 	ManilaAPIReadyCondition condition.Type = "ManilaAPIReady"
 
@@ -30,24 +27,6 @@ const (
 
 	// ManilaShareReadyCondition Status=True condition which indicates if the ManilaShare is configured and operational
 	ManilaShareReadyCondition condition.Type = "ManilaShareReady"
-)
-
-// Manila Reasons used by API objects.
-const (
-
-	// ManilaRabbitMqTransportURLReady condition messages
-	//
-	// ManilaRabbitMqTransportURLReadyInitMessage
-	ManilaRabbitMqTransportURLReadyInitMessage = "ManilaRabbitMqTransportURL not started"
-
-	// ManilaRabbitMqTransportURLReadyRunningMessage
-	ManilaRabbitMqTransportURLReadyRunningMessage = "ManilaRabbitMqTransportURL creation in progress"
-
-	// ManilaRabbitMqTransportURLReadyMessage
-	ManilaRabbitMqTransportURLReadyMessage = "ManilaRabbitMqTransportURL successfully created"
-
-	// ManilaRabbitMqTransportURLReadyErrorMessage
-	ManilaRabbitMqTransportURLReadyErrorMessage = "ManilaRabbitMqTransportURL error occured %s"
 )
 
 // Common Messages used by API objects.
