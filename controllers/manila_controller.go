@@ -170,7 +170,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		cl := condition.CreateList(
 			condition.UnknownCondition(condition.DBReadyCondition, condition.InitReason, condition.DBReadyInitMessage),
 			condition.UnknownCondition(condition.DBSyncReadyCondition, condition.InitReason, condition.DBSyncReadyInitMessage),
-			condition.UnknownCondition(manilav1beta1.ManilaRabbitMqTransportURLReadyCondition, condition.InitReason, manilav1beta1.ManilaRabbitMqTransportURLReadyInitMessage),
+			condition.UnknownCondition(condition.RabbitMqTransportURLReadyCondition, condition.InitReason, condition.RabbitMqTransportURLReadyInitMessage),
 			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaAPIReadyCondition, condition.InitReason, manilav1beta1.ManilaAPIReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaSchedulerReadyCondition, condition.InitReason, manilav1beta1.ManilaSchedulerReadyInitMessage),
@@ -439,10 +439,10 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			manilav1beta1.ManilaRabbitMqTransportURLReadyCondition,
+			condition.RabbitMqTransportURLReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			manilav1beta1.ManilaRabbitMqTransportURLReadyErrorMessage,
+			condition.RabbitMqTransportURLReadyErrorMessage,
 			err.Error()))
 		return ctrl.Result{}, err
 	}
@@ -456,14 +456,14 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	if instance.Status.TransportURLSecret == "" {
 		r.Log.Info(fmt.Sprintf("Waiting for TransportURL %s secret to be created", transportURL.Name))
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			manilav1beta1.ManilaRabbitMqTransportURLReadyCondition,
+			condition.RabbitMqTransportURLReadyCondition,
 			condition.RequestedReason,
 			condition.SeverityInfo,
-			manilav1beta1.ManilaRabbitMqTransportURLReadyRunningMessage))
+			condition.RabbitMqTransportURLReadyRunningMessage))
 		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
-	instance.Status.Conditions.MarkTrue(manilav1beta1.ManilaRabbitMqTransportURLReadyCondition, manilav1beta1.ManilaRabbitMqTransportURLReadyMessage)
+	instance.Status.Conditions.MarkTrue(condition.RabbitMqTransportURLReadyCondition, condition.RabbitMqTransportURLReadyMessage)
 
 	// end transportURL
 
