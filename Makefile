@@ -58,7 +58,8 @@ endif
 DEFAULT_IMG ?= quay.io/openstack-k8s-operators/manila-operator:latest
 IMG ?= $(DEFAULT_IMG)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25.0
+ENVTEST_K8S_VERSION = 1.26
+
 GINKGO ?= $(LOCALBIN)/ginkgo
 
 PROCS ?=$(shell expr $(shell nproc --ignore 2) / 4)
