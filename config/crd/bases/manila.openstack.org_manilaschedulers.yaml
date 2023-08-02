@@ -891,6 +891,7 @@ spec:
                 type: string
             required:
             - containerImage
+            - secret
             - serviceAccount
             type: object
           status:

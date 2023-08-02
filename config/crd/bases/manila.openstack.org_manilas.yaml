@@ -1087,6 +1087,7 @@ spec:
             - manilaAPI
             - manilaScheduler
             - rabbitMqClusterName
+            - secret
             type: object
           status:
             properties:

@@ -47,9 +47,9 @@ type ManilaTemplate struct {
 	// TODO: -> implement needs work in mariadb-operator, right now only manila
 	DatabaseUser string `json:"databaseUser,omitempty"`
 
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Required
 	// Secret containing OpenStack password information for ManilaDatabasePassword, AdminPassword
-	Secret string `json:"secret,omitempty"`
+	Secret string `json:"secret"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
