@@ -15,6 +15,8 @@ package functional
 
 import (
 	"fmt"
+	"golang.org/x/exp/maps"
+
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,37 +71,64 @@ func GetDefaultManilaSpec() map[string]interface{} {
 	return map[string]interface{}{
 		"databaseInstance": "openstack",
 		"secret":           SecretName,
-		"manilaAPI":        GetDefaultManilaAPISpec(),
-		"manilaScheduler":  GetDefaultManilaSchedulerSpec(),
-		"manilaShare":      GetDefaultManilaShareSpec(),
+		"manilaAPI":        GetDefaultManilaAPITemplate(),
+		"manilaScheduler":  GetDefaultManilaSchedulerTemplate(),
+		"manilaShare":      GetDefaultManilaShareTemplate(),
+	}
+}
+
+func GetDefaultManilaAPITemplate() map[string]interface{} {
+	return map[string]interface{}{
+		"replicas":       1,
+		"containerImage": manilaTest.ContainerImage,
 	}
 }
 
 func GetDefaultManilaAPISpec() map[string]interface{} {
+	spec := GetDefaultManilaAPITemplate()
+	maps.Copy(spec, map[string]interface{}{
+		"databaseHostname":   "openstack",
+		"secret":             SecretName,
+		"serviceAccount":     manilaTest.ManilaSA.Name,
+		"transportURLSecret": "rabbitmq-transport-url-manila-manila-transport",
+	})
+	return spec
+}
+
+func GetDefaultManilaSchedulerTemplate() map[string]interface{} {
 	return map[string]interface{}{
-		"secret":         SecretName,
 		"replicas":       1,
 		"containerImage": manilaTest.ContainerImage,
-		"serviceAccount": manilaTest.ManilaSA.Name,
 	}
 }
 
 func GetDefaultManilaSchedulerSpec() map[string]interface{} {
+	spec := GetDefaultManilaSchedulerTemplate()
+	maps.Copy(spec, map[string]interface{}{
+		"databaseHostname":   "openstack",
+		"secret":             SecretName,
+		"serviceAccount":     manilaTest.ManilaSA.Name,
+		"transportURLSecret": "rabbitmq-transport-url-manila-manila-transport",
+	})
+	return spec
+}
+
+func GetDefaultManilaShareTemplate() map[string]interface{} {
 	return map[string]interface{}{
-		"secret":         SecretName,
 		"replicas":       1,
 		"containerImage": manilaTest.ContainerImage,
-		"serviceAccount": manilaTest.ManilaSA.Name,
 	}
 }
 
 func GetDefaultManilaShareSpec() map[string]interface{} {
-	return map[string]interface{}{
-		"secret":         SecretName,
-		"replicas":       1,
-		"containerImage": manilaTest.ContainerImage,
-		"serviceAccount": manilaTest.ManilaSA.Name,
-	}
+	spec := GetDefaultManilaShareTemplate()
+	maps.Copy(spec, map[string]interface{}{
+		"databaseHostname":   "openstack",
+		"secret":             SecretName,
+		"serviceAccount":     manilaTest.ManilaSA.Name,
+		"transportURLSecret": "rabbitmq-transport-url-manila-manila-transport",
+	})
+	return spec
 }
 
 func GetManila(name types.NamespacedName) *manilav1.Manila {

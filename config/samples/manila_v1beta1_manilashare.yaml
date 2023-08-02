@@ -3,4 +3,5 @@ kind: ManilaShare
 metadata:
   name: manilashare-sample
 spec:
-  # TODO(user): Add fields here
+  databaseHostname: openstack
+  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
