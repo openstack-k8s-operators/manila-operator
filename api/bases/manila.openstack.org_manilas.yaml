@@ -1084,6 +1084,7 @@ spec:
                 default: manila
                 type: string
             required:
+            - databaseInstance
             - manilaAPI
             - manilaScheduler
             - rabbitMqClusterName
