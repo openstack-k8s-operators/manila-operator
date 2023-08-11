@@ -16,10 +16,13 @@ limitations under the License.
 package functional
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
@@ -257,9 +260,6 @@ var _ = Describe("Manila controller", func() {
 			th.AssertServiceExists(manilaTest.ManilaServicePublic)
 			th.AssertServiceExists(manilaTest.ManilaServiceInternal)
 		})
-		It("Assert Routes are created", func() {
-			th.AssertRouteExists(manilaTest.ManilaServicePublic)
-		})
 	})
 	When("Manila CR instance is deleted", func() {
 		BeforeEach(func() {
@@ -313,14 +313,6 @@ var _ = Describe("Manila controller", func() {
 		BeforeEach(func() {
 			nad := th.CreateNetworkAttachmentDefinition(manilaTest.InternalAPINAD)
 			DeferCleanup(th.DeleteInstance, nad)
-			var externalEndpoints []interface{}
-			externalEndpoints = append(
-				externalEndpoints, map[string]interface{}{
-					"endpoint":        "internal",
-					"ipAddressPool":   "osp-internalapi",
-					"loadBalancerIPs": []string{"10.1.0.1", "10.1.0.2"},
-				},
-			)
 			rawSpec := map[string]interface{}{
 				"secret":              SecretName,
 				"databaseInstance":    "openstack",
@@ -328,7 +320,6 @@ var _ = Describe("Manila controller", func() {
 				"manilaAPI": map[string]interface{}{
 					"containerImage":     manilav1.ManilaAPIContainerImage,
 					"networkAttachments": []string{"internalapi"},
-					"externalEndpoints":  externalEndpoints,
 				},
 				"manilaScheduler": map[string]interface{}{
 					"containerImage":     manilav1.ManilaSchedulerContainerImage,
@@ -386,13 +377,118 @@ var _ = Describe("Manila controller", func() {
 			share := GetManilaShare(manilaTest.ManilaShares[0])
 			// Check ManilaAPI NADs
 			Expect(api.Spec.NetworkAttachments).To(Equal(manila.Spec.ManilaAPI.ManilaServiceTemplate.NetworkAttachments))
-			Expect(api.Spec.ExternalEndpoints).To(Equal(manila.Spec.ManilaAPI.ExternalEndpoints))
 			// Check ManilaScheduler NADs
 			Expect(sched.Spec.NetworkAttachments).To(Equal(manila.Spec.ManilaScheduler.ManilaServiceTemplate.NetworkAttachments))
 			// Check ManilaShare exists
 			ManilaShareExists(manilaTest.ManilaShares[0])
 			// Check ManilaShare NADs
 			Expect(share.Spec.NetworkAttachments).To(Equal(share.Spec.ManilaServiceTemplate.NetworkAttachments))
+		})
+	})
+
+	When("A Manila is created with service override", func() {
+
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			var serviceOverride []interface{}
+			serviceOverride = append(
+				serviceOverride, map[string]interface{}{
+					"endpoint": "internal",
+					"metadata": map[string]map[string]string{
+						"annotations": {
+							"dnsmasq.network.openstack.org/hostname": "manila-internal.openstack.svc",
+							"metallb.universe.tf/address-pool":       "osp-internalapi",
+							"metallb.universe.tf/allow-shared-ip":    "osp-internalapi",
+							"metallb.universe.tf/loadBalancerIPs":    "internal-lb-ip-1,internal-lb-ip-2",
+						},
+						"labels": {
+							"internal": "true",
+							"service":  "manila",
+						},
+					},
+					"spec": map[string]interface{}{
+						"type": "LoadBalancer",
+					},
+				},
+			)
+
+			spec["override"] = map[string]interface{}{
+				"manilaAPI": map[string]interface{}{
+					"override": map[string]interface{}{
+						"service": serviceOverride,
+					},
+				},
+			}
+
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
+			DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManilaShare(manilaTest.Instance, GetDefaultManilaShareSpec()))
+			DeferCleanup(
+				th.DeleteDBService,
+				th.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaName).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(th.DeleteKeystoneAPI, th.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			th.SimulateKeystoneServiceReady(manilaTest.Instance)
+			th.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+			th.SimulateDeploymentReadyWithPods(
+				manilaTest.ManilaAPI,
+				map[string][]string{},
+			)
+			th.SimulateStatefulSetReplicaReadyWithPods(
+				manilaTest.ManilaScheduler,
+				map[string][]string{},
+			)
+			th.SimulateStatefulSetReplicaReadyWithPods(
+				manilaTest.ManilaShares[0],
+				map[string][]string{},
+			)
+		})
+
+		It("creates KeystoneEndpoint", func() {
+			keystoneEndpoint := th.GetKeystoneEndpoint(manilaTest.ManilaKeystoneEndpoint)
+			endpoints := keystoneEndpoint.Spec.Endpoints
+			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manilaTest.Instance.Namespace+".svc:8786/v2"))
+			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaTest.Instance.Namespace+".svc:8786/v2"))
+
+			th.ExpectCondition(
+				manilaTest.ManilaAPI,
+				ConditionGetterFunc(ManilaAPIConditionGetter),
+				condition.KeystoneEndpointReadyCondition,
+				corev1.ConditionTrue,
+			)
+		})
+
+		It("creates LoadBalancer service", func() {
+			// As the internal endpoint is configured via overrides it
+			// gets a LoadBalancer Service with MetalLB annotations
+			service := th.GetService(types.NamespacedName{Namespace: namespace, Name: "manila-internal"})
+			th.Logger.Info(fmt.Sprintf("BOO %+v", service))
+			Expect(service.Annotations).To(
+				HaveKeyWithValue("dnsmasq.network.openstack.org/hostname", "manila-internal.openstack.svc"))
+			Expect(service.Annotations).To(
+				HaveKeyWithValue("metallb.universe.tf/address-pool", "osp-internalapi"))
+			Expect(service.Annotations).To(
+				HaveKeyWithValue("metallb.universe.tf/allow-shared-ip", "osp-internalapi"))
+			Expect(service.Annotations).To(
+				HaveKeyWithValue("metallb.universe.tf/loadBalancerIPs", "internal-lb-ip-1,internal-lb-ip-2"))
+
+			th.ExpectCondition(
+				manilaTest.Instance,
+				ConditionGetterFunc(ManilaConditionGetter),
+				condition.ReadyCondition,
+				corev1.ConditionTrue,
+			)
 		})
 	})
 })
