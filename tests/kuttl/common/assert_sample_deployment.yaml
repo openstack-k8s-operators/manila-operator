@@ -64,3 +64,63 @@ spec:
    rabbitMqClusterName: rabbitmq
    secret: osp-secret
    serviceUser: manila
+status:
+   conditions:
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: Ready
+      - message: DB create completed
+        reason: Ready
+        status: "True"
+        type: DBReady
+      - message: DBsync completed
+        reason: Ready
+        status: "True"
+        type: DBSyncReady
+      - message: Input data complete
+        reason: Ready
+        status: "True"
+        type: InputReady
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: ManilaAPIReady
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: ManilaSchedulerReady
+      - message: Deployment completed
+        reason: Ready
+        status: "True"
+        type: ManilaShareReady
+      - message: NetworkAttachments completed
+        reason: Ready
+        status: "True"
+        type: NetworkAttachmentsReady
+      - message: RabbitMqTransportURL successfully created
+        reason: Ready
+        status: "True"
+        type: RabbitMqTransportURLReady
+      - message: RoleBinding created
+        reason: Ready
+        status: "True"
+        type: RoleBindingReady
+      - message: Role created
+        reason: Ready
+        status: "True"
+        type: RoleReady
+      - message: ServiceAccount created
+        reason: Ready
+        status: "True"
+        type: ServiceAccountReady
+      - message: Service config create completed
+        reason: Ready
+        status: "True"
+        type: ServiceConfigReady
+   databaseHostname: openstack
+   manilaAPIReadyCount: 1
+   manilaSchedulerReadyCount: 1
+   manilaSharesReadyCounts:
+      share1: 1
+   transportURLSecret: rabbitmq-transport-url-manila-manila-transport
