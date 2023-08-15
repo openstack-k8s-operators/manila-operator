@@ -13,8 +13,6 @@ limitations under the License.
 package manilaapi
 
 const (
-	// KollaConfig -
-	KollaConfig = "/var/lib/config-data/merged/manila-api-config.json"
 	// Component -
 	Component = "manila-api"
 )

@@ -33,9 +33,6 @@ const (
 	// ManilaInternalPort -
 	ManilaInternalPort int32 = 8786
 
-	// KollaConfigDbSync -
-	KollaConfigDbSync = "/var/lib/config-data/merged/db-sync-config.json"
-
 	// ManilaExtraVolTypeUndefined can be used to label an extraMount which
 	// is not associated with a specific backend
 	ManilaExtraVolTypeUndefined storage.ExtraVolType = "Undefined"

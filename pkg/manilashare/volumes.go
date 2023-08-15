@@ -74,6 +74,12 @@ func GetVolumeMounts(name string, secretNames []string, extraVol []manilav1.Mani
 			Name:      "var-lib-manila",
 			MountPath: "/var/lib/manila",
 		},
+		{
+			Name:      "config-data",
+			MountPath: "/var/lib/kolla/config_files/config.json",
+			SubPath:   "manila-share-config.json",
+			ReadOnly:  true,
+		},
 	}
 
 	// Set the propagation levels for ManilaShare, including the backend name

@@ -54,5 +54,14 @@ func GetInitVolumeMounts(secretNames []string, extraVol []manilav1.ManilaExtraVo
 
 // GetVolumeMounts - ManilaAPI VolumeMounts
 func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMount {
-	return manila.GetVolumeMounts(extraVol, manila.ManilaAPIPropagation)
+	apiVolumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "config-data",
+			MountPath: "/var/lib/kolla/config_files/config.json",
+			SubPath:   "manila-api-config.json",
+			ReadOnly:  true,
+		},
+	}
+
+	return append(manila.GetVolumeMounts(extraVol, manila.ManilaAPIPropagation), apiVolumeMounts...)
 }
