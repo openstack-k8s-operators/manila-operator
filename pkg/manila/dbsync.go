@@ -19,6 +19,15 @@ const (
 // DbSyncJob func
 func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations map[string]string) *batchv1.Job {
 
+	dbSyncMounts := []corev1.VolumeMount{
+		{
+			Name:      "config-data-merged",
+			MountPath: "/var/lib/kolla/config_files/config.json",
+			SubPath:   "db-sync-config.json",
+			ReadOnly:  true,
+		},
+	}
+
 	dbSyncExtraMounts := []manilav1.ManilaExtraVolMounts{}
 
 	args := []string{"-c"}
@@ -30,7 +39,6 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 
 	runAsUser := int64(0)
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_FILE"] = env.SetValue(KollaConfigDbSync)
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["KOLLA_BOOTSTRAP"] = env.SetValue("TRUE")
 
@@ -60,7 +68,7 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 								RunAsUser: &runAsUser,
 							},
 							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts: GetVolumeMounts(dbSyncExtraMounts, DbsyncPropagation),
+							VolumeMounts: append(GetVolumeMounts(dbSyncExtraMounts, DbsyncPropagation), dbSyncMounts...),
 						},
 					},
 					Volumes: GetVolumes(instance.Name, dbSyncExtraMounts, DbsyncPropagation),
