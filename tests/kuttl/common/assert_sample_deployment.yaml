@@ -21,7 +21,6 @@ spec:
       dbInitContainer: false
       dbSync: false
    manilaAPI:
-      containerImage: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
       customServiceConfig: |
          [DEFAULT]
          enabled_share_protocols = cephfs
@@ -31,7 +30,6 @@ spec:
       replicas: 1
       resources: {}
    manilaScheduler:
-      containerImage: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
       customServiceConfig: '# add your customization here'
       debug:
          initContainer: false
@@ -40,7 +38,6 @@ spec:
       resources: {}
    manilaShares:
       share1:
-         containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
          replicas: 1
          resources: {}
          customServiceConfig: |
@@ -124,3 +121,36 @@ status:
    manilaSharesReadyCounts:
       share1: 1
    transportURLSecret: rabbitmq-transport-url-manila-manila-transport
+---
+# when using image digests the containerImage URLs are SHA's so we verify them with a script
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+commands:
+  - script: |
+      tupleTemplate='{{ range (index .spec.template.spec.containers 1).env }}{{ .name }}{{ "#" }}{{ .value}}{{"\n"}}{{ end }}'
+      imageTuples=$(oc get -n openstack-operators deployment manila-operator-controller-manager -o go-template="$tupleTemplate")
+      # format of imageTuple is: RELATED_IMAGE_MANILA_<service>#<image URL with SHA> separated by newlines
+      for ITEM in $(echo $imageTuples); do
+        # it is an image
+        if echo $ITEM | grep 'RELATED_IMAGE' &> /dev/null; then
+          NAME=$(echo $ITEM | sed -e 's|^RELATED_IMAGE_MANILA_\([^_]*\)_.*|\1|')
+          IMG_FROM_ENV=$(echo $ITEM | sed -e 's|^.*#\(.*\)|\1|')
+          template='{{.spec.containerImage}}'
+          case $NAME in
+            API)
+              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilaapi manila-api -o go-template="$template")
+              ;;
+            SHARE)
+              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilashares manila-share-share1 -o go-template="$template")
+              ;;
+            SCHEDULER)
+              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilascheduler manila-scheduler -o go-template="$template")
+              ;;
+          esac
+          if [ "$SERVICE_IMAGE" != "$IMG_FROM_ENV" ]; then
+            echo "$NAME image does not equal $VALUE"
+            exit 1
+          fi
+        fi
+      done
+      exit 0
