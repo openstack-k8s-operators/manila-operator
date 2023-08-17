@@ -174,9 +174,9 @@ type MetalLBConfig struct {
 func SetupDefaults() {
 	// Acquire environmental defaults and initialize Manila defaults with them
 	manilaDefaults := ManilaDefaults{
-		APIContainerImageURL:       util.GetEnvVar("MANILA_API_IMAGE_URL_DEFAULT", ManilaAPIContainerImage),
-		SchedulerContainerImageURL: util.GetEnvVar("MANILA_SCHEDULER_IMAGE_URL_DEFAULT", ManilaSchedulerContainerImage),
-		ShareContainerImageURL:     util.GetEnvVar("MANILA_SHARE_IMAGE_URL_DEFAULT", ManilaShareContainerImage),
+		APIContainerImageURL:       util.GetEnvVar("RELATED_IMAGE_MANILA_API_IMAGE_URL_DEFAULT", ManilaAPIContainerImage),
+		SchedulerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_MANILA_SCHEDULER_IMAGE_URL_DEFAULT", ManilaSchedulerContainerImage),
+		ShareContainerImageURL:     util.GetEnvVar("RELATED_IMAGE_MANILA_SHARE_IMAGE_URL_DEFAULT", ManilaShareContainerImage),
 	}
 
 	SetupManilaDefaults(manilaDefaults)
