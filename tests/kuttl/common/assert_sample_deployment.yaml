@@ -10,7 +10,6 @@ apiVersion: manila.openstack.org/v1beta1
 kind: Manila
 metadata:
    name: manila
-   namespace: openstack
 spec:
    customServiceConfig: |
       [DEFAULT]
