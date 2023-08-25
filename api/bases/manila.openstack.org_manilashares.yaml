@@ -56,9 +56,6 @@ spec:
                 type: string
               debug:
                 properties:
-                  initContainer:
-                    default: false
-                    type: boolean
                   service:
                     default: false
                     type: boolean

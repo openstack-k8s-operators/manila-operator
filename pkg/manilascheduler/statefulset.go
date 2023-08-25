@@ -42,7 +42,6 @@ func StatefulSet(
 	manilaUser := int64(42429)
 	manilaGroup := int64(42429)
 
-	// TODO until we determine how to properly query for these
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
 		TimeoutSeconds:      5,
@@ -145,7 +144,6 @@ func StatefulSet(
 	statefulset.Spec.Template.Spec.Volumes = GetVolumes(
 		manila.GetOwningManilaName(instance),
 		instance.Name,
-		instance.Spec.CustomServiceConfigSecrets,
 		instance.Spec.ExtraMounts,
 	)
 	// If possible two pods of the same service should not
@@ -161,31 +159,6 @@ func StatefulSet(
 	if instance.Spec.NodeSelector != nil && len(instance.Spec.NodeSelector) > 0 {
 		statefulset.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
-
-	initContainerDetails := manila.APIDetails{
-		ContainerImage:       instance.Spec.ContainerImage,
-		DatabaseHost:         instance.Spec.DatabaseHostname,
-		DatabaseUser:         instance.Spec.DatabaseUser,
-		DatabaseName:         manila.DatabaseName,
-		OSPSecret:            instance.Spec.Secret,
-		TransportURLSecret:   instance.Spec.TransportURLSecret,
-		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
-		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts: GetInitVolumeMounts(
-			instance.Spec.CustomServiceConfigSecrets,
-			instance.Spec.ExtraMounts,
-		),
-		Debug:       instance.Spec.Debug.InitContainer,
-		LoggingConf: true,
-	}
-
-	statefulset.Spec.Template.Spec.InitContainers = manila.InitContainer(initContainerDetails)
-
-	// TODO: Clean up this hack
-	// Add custom config for the Scheduler Service
-	envVars = map[string]env.Setter{}
-	envVars["CustomConf"] = env.SetValue(common.CustomServiceConfigFileName)
-	statefulset.Spec.Template.Spec.InitContainers[0].Env = env.MergeEnvs(statefulset.Spec.Template.Spec.InitContainers[0].Env, envVars)
 
 	return statefulset
 }

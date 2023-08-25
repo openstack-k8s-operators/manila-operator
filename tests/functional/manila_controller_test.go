@@ -71,11 +71,6 @@ var _ = Describe("Manila controller", func() {
 				return GetManila(manilaTest.Instance).Finalizers
 			}, timeout, interval).Should(ContainElement("Manila"))
 		})
-		It("should not create a config map", func() {
-			Eventually(func() []corev1.ConfigMap {
-				return th.ListConfigMaps(manilaTest.ManilaConfigMapData.Name).Items
-			}, timeout, interval).Should(BeEmpty())
-		})
 		It("creates service account, role and rolebindig", func() {
 
 			th.ExpectCondition(
@@ -117,7 +112,6 @@ var _ = Describe("Manila controller", func() {
 				corev1.ConditionUnknown,
 			)
 		})
-		// should create 01-deployment.conf secret
 	})
 	When("Manila DB is created", func() {
 		BeforeEach(func() {
@@ -197,11 +191,11 @@ var _ = Describe("Manila controller", func() {
 		It("should create config-data and scripts ConfigMaps", func() {
 			keystoneAPI := th.CreateKeystoneAPI(manilaTest.Instance.Namespace)
 			DeferCleanup(th.DeleteKeystoneAPI, keystoneAPI)
-			Eventually(func() corev1.ConfigMap {
-				return *th.GetConfigMap(manilaTest.ManilaConfigMapData)
+			Eventually(func() corev1.Secret {
+				return th.GetSecret(manilaTest.ManilaConfigSecret)
 			}, timeout, interval).ShouldNot(BeNil())
-			Eventually(func() corev1.ConfigMap {
-				return *th.GetConfigMap(manilaTest.ManilaConfigMapScripts)
+			Eventually(func() corev1.Secret {
+				return th.GetSecret(manilaTest.ManilaConfigScripts)
 			}, timeout, interval).ShouldNot(BeNil())
 		})
 	})
@@ -291,25 +285,8 @@ var _ = Describe("Manila controller", func() {
 			mDB = th.GetMariaDBDatabase(manilaTest.Instance)
 			Expect(mDB.Finalizers).NotTo(ContainElement("Manila"))
 		})
-		It("removes the ConfigMaps", func() {
-			keystoneAPI := th.CreateKeystoneAPI(manilaTest.Instance.Namespace)
-			DeferCleanup(th.DeleteKeystoneAPI, keystoneAPI)
-
-			Eventually(func() corev1.ConfigMap {
-				return *th.GetConfigMap(manilaTest.ManilaConfigMapData)
-			}, timeout, interval).ShouldNot(BeNil())
-			Eventually(func() corev1.ConfigMap {
-				return *th.GetConfigMap(manilaTest.ManilaConfigMapScripts)
-			}, timeout, interval).ShouldNot(BeNil())
-			Eventually(func() []corev1.ConfigMap {
-				return th.ListConfigMaps(manilaTest.ManilaConfigMapData.Name).Items
-			}, timeout, interval).Should(BeEmpty())
-			Eventually(func() []corev1.ConfigMap {
-				return th.ListConfigMaps(manilaTest.ManilaConfigMapScripts.Name).Items
-			}, timeout, interval).Should(BeEmpty())
-		})
 	})
-	When("Manila CR instance is built w/ NAD", func() {
+	When("Manila CR instance is built with NAD", func() {
 		BeforeEach(func() {
 			nad := th.CreateNetworkAttachmentDefinition(manilaTest.InternalAPINAD)
 			DeferCleanup(th.DeleteInstance, nad)

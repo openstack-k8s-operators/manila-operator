@@ -37,7 +37,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
@@ -81,7 +80,6 @@ type ManilaShareReconciler struct {
 //+kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=manila.openstack.org,resources=manilashares/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;create;update;patch;delete;watch
@@ -179,7 +177,7 @@ func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	// Watch for changes to any CustomServiceConfigSecrets. Global secrets
 	// (e.g. TransportURLSecret) are handled by the top Manila controller.
-	svcSecretFn := func(o client.Object) []reconcile.Request {
+	secretFn := func(o client.Object) []reconcile.Request {
 		var namespace string = o.GetNamespace()
 		var secretName string = o.GetName()
 		result := []reconcile.Request{}
@@ -192,6 +190,22 @@ func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		if err := r.Client.List(context.Background(), shares, listOpts...); err != nil {
 			r.Log.Error(err, "Unable to retrieve API CRs %v")
 			return nil
+		}
+
+		label := o.GetLabels()
+		if l, ok := label[labels.GetOwnerNameLabelSelector(labels.GetGroupLabel(manila.ServiceName))]; ok {
+			for _, cr := range shares.Items {
+				// return reconcil event for the CR where the CM owner label AND the parentManilaName matches
+				if l == manila.GetOwningManilaName(&cr) {
+					// return namespace and Name of CR
+					name := client.ObjectKey{
+						Namespace: namespace,
+						Name:      cr.Name,
+					}
+					r.Log.Info(fmt.Sprintf("Secret object %s and CR %s marked with label: %s", o.GetName(), cr.Name, l))
+					result = append(result, reconcile.Request{NamespacedName: name})
+				}
+			}
 		}
 		for _, cr := range shares.Items {
 			for _, v := range cr.Spec.CustomServiceConfigSecrets {
@@ -210,42 +224,6 @@ func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 		return nil
 	}
-	// watch for configmap where the CM owner label AND the CR.Spec.ManagingCrName label matches
-	configMapFn := func(o client.Object) []reconcile.Request {
-		result := []reconcile.Request{}
-
-		// get all manila shares CRs
-		shares := &manilav1beta1.ManilaShareList{}
-		listOpts := []client.ListOption{
-			client.InNamespace(o.GetNamespace()),
-		}
-		if err := r.Client.List(context.Background(), shares, listOpts...); err != nil {
-			r.Log.Error(err, "Unable to retrieve share CRs %v")
-			return nil
-		}
-
-		label := o.GetLabels()
-		// TODO: Just trying to verify that the CM is owned by this CR's managing CR
-		if l, ok := label[labels.GetOwnerNameLabelSelector(labels.GetGroupLabel(manila.ServiceName))]; ok {
-			for _, cr := range shares.Items {
-				// return reconcil event for the CR where the CM owner label AND the parentManilaName matches
-				if l == manila.GetOwningManilaName(&cr) {
-					// return namespace and Name of CR
-					name := client.ObjectKey{
-						Namespace: o.GetNamespace(),
-						Name:      cr.Name,
-					}
-					r.Log.Info(fmt.Sprintf("ConfigMap object %s and CR %s marked with label: %s", o.GetName(), cr.Name, l))
-
-					result = append(result, reconcile.Request{NamespacedName: name})
-				}
-			}
-		}
-		if len(result) > 0 {
-			return result
-		}
-		return nil
-	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&manilav1beta1.ManilaShare{}).
@@ -253,10 +231,7 @@ func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		// watch the secrets we don't own
 		Watches(&source.Kind{Type: &corev1.Secret{}},
-			handler.EnqueueRequestsFromMapFunc(svcSecretFn)).
-		// watch the config CMs we don't own
-		Watches(&source.Kind{Type: &corev1.ConfigMap{}},
-			handler.EnqueueRequestsFromMapFunc(configMapFn)).
+			handler.EnqueueRequestsFromMapFunc(secretFn)).
 		Complete(r)
 }
 
@@ -285,100 +260,57 @@ func (r *ManilaShareReconciler) reconcileInit(
 func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *manilav1beta1.ManilaShare, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
 
-	// ConfigMap
-	configMapVars := make(map[string]env.Setter)
+	// configVars
+	configVars := make(map[string]env.Setter)
 
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
-	ospSecret, hash, err := secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
+	ctrlResult, err := r.getSecret(ctx, helper, instance, instance.Spec.Secret, &configVars)
 	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
+		return ctrlResult, err
 	}
-	configMapVars[ospSecret.Name] = env.SetValue(hash)
-	// run check OpenStack secret - end
 
 	//
 	// check for required TransportURL secret holding transport URL string
 	//
-	transportURLSecret, hash, err := secret.GetSecret(ctx, helper, instance.Spec.TransportURLSecret, instance.Namespace)
+	ctrlResult, err = r.getSecret(ctx, helper, instance, instance.Spec.TransportURLSecret, &configVars)
 	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("TransportURL secret %s not found", instance.Spec.TransportURLSecret)
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
+		return ctrlResult, err
 	}
-	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
-	// run check TransportURL secret - end
 
 	//
-	// check for required Manila config maps that should have been created by parent Manila CR
+	// check for required service secrets
 	//
+	for _, secretName := range instance.Spec.CustomServiceConfigSecrets {
+		ctrlResult, err = r.getSecret(ctx, helper, instance, secretName, &configVars)
+		if err != nil {
+			return ctrlResult, err
+		}
+	}
 
 	parentManilaName := manila.GetOwningManilaName(instance)
-
-	configMaps := []string{
-		fmt.Sprintf("%s-scripts", parentManilaName),     //ScriptsConfigMap
-		fmt.Sprintf("%s-config-data", parentManilaName), //ConfigMap
+	parentSecrets := []string{
+		fmt.Sprintf("%s-scripts", parentManilaName),     // ScriptsSecret
+		fmt.Sprintf("%s-config-data", parentManilaName), // Secret used for ServiceConfig
 	}
 
-	_, err = configmap.GetConfigMaps(ctx, helper, instance, configMaps, instance.Namespace, &configMapVars)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("Could not find all config maps for parent Manila CR %s", parentManilaName)
+	for _, parentSecret := range parentSecrets {
+		ctrlResult, err = r.getSecret(ctx, helper, instance, parentSecret, &configVars)
+		if err != nil {
+			return ctrlResult, err
 		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
 	}
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
-	// run check parent Manila CR config maps - end
 
-	//
-	// Create ConfigMaps required as input for the Service and calculate an overall hash of hashes
-	//
 	serviceLabels := map[string]string{
 		common.AppSelector:       manila.ServiceName,
 		common.ComponentSelector: manilashare.Component,
 	}
 	//
-	// create custom Configmap for this manila-share service
+	// create service Secrets for manila-share service
 	//
-	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars, serviceLabels)
+	err = r.generateServiceConfig(ctx, helper, instance, &configVars, serviceLabels)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -388,13 +320,12 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	// Create ConfigMaps - end
 
 	//
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
+	inputHash, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -409,7 +340,6 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 		return ctrl.Result{}, nil
 	}
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
-	// Create ConfigMaps and Secrets - end
 
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
@@ -445,7 +375,7 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	}
 
 	// Handle service init
-	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels)
+	ctrlResult, err = r.reconcileInit(ctx, instance, helper, serviceLabels)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -560,9 +490,43 @@ func (r *ManilaShareReconciler) reconcileUpgrade(ctx context.Context, instance *
 	return ctrl.Result{}, nil
 }
 
-// generateServiceConfigMaps - create custom configmap to hold service-specific config
+// getSecret - get the specified secret, and add its hash to envVars
+func (r *ManilaShareReconciler) getSecret(
+	ctx context.Context,
+	h *helper.Helper,
+	instance *manilav1beta1.ManilaShare,
+	secretName string,
+	envVars *map[string]env.Setter,
+) (ctrl.Result, error) {
+	secret, hash, err := secret.GetSecret(ctx, h, secretName, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("Secret %s not found", secretName)
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
+	// Add a prefix to the var name to avoid accidental collision with other non-secret
+	// vars. The secret names themselves will be unique.
+	(*envVars)["secret-"+secret.Name] = env.SetValue(hash)
+
+	return ctrl.Result{}, nil
+}
+
+// generateServiceConfig - create custom Secret to hold service-specific config
 // TODO add DefaultConfigOverwrite
-func (r *ManilaShareReconciler) generateServiceConfigMaps(
+func (r *ManilaShareReconciler) generateServiceConfig(
 	ctx context.Context,
 	h *helper.Helper,
 	instance *manilav1beta1.ManilaShare,
@@ -570,24 +534,45 @@ func (r *ManilaShareReconciler) generateServiceConfigMaps(
 	serviceLabels map[string]string,
 ) error {
 	//
-	// create custom Configmap for manila-share-specific config input
-	// - %-config-data configmap holding custom config for the service's manila.conf
+	// create custom Secret for manila-share-specific config input
+	// - %-config-data Secret holding custom config for the service's manila.conf
 	//
 
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
+	labels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
-	// customData hold any customization for the service.
-	// custom.conf is going to be merged into /etc/manila/manila.conf
-	// TODO: make sure custom.conf can not be overwritten
-	customData := map[string]string{common.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
+	customData := map[string]string{manila.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
 
 	for key, data := range instance.Spec.DefaultConfigOverwrite {
 		customData[key] = data
 	}
 
-	customData[common.CustomServiceConfigFileName] = instance.Spec.CustomServiceConfig
+	customData[manila.CustomServiceConfigFileName] = instance.Spec.CustomServiceConfig
 
-	cms := []util.Template{
+	// Fetch the two service config snippets (DefaultsConfigFileName and
+	// CustomConfigFileName) from the Secret generated by the top level
+	// manila controller, and add them to this service specific Secret.
+	manilaSecretName := manila.GetOwningManilaName(instance) + "-config-data"
+	manilaSecret, _, err := secret.GetSecret(ctx, h, manilaSecretName, instance.Namespace)
+	if err != nil {
+		return err
+	}
+	customData[manila.DefaultsConfigFileName] = string(manilaSecret.Data[manila.DefaultsConfigFileName])
+	customData[manila.CustomConfigFileName] = string(manilaSecret.Data[manila.CustomConfigFileName])
+
+	customSecrets := ""
+	for _, secretName := range instance.Spec.CustomServiceConfigSecrets {
+		secret, _, err := secret.GetSecret(ctx, h, secretName, instance.Namespace)
+		if err != nil {
+			return err
+		}
+		for _, data := range secret.Data {
+			customSecrets += string(data) + "\n"
+		}
+	}
+
+	customData[manila.CustomServiceConfigSecretsFileName] = customSecrets
+
+	configTemplates := []util.Template{
 		// Custom ConfigMap
 		{
 			Name:         fmt.Sprintf("%s-config-data", instance.Name),
@@ -595,11 +580,11 @@ func (r *ManilaShareReconciler) generateServiceConfigMaps(
 			Type:         util.TemplateTypeConfig,
 			InstanceType: instance.Kind,
 			CustomData:   customData,
-			Labels:       cmLabels,
+			Labels:       labels,
 		},
 	}
 
-	return configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+	return secret.EnsureSecrets(ctx, h, instance, configTemplates, envVars)
 }
 
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart

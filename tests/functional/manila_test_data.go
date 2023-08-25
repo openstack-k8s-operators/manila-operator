@@ -38,8 +38,8 @@ type ManilaTestData struct {
 	ManilaKeystoneEndpoint types.NamespacedName
 	ManilaServicePublic    types.NamespacedName
 	ManilaServiceInternal  types.NamespacedName
-	ManilaConfigMapData    types.NamespacedName
-	ManilaConfigMapScripts types.NamespacedName
+	ManilaConfigSecret     types.NamespacedName
+	ManilaConfigScripts    types.NamespacedName
 	ManilaAPI              types.NamespacedName
 	ManilaScheduler        types.NamespacedName
 	ManilaShares           []types.NamespacedName
@@ -93,11 +93,11 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("manila-%s-transport", manilaName.Name),
 		},
-		ManilaConfigMapData: types.NamespacedName{
+		ManilaConfigSecret: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "config-data"),
 		},
-		ManilaConfigMapScripts: types.NamespacedName{
+		ManilaConfigScripts: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "scripts"),
 		},

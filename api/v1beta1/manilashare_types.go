@@ -106,7 +106,6 @@ func init() {
 	SchemeBuilder.Register(&ManilaShare{}, &ManilaShareList{})
 }
 
-
 // IsReady - returns true if ManilaShare is reconciled successfully
 func (instance ManilaShare) IsReady() bool {
 	return instance.Status.Conditions.IsTrue(condition.ReadyCondition)

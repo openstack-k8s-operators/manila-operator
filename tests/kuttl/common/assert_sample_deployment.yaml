@@ -17,21 +17,18 @@ spec:
    databaseInstance: openstack
    databaseUser: manila
    debug:
-      dbInitContainer: false
       dbSync: false
    manilaAPI:
       customServiceConfig: |
          [DEFAULT]
          enabled_share_protocols = cephfs
       debug:
-         initContainer: false
          service: false
       replicas: 1
       resources: {}
    manilaScheduler:
       customServiceConfig: '# add your customization here'
       debug:
-         initContainer: false
          service: false
       replicas: 1
       resources: {}
@@ -51,7 +48,6 @@ spec:
             cephfs_cluster_name=ceph
             cephfs_protocol_helper_type=CEPHFS
          debug:
-            initContainer: false
             service: false
    passwordSelectors:
       database: ManilaDatabasePassword
