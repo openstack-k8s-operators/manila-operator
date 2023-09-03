@@ -65,9 +65,9 @@ func (r *ManilaReconciler) GetKClient() kubernetes.Interface {
 	return r.Kclient
 }
 
-// GetLogger -
-func (r *ManilaReconciler) GetLogger() logr.Logger {
-	return r.Log
+// GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
+func (r *ManilaReconciler) GetLogger(ctx context.Context) logr.Logger {
+	return log.FromContext(ctx).WithName("Controllers").WithName("Manila")
 }
 
 // GetScheme -
@@ -79,7 +79,6 @@ func (r *ManilaReconciler) GetScheme() *runtime.Scheme {
 type ManilaReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
-	Log     logr.Logger
 	Scheme  *runtime.Scheme
 }
 
@@ -114,7 +113,7 @@ type ManilaReconciler struct {
 
 // Reconcile -
 func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
-	_ = log.FromContext(ctx)
+	Log := r.GetLogger(ctx)
 
 	instance := &manilav1beta1.Manila{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
@@ -130,7 +129,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		r.Client,
 		r.Kclient,
 		r.Scheme,
-		r.Log,
+		Log,
 	)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -205,7 +204,9 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ManilaReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	Log := r.GetLogger(ctx)
+
 	// transportURLSecretFn - Watch for changes made to the secret associated with the RabbitMQ
 	// TransportURL created and used by Manila CRs. Watch functions return a list of namespace-scoped
 	// CRs that then get fed to the reconciler. Hence, in this case, we need to know the name of the
@@ -225,8 +226,8 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		listOpts := []client.ListOption{
 			client.InNamespace(o.GetNamespace()),
 		}
-		if err := r.Client.List(context.Background(), manilas, listOpts...); err != nil {
-			r.Log.Error(err, "Unable to retrieve Manila CRs %v")
+		if err := r.Client.List(ctx, manilas, listOpts...); err != nil {
+			Log.Error(err, "Unable to retrieve Manila CRs %v")
 			return nil
 		}
 
@@ -239,7 +240,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 							Namespace: o.GetNamespace(),
 							Name:      cr.Name,
 						}
-						r.Log.Info(fmt.Sprintf("TransportURL Secret %s belongs to TransportURL belonging to Manila CR %s", o.GetName(), cr.Name))
+						Log.Info(fmt.Sprintf("TransportURL Secret %s belongs to TransportURL belonging to Manila CR %s", o.GetName(), cr.Name))
 						result = append(result, reconcile.Request{NamespacedName: name})
 					}
 				}
@@ -271,7 +272,9 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ManilaReconciler) reconcileDelete(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
+	Log := r.GetLogger(ctx)
+
+	Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
 
 	// remove db finalizer first
 	db, err := mariadbv1.GetDatabaseByName(ctx, helper, instance.Name)
@@ -287,7 +290,7 @@ func (r *ManilaReconciler) reconcileDelete(ctx context.Context, instance *manila
 
 	// Service is deleted so remove the finalizer.
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
 
 	return ctrl.Result{}, nil
 }
@@ -299,7 +302,9 @@ func (r *ManilaReconciler) reconcileInit(
 	serviceLabels map[string]string,
 	serviceAnnotations map[string]string,
 ) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
+	Log := r.GetLogger(ctx)
+
+	Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
 
 	//
 	// create service DB instance
@@ -396,18 +401,20 @@ func (r *ManilaReconciler) reconcileInit(
 	}
 	if dbSyncjob.HasChanged() {
 		instance.Status.Hash[manilav1beta1.DbSyncHash] = dbSyncjob.GetHash()
-		r.Log.Info(fmt.Sprintf("Service '%s' - Job %s hash added - %s", instance.Name, jobDef.Name, instance.Status.Hash[manilav1beta1.DbSyncHash]))
+		Log.Info(fmt.Sprintf("Service '%s' - Job %s hash added - %s", instance.Name, jobDef.Name, instance.Status.Hash[manilav1beta1.DbSyncHash]))
 	}
 	instance.Status.Conditions.MarkTrue(condition.DBSyncReadyCondition, condition.DBSyncReadyMessage)
 
 	// run Manila db sync - end
 
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' init successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' init successfully", instance.Name))
 	return ctrl.Result{}, nil
 }
 
 func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
+	Log := r.GetLogger(ctx)
+
+	Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
 
 	// Service account, role, binding
 	rbacRules := []rbacv1.PolicyRule{
@@ -450,13 +457,13 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	}
 
 	if op != controllerutil.OperationResultNone {
-		r.Log.Info(fmt.Sprintf("TransportURL %s successfully reconciled - operation: %s", transportURL.Name, string(op)))
+		Log.Info(fmt.Sprintf("TransportURL %s successfully reconciled - operation: %s", transportURL.Name, string(op)))
 	}
 
 	instance.Status.TransportURLSecret = transportURL.Status.SecretName
 
 	if instance.Status.TransportURLSecret == "" {
-		r.Log.Info(fmt.Sprintf("Waiting for TransportURL %s secret to be created", transportURL.Name))
+		Log.Info(fmt.Sprintf("Waiting for TransportURL %s secret to be created", transportURL.Name))
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.RabbitMqTransportURLReadyCondition,
 			condition.RequestedReason,
@@ -613,7 +620,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		return ctrl.Result{}, err
 	}
 	if op != controllerutil.OperationResultNone {
-		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	// Mirror ManilaAPI status' ReadyCount to this parent CR
@@ -638,7 +645,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		return ctrl.Result{}, err
 	}
 	if op != controllerutil.OperationResultNone {
-		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	// Mirror ManilaScheduler status' ReadyCount to this parent CR
@@ -665,7 +672,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			return ctrl.Result{}, err
 		}
 		if op != controllerutil.OperationResultNone {
-			r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+			Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 		}
 
 		// Mirror ManilaShare status' ReadyCount to this parent CR
@@ -716,27 +723,31 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	instance.Status.Conditions.MarkTrue(condition.CronJobReadyCondition, condition.CronJobReadyMessage)
 	// create CronJob - end
 
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	return ctrl.Result{}, nil
 }
 
 func (r *ManilaReconciler) reconcileUpdate(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' update", instance.Name))
+	Log := r.GetLogger(ctx)
+
+	Log.Info(fmt.Sprintf("Reconciling Service '%s' update", instance.Name))
 
 	// TODO: should have minor update tasks if required
 	// - delete dbsync hash from status to rerun it?
 
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' update successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' update successfully", instance.Name))
 	return ctrl.Result{}, nil
 }
 
 func (r *ManilaReconciler) reconcileUpgrade(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' upgrade", instance.Name))
+	Log := r.GetLogger(ctx)
+
+	Log.Info(fmt.Sprintf("Reconciling Service '%s' upgrade", instance.Name))
 
 	// TODO: should have major version upgrade tasks
 	// -delete dbsync hash from status to rerun it?
 
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' upgrade successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' upgrade successfully", instance.Name))
 	return ctrl.Result{}, nil
 }
 
@@ -836,6 +847,8 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 	instance *manilav1beta1.Manila,
 	envVars map[string]env.Setter,
 ) (string, bool, error) {
+	Log := r.GetLogger(ctx)
+
 	var hashMap map[string]string
 	changed := false
 	mergedMapVars := env.MergeEnvs([]corev1.EnvVar{}, envVars)
@@ -845,7 +858,7 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 	}
 	if hashMap, changed = util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
+		Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, changed, nil
 }

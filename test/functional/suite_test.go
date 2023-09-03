@@ -190,8 +190,7 @@ var _ = BeforeSuite(func() {
 		Client:  k8sManager.GetClient(),
 		Scheme:  k8sManager.GetScheme(),
 		Kclient: kclient,
-		Log:     ctrl.Log.WithName("controllers").WithName("Manila"),
-	}).SetupWithManager(k8sManager)
+	}).SetupWithManager(context.Background(), k8sManager)
 
 	Expect(err).ToNot(HaveOccurred())
 
@@ -202,24 +201,21 @@ var _ = BeforeSuite(func() {
 		Client:  k8sManager.GetClient(),
 		Scheme:  k8sManager.GetScheme(),
 		Kclient: kclient,
-		Log:     ctrl.Log.WithName("controllers").WithName("ManilaAPI"),
-	}).SetupWithManager(k8sManager)
+	}).SetupWithManager(context.Background(), k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&controllers.ManilaSchedulerReconciler{
 		Client:  k8sManager.GetClient(),
 		Scheme:  k8sManager.GetScheme(),
 		Kclient: kclient,
-		Log:     ctrl.Log.WithName("controllers").WithName("ManilaScheduler"),
-	}).SetupWithManager(k8sManager)
+	}).SetupWithManager(context.Background(), k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&controllers.ManilaShareReconciler{
 		Client:  k8sManager.GetClient(),
 		Scheme:  k8sManager.GetScheme(),
 		Kclient: kclient,
-		Log:     ctrl.Log.WithName("controllers").WithName("ManilaShare"),
-	}).SetupWithManager(k8sManager)
+	}).SetupWithManager(context.Background(), k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
