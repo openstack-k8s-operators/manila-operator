@@ -4,4 +4,3 @@ delete:
 - apiVersion: manila.openstack.org/v1beta1
   kind: Manila
   name: manila
-  namespace: openstack

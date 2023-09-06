@@ -7,6 +7,9 @@ patches:
         - op: replace
           path: /spec/secret
           value: osp-secret
+        - op: replace
+          path: /metadata/namespace
+          value: manila-kuttl-tests
      target:
         kind: Manila
 patchesStrategicMerge:
