@@ -40,13 +40,11 @@ func Deployment(
 	runAsUser := int64(0)
 
 	livenessProbe := &corev1.Probe{
-		// TODO might need tuning
 		TimeoutSeconds:      5,
 		PeriodSeconds:       3,
 		InitialDelaySeconds: 5,
 	}
 	readinessProbe := &corev1.Probe{
-		// TODO might need tuning
 		TimeoutSeconds:      5,
 		PeriodSeconds:       5,
 		InitialDelaySeconds: 5,
@@ -122,7 +120,6 @@ func Deployment(
 	deployment.Spec.Template.Spec.Volumes = GetVolumes(
 		manila.GetOwningManilaName(instance),
 		instance.Name,
-		instance.Spec.CustomServiceConfigSecrets,
 		instance.Spec.ExtraMounts,
 	)
 	// If possible two pods of the same service should not
@@ -138,30 +135,6 @@ func Deployment(
 	if instance.Spec.NodeSelector != nil && len(instance.Spec.NodeSelector) > 0 {
 		deployment.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
-
-	initContainerDetails := manila.APIDetails{
-		ContainerImage:       instance.Spec.ContainerImage,
-		DatabaseHost:         instance.Spec.DatabaseHostname,
-		DatabaseUser:         instance.Spec.DatabaseUser,
-		DatabaseName:         manila.DatabaseName,
-		OSPSecret:            instance.Spec.Secret,
-		TransportURLSecret:   instance.Spec.TransportURLSecret,
-		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
-		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts: GetInitVolumeMounts(
-			instance.Spec.CustomServiceConfigSecrets,
-			instance.Spec.ExtraMounts,
-		),
-		Debug:       instance.Spec.Debug.InitContainer,
-		LoggingConf: false,
-	}
-	deployment.Spec.Template.Spec.InitContainers = manila.InitContainer(initContainerDetails)
-
-	// TODO: Clean up this hack
-	// Add custom config for the API Service
-	envVars = map[string]env.Setter{}
-	envVars["CustomConf"] = env.SetValue(common.CustomServiceConfigFileName)
-	deployment.Spec.Template.Spec.InitContainers[0].Env = env.MergeEnvs(deployment.Spec.Template.Spec.InitContainers[0].Env, envVars)
 
 	return deployment
 }

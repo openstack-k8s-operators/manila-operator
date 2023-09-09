@@ -26,7 +26,6 @@ import (
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
@@ -258,7 +257,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&manilav1beta1.ManilaShare{}).
 		Owns(&rabbitmqv1.TransportURL{}).
 		Owns(&batchv1.Job{}).
-		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
@@ -429,7 +428,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	}
 
 	// ConfigMap
-	configMapVars := make(map[string]env.Setter)
+	configVars := make(map[string]env.Setter)
 
 	//
 	// create RabbitMQ transportURL CR and get the actual URL from the associated secret that is created
@@ -488,7 +487,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	configMapVars[ospSecret.Name] = env.SetValue(hash)
+	configVars[ospSecret.Name] = env.SetValue(hash)
 
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 	// run check OpenStack secret - end
@@ -500,12 +499,12 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		common.AppSelector: manila.ServiceName,
 	}
 	//
-	// create Configmap required for manila input
+	// create Config required for Manila input
 	// - %-scripts configmap holding scripts to e.g. bootstrap the service
 	// - %-config configmap holding minimal manila config required to get the service up, user can add additional files to be added to the service
 	// - parameters which has passwords gets added from the OpenStack secret via the init container
 	//
-	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars, serviceLabels)
+	err = r.generateServiceConfig(ctx, helper, instance, &configVars, serviceLabels)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -520,7 +519,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
+	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -534,7 +533,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		// so we need to return and reconcile again
 		return ctrl.Result{}, nil
 	}
-	// Create ConfigMaps and Secrets - end
+	// Create Service Config and Secrets - end
 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
@@ -718,8 +717,7 @@ func (r *ManilaReconciler) reconcileUpgrade(ctx context.Context, instance *manil
 }
 
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
-// TODO add DefaultConfigOverwrite
-func (r *ManilaReconciler) generateServiceConfigMaps(
+func (r *ManilaReconciler) generateServiceConfig(
 	ctx context.Context,
 	h *helper.Helper,
 	instance *manilav1beta1.Manila,
@@ -727,19 +725,18 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 	serviceLabels map[string]string,
 ) error {
 	//
-	// create Configmap/Secret required for manila input
+	// create Secret required for manila input
 	// - %-scripts configmap holding scripts to e.g. bootstrap the service
 	// - %-config configmap holding minimal manila config required to get the service up, user can add additional files to be added to the service
 	// - parameters which has passwords gets added from the ospSecret via the init container
 	//
 
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
+	labels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
 	// customData hold any customization for the service.
 	// custom.conf is going to /etc/<service>/<service>.conf.d
 	// all other files get placed into /etc/<service> to allow overwrite of e.g. policy.json
-	// TODO: make sure custom.conf can not be overwritten
-	customData := map[string]string{common.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
+	customData := map[string]string{manila.CustomConfigFileName: instance.Spec.CustomServiceConfig}
 
 	for key, data := range instance.Spec.DefaultConfigOverwrite {
 		customData[key] = data
@@ -758,19 +755,38 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 		return err
 	}
 
-	templateParameters := make(map[string]interface{})
-	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
-	templateParameters["KeystonePublicURL"] = keystonePublicURL
-	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
+	ospSecret, _, err := secret.GetSecret(ctx, h, instance.Spec.Secret, instance.Namespace)
+	if err != nil {
+		return err
+	}
 
-	cms := []util.Template{
+	transportURLSecret, _, err := secret.GetSecret(ctx, h, instance.Status.TransportURLSecret, instance.Namespace)
+	if err != nil {
+		return err
+	}
+
+	//templateParameters := make(map[string]interface{})
+	templateParameters := map[string]interface{}{
+		"ServiceUser":         instance.Spec.ServiceUser,
+		"ServicePassword":     string(ospSecret.Data[instance.Spec.PasswordSelectors.Service]),
+		"KeystonePublicURL":   keystonePublicURL,
+		"KeystoneInternalURL": keystoneInternalURL,
+		"TransportURL":        string(transportURLSecret.Data["transport_url"]),
+		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			instance.Spec.DatabaseUser,
+			string(ospSecret.Data[instance.Spec.PasswordSelectors.Database]),
+			instance.Status.DatabaseHostname,
+			manila.DatabaseName),
+	}
+
+	configTemplates := []util.Template{
 		// ScriptsConfigMap
 		{
 			Name:         fmt.Sprintf("%s-scripts", instance.Name),
 			Namespace:    instance.Namespace,
 			Type:         util.TemplateTypeScripts,
 			InstanceType: instance.Kind,
-			Labels:       cmLabels,
+			Labels:       labels,
 		},
 		// ConfigMap
 		{
@@ -780,11 +796,11 @@ func (r *ManilaReconciler) generateServiceConfigMaps(
 			InstanceType:  instance.Kind,
 			CustomData:    customData,
 			ConfigOptions: templateParameters,
-			Labels:        cmLabels,
+			Labels:        labels,
 		},
 	}
 
-	return configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+	return secret.EnsureSecrets(ctx, h, instance, configTemplates, envVars)
 }
 
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart

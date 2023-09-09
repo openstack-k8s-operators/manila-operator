@@ -46,9 +46,6 @@ spec:
                 type: string
               debug:
                 properties:
-                  dbInitContainer:
-                    default: false
-                    type: boolean
                   dbSync:
                     default: false
                     type: boolean
@@ -826,9 +823,6 @@ spec:
                     type: array
                   debug:
                     properties:
-                      initContainer:
-                        default: false
-                        type: boolean
                       service:
                         default: false
                         type: boolean
@@ -923,9 +917,6 @@ spec:
                     type: array
                   debug:
                     properties:
-                      initContainer:
-                        default: false
-                        type: boolean
                       service:
                         default: false
                         type: boolean
@@ -996,9 +987,6 @@ spec:
                       type: array
                     debug:
                       properties:
-                        initContainer:
-                          default: false
-                          type: boolean
                         service:
                           default: false
                           type: boolean

@@ -1,17 +1,3 @@
 {
-  "command": "/usr/bin/manila-share --config-dir /etc/manila/manila.conf.d",
-  "config_files": [
-   {
-      "source": "/var/lib/config-data/merged/manila.conf.d",
-      "dest": "/etc/manila/manila.conf.d",
-      "owner": "root:manila",
-      "perm": "0750"
-    },
-    {
-      "source": "/var/lib/config-data/merged/logging.conf",
-      "dest": "/etc/manila/logging.conf",
-      "owner": "root:manila",
-      "perm": "0600"
-    }
-  ]
+  "command": "/usr/bin/manila-share --config-dir /etc/manila/manila.conf.d"
 }

@@ -79,7 +79,7 @@ type ManilaServiceTemplate struct {
 	// +kubebuilder:default="# add your customization here"
 	// CustomServiceConfig - customize the service config using this parameter to change service defaults,
 	// or overwrite rendered information using raw OpenStack config format. The content gets added to
-	// to /etc/<service>/<service>.conf.d directory as custom.conf file.
+	// to /etc/<service>/<service>.conf.d directory a custom config file.
 	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -120,10 +120,6 @@ type PasswordSelector struct {
 type ManilaDebug struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	// dbInitContainer enable debug (waits until /tmp/stop-init-container disappears)
-	DBInitContainer bool `json:"dbInitContainer,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
 	// dbSync enable debug
 	DBSync bool `json:"dbSync,omitempty"`
 }
@@ -131,10 +127,6 @@ type ManilaDebug struct {
 // ManilaServiceDebug indicates whether certain stages of Manila service
 // deployment should pause in debug mode
 type ManilaServiceDebug struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	// initContainer enable debug (waits until /tmp/stop-init-container disappears)
-	InitContainer bool `json:"initContainer,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// service enable debug

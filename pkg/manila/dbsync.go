@@ -10,25 +10,59 @@ import (
 )
 
 const (
-	// DBSyncCommand -
-	// FIXME?: The old CN-OSP use of bootstrap.sh does not work here, but not using it might be
-	// a problem as it has a few conditionals that should perhaps be considered (and they're not here)
-	DBSyncCommand = "/usr/local/bin/kolla_set_configs && su -s /bin/sh -c \"manila-manage db sync\""
+	//DBSyncCommand -
+	DBSyncCommand = "/usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start"
 )
 
 // DbSyncJob func
 func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations map[string]string) *batchv1.Job {
+	var config0644AccessMode int32 = 0644
+
+	// Unlike the individual manila services, the DbSyncJob doesn't need a
+	// secret that contains all of the config snippets required by every
+	// service, The two snippet files that it does need (DefaultsConfigFileName
+	// and CustomConfigFileName) can be extracted from the top-level manila
+	// config-data secret.
+	dbSyncVolume := []corev1.Volume{
+		{
+			Name: "db-sync-config-data",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					DefaultMode: &config0644AccessMode,
+					SecretName:  instance.Name + "-config-data",
+					Items: []corev1.KeyToPath{
+						{
+							Key:  DefaultsConfigFileName,
+							Path: DefaultsConfigFileName,
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "config-data",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					DefaultMode: &config0644AccessMode,
+					SecretName:  instance.Name + "-config-data",
+				},
+			},
+		},
+	}
 
 	dbSyncMounts := []corev1.VolumeMount{
 		{
-			Name:      "config-data-merged",
+			Name:      "db-sync-config-data",
+			MountPath: "/etc/manila/manila.conf.d",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "config-data",
 			MountPath: "/var/lib/kolla/config_files/config.json",
 			SubPath:   "db-sync-config.json",
 			ReadOnly:  true,
 		},
 	}
-
-	dbSyncExtraMounts := []manilav1.ManilaExtraVolMounts{}
 
 	args := []string{"-c"}
 	if instance.Spec.Debug.DBSync {
@@ -68,28 +102,14 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 								RunAsUser: &runAsUser,
 							},
 							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts: append(GetVolumeMounts(dbSyncExtraMounts, DbsyncPropagation), dbSyncMounts...),
+							VolumeMounts: dbSyncMounts,
 						},
 					},
-					Volumes: GetVolumes(instance.Name, dbSyncExtraMounts, DbsyncPropagation),
+					Volumes: dbSyncVolume,
 				},
 			},
 		},
 	}
-
-	initContainerDetails := APIDetails{
-		ContainerImage:       instance.Spec.ManilaAPI.ContainerImage,
-		DatabaseHost:         instance.Status.DatabaseHostname,
-		DatabaseUser:         instance.Spec.DatabaseUser,
-		DatabaseName:         DatabaseName,
-		OSPSecret:            instance.Spec.Secret,
-		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
-		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         GetInitVolumeMounts(dbSyncExtraMounts, DbsyncPropagation),
-		Debug:                instance.Spec.Debug.DBInitContainer,
-		LoggingConf:          false,
-	}
-	job.Spec.Template.Spec.InitContainers = InitContainer(initContainerDetails)
 
 	return job
 }

@@ -48,6 +48,15 @@ const (
 	// Manila is the global ServiceType that refers to all the components deployed
 	// by the manila operator
 	Manila storage.PropagationType = "Manila"
+
+	// DefaultsConfigFileName -
+	DefaultsConfigFileName = "00-config.conf"
+	// CustomConfigFileName -
+	CustomConfigFileName = "01-config.conf"
+	// CustomServiceConfigFileName -
+	CustomServiceConfigFileName = "02-config.conf"
+	// CustomServiceConfigSecretsFileName -
+	CustomServiceConfigSecretsFileName = "03-config.conf"
 )
 
 // DbsyncPropagation keeps track of the DBSync Service Propagation Type
