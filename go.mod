@@ -7,14 +7,14 @@ require (
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
 	github.com/openshift/api v3.9.0+incompatible
-	github.com/openstack-k8s-operators/infra-operator/apis v0.1.1-0.20230829092744-a3dd5edba332
+	github.com/openstack-k8s-operators/infra-operator/apis v0.1.1-0.20230905074428-c6aefc16dd01
 	github.com/openstack-k8s-operators/keystone-operator/api v0.1.1-0.20230830083045-d73d07cca617
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.1.1-0.20230824094610-976b18ca2875
 	github.com/openstack-k8s-operators/lib-common/modules/database v0.1.1-0.20230824094610-976b18ca2875
 	github.com/openstack-k8s-operators/lib-common/modules/storage v0.1.1-0.20230824094610-976b18ca2875
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.1.2-0.20230824094610-976b18ca2875
 	github.com/openstack-k8s-operators/manila-operator/api v0.1.1-0.20230817135608-41dee07f5847
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.1.1-0.20230823144333-b9363c5be8d2
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.1.1-0.20230905141738-de0804f52e09
 	k8s.io/api v0.26.7
 	k8s.io/apimachinery v0.26.7
 	k8s.io/client-go v0.26.7
