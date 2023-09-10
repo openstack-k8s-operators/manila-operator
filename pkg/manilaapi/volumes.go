@@ -43,3 +43,22 @@ func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMo
 
 	return append(manila.GetVolumeMounts(extraVol, manila.ManilaAPIPropagation), apiVolumeMounts...)
 }
+
+// GetLogVolumeMount - Manila API LogVolumeMount
+func GetLogVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      logVolume,
+		MountPath: "/var/log/manila",
+		ReadOnly:  false,
+	}
+}
+
+// GetLogVolume - Manila API LogVolume
+func GetLogVolume() corev1.Volume {
+	return corev1.Volume{
+		Name: logVolume,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""},
+		},
+	}
+}

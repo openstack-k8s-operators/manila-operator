@@ -15,4 +15,10 @@ package manilaapi
 const (
 	// Component -
 	Component = "manila-api"
+
+	//LogFile -
+	LogFile = "/var/log/manila/manila-api.log"
+
+	// logVolume -
+	logVolume = "logs"
 )

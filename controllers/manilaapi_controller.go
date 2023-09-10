@@ -822,15 +822,19 @@ func (r *ManilaAPIReconciler) generateServiceConfig(
 	}
 	customData[manila.CustomServiceConfigSecretsFileName] = customSecrets
 
+	templateParameters := map[string]interface{}{
+		"LogFile": manilaapi.LogFile,
+	}
 	configTemplates := []util.Template{
 		// Custom ConfigMap
 		{
-			Name:         fmt.Sprintf("%s-config-data", instance.Name),
-			Namespace:    instance.Namespace,
-			Type:         util.TemplateTypeConfig,
-			InstanceType: instance.Kind,
-			CustomData:   customData,
-			Labels:       labels,
+			Name:          fmt.Sprintf("%s-config-data", instance.Name),
+			Namespace:     instance.Namespace,
+			Type:          util.TemplateTypeConfig,
+			InstanceType:  instance.Kind,
+			CustomData:    customData,
+			ConfigOptions: templateParameters,
+			Labels:        labels,
 		},
 	}
 
