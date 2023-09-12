@@ -141,7 +141,7 @@ $(GINKGO): $(LOCALBIN)
 test: manifests generate fmt vet envtest ginkgo ## Run tests.
 	go test -v ./pkg/.. ./controllers/.. ./api/.. -coverprofile cover.out
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
-	$(GINKGO) --trace --cover --coverprofile cover.out --covermode=atomic --randomize-all ${PROC_CMD} $(GINKGO_ARGS) ./tests/functional/...
+	$(GINKGO) --trace --cover --coverprofile cover.out --covermode=atomic --randomize-all ${PROC_CMD} $(GINKGO_ARGS) ./test/functional/...
 .PHONY: gowork
 gowork: export GOWORK=
 gowork: ## Generate go.work file to support our multi module repository
