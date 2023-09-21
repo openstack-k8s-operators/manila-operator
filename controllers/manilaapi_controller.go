@@ -29,7 +29,6 @@ import (
 
 	"github.com/go-logr/logr"
 
-	routev1 "github.com/openshift/api/route/v1"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
@@ -40,6 +39,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
@@ -82,7 +82,6 @@ var (
 //+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;create;update;patch;delete;watch
-// +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneservices,verbs=get;list;watch;create;update;patch;delete
@@ -263,7 +262,6 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&keystonev1.KeystoneEndpoint{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Secret{}).
-		Owns(&routev1.Route{}).
 		Owns(&corev1.Service{}).
 		// watch the secrets we don't own
 		Watches(&source.Kind{Type: &corev1.Secret{}},
@@ -321,7 +319,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
 
 	//
-	// expose the service (create service, route and return the created endpoint URLs)
+	// expose the service (create service and return the created endpoint URLs)
 	//
 
 	// V2 (Supported micro-versioned API endpoint)
@@ -334,106 +332,111 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		Path: "/v2",
 	}
 
-	data := map[endpoint.Endpoint]endpoint.Data{
-		endpoint.EndpointPublic:   publicEndpointData,
-		endpoint.EndpointInternal: internalEndpointData,
+	data := map[service.Endpoint]endpoint.Data{
+		service.EndpointPublic:   publicEndpointData,
+		service.EndpointInternal: internalEndpointData,
 	}
 
-	for _, metallbcfg := range instance.Spec.ExternalEndpoints {
-		portCfg := data[metallbcfg.Endpoint]
+	apiEndpointsV1 := make(map[string]string)
+	apiEndpointsV2 := make(map[string]string)
 
-		portCfg.MetalLB = &endpoint.MetalLBData{
-			IPAddressPool:   metallbcfg.IPAddressPool,
-			SharedIP:        metallbcfg.SharedIP,
-			SharedIPKey:     metallbcfg.SharedIPKey,
-			LoadBalancerIPs: metallbcfg.LoadBalancerIPs,
+	for endpointType, data := range data {
+		endpointTypeStr := string(endpointType)
+		endpointName := manila.ServiceName + "-" + endpointTypeStr
+		svcOverride := instance.Spec.Override.Service[endpointType]
+		if svcOverride.EmbeddedLabelsAnnotations == nil {
+			svcOverride.EmbeddedLabelsAnnotations = &service.EmbeddedLabelsAnnotations{}
 		}
 
-		data[metallbcfg.Endpoint] = portCfg
-	}
+		exportLabels := util.MergeStringMaps(
+			serviceLabels,
+			map[string]string{
+				service.AnnotationEndpointKey: endpointTypeStr,
+			},
+		)
 
-	apiEndpointsV2, ctrlResult, err := endpoint.ExposeEndpoints(
-		ctx,
-		helper,
-		manila.ServiceName,
-		serviceLabels,
-		data,
-		time.Duration(5)*time.Second,
-	)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.ExposeServiceReadyRunningMessage))
-		return ctrlResult, nil
-	}
+		// Create the service
+		svc, err := service.NewService(
+			service.GenericService(&service.GenericServiceDetails{
+				Name:      endpointName,
+				Namespace: instance.Namespace,
+				Labels:    exportLabels,
+				Selector:  serviceLabels,
+				Port: service.GenericServicePort{
+					Name:     endpointName,
+					Port:     data.Port,
+					Protocol: corev1.ProtocolTCP,
+				},
+			}),
+			5,
+			&svcOverride.OverrideSpec,
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.ExposeServiceReadyErrorMessage,
+				err.Error()))
 
-	// V2 - end
-
-	// V1 (Deprected, non micro-versioned API endpoint, here for legacy users)
-	// will be removed when the upstream service (and dependencies) drop it
-	v1publicEndpointData := endpoint.Data{
-		Port: manila.ManilaPublicPort,
-		Path: "/v1/%(project_id)s",
-	}
-	v1internalEndpointData := endpoint.Data{
-		Port: manila.ManilaInternalPort,
-		Path: "/v1/%(project_id)s",
-	}
-
-	v1data := map[endpoint.Endpoint]endpoint.Data{
-		endpoint.EndpointPublic:   v1publicEndpointData,
-		endpoint.EndpointInternal: v1internalEndpointData,
-	}
-
-	for _, metallbcfg := range instance.Spec.ExternalEndpoints {
-		portCfg := v1data[metallbcfg.Endpoint]
-
-		portCfg.MetalLB = &endpoint.MetalLBData{
-			IPAddressPool:   metallbcfg.IPAddressPool,
-			SharedIP:        metallbcfg.SharedIP,
-			SharedIPKey:     metallbcfg.SharedIPKey,
-			LoadBalancerIPs: metallbcfg.LoadBalancerIPs,
+			return ctrl.Result{}, err
 		}
 
-		v1data[metallbcfg.Endpoint] = portCfg
-	}
+		svc.AddAnnotation(map[string]string{
+			service.AnnotationEndpointKey: endpointTypeStr,
+		})
 
-	apiEndpointsV1, ctrlResult, err := endpoint.ExposeEndpoints(
-		ctx,
-		helper,
-		manila.ServiceName,
-		serviceLabels,
-		v1data,
-		time.Duration(5)*time.Second,
-	)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.ExposeServiceReadyRunningMessage))
-		return ctrlResult, nil
-	}
+		// add Annotation to whether creating an ingress is required or not
+		if endpointType == service.EndpointPublic && svc.GetServiceType() == corev1.ServiceTypeClusterIP {
+			svc.AddAnnotation(map[string]string{
+				service.AnnotationIngressCreateKey: "true",
+			})
+		} else {
+			svc.AddAnnotation(map[string]string{
+				service.AnnotationIngressCreateKey: "false",
+			})
+			if svc.GetServiceType() == corev1.ServiceTypeLoadBalancer {
+				svc.AddAnnotation(map[string]string{
+					service.AnnotationHostnameKey: svc.GetServiceHostname(), // add annotation to register service name in dnsmasq
+				})
+			}
+		}
 
-	// V1 - end
+		ctrlResult, err := svc.CreateOrPatch(ctx, helper)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.ExposeServiceReadyErrorMessage,
+				err.Error()))
+
+			return ctrlResult, err
+		} else if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.ExposeServiceReadyRunningMessage))
+			return ctrlResult, nil
+		}
+		// create service - end
+
+		// TODO: TLS, pass in https as protocol
+		apiEndpointsV2[string(endpointType)], err = svc.GetAPIEndpoint(
+			svcOverride.EndpointURL, data.Protocol, data.Path)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// V1 (Deprected, non micro-versioned API endpoint, here for legacy users)
+		// will be removed when the upstream service (and dependencies) drop it
+		apiEndpointsV1[string(endpointType)], err = svc.GetAPIEndpoint(
+			svcOverride.EndpointURL, data.Protocol, "/v1/%(project_id)s")
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	apiEndpoints := map[string]map[string]string{
 		manila.ServiceNameV2: apiEndpointsV2,
@@ -458,7 +461,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		}
 
 		ksSvcObj := keystonev1.NewKeystoneService(ksSvcSpec, instance.Namespace, serviceLabels, time.Duration(10)*time.Second)
-		ctrlResult, err = ksSvcObj.CreateOrPatch(ctx, helper)
+		ctrlResult, err := ksSvcObj.CreateOrPatch(ctx, helper)
 		if err != nil {
 			return ctrlResult, err
 		}
