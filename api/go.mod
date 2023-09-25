@@ -3,14 +3,12 @@ module github.com/openstack-k8s-operators/manila-operator/api
 go 1.19
 
 require (
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.1.1-0.20230919113507-d74c2f31d216
-	github.com/openstack-k8s-operators/lib-common/modules/storage v0.1.1-0.20230919113507-d74c2f31d216
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.1.1-0.20230925103424-7dcb605ea0bb
+	github.com/openstack-k8s-operators/lib-common/modules/storage v0.1.1-0.20230925103424-7dcb605ea0bb
 	k8s.io/api v0.26.9
 	k8s.io/apimachinery v0.26.9
 	sigs.k8s.io/controller-runtime v0.14.6
 )
-
-require k8s.io/client-go v0.26.9 // indirect
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -57,6 +55,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.26.9 // indirect
+	k8s.io/client-go v0.26.9 // indirect
 	k8s.io/component-base v0.26.9 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230308215209-15aac26d736a // indirect

@@ -129,7 +129,7 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
-			DeferCleanup(th.DeleteKeystoneAPI, th.CreateKeystoneAPI(namespace))
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(namespace))
 		})
 		It("Should set DBReady Condition and set DatabaseHostname Status when DB is Created", func() {
 			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
@@ -190,8 +190,8 @@ var _ = Describe("Manila controller", func() {
 			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 		})
 		It("should create config-data and scripts ConfigMaps", func() {
-			keystoneAPI := th.CreateKeystoneAPI(manilaTest.Instance.Namespace)
-			DeferCleanup(th.DeleteKeystoneAPI, keystoneAPI)
+			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPI)
 			Eventually(func() corev1.Secret {
 				return th.GetSecret(manilaTest.ManilaConfigSecret)
 			}, timeout, interval).ShouldNot(BeNil())
@@ -233,11 +233,11 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
-			DeferCleanup(th.DeleteKeystoneAPI, th.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
-			th.SimulateKeystoneServiceReady(manilaTest.Instance)
-			th.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 		})
 		It("Creates ManilaAPI", func() {
 			ManilaAPIExists(manilaTest.Instance)
@@ -268,12 +268,12 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
-			DeferCleanup(th.DeleteKeystoneAPI, th.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 		})
 		It("removes the finalizers from the Manila DB", func() {
-			th.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 
 			mDB := th.GetMariaDBDatabase(manilaTest.Instance)
 			Expect(mDB.Finalizers).To(ContainElement("Manila"))
@@ -341,16 +341,16 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
-			keystoneAPIName := th.CreateKeystoneAPI(manilaTest.Instance.Namespace)
-			DeferCleanup(th.DeleteKeystoneAPI, keystoneAPIName)
-			keystoneAPI := th.GetKeystoneAPI(keystoneAPIName)
+			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)
 			keystoneAPI.Status.APIEndpoints["internal"] = "http://keystone-internal-openstack.testing"
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
 			}, timeout, interval).Should(Succeed())
 			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
-			th.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 		})
 		It("Check the resulting endpoints of the generated sub-CRs", func() {
 			th.SimulateDeploymentReadyWithPods(
@@ -365,7 +365,7 @@ var _ = Describe("Manila controller", func() {
 				manilaTest.ManilaShares[0],
 				map[string][]string{manilaName.Namespace + "/internalapi": {"10.0.0.1"}},
 			)
-			th.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 			// Retrieve the generated resources
 			manila := GetManila(manilaTest.Instance)
 			api := GetManilaAPI(manilaTest.ManilaAPI)
@@ -397,12 +397,12 @@ var _ = Describe("Manila controller", func() {
 				HaveKeyWithValue("metallb.universe.tf/loadBalancerIPs", "internal-lb-ip-1,internal-lb-ip-2"))
 
 			// check keystone endpoints for v1 and v2
-			keystoneEndpoint := th.GetKeystoneEndpoint(types.NamespacedName{Namespace: manila.Namespace, Name: "manila"})
+			keystoneEndpoint := keystone.GetKeystoneEndpoint(types.NamespacedName{Namespace: manila.Namespace, Name: "manila"})
 			endpoints := keystoneEndpoint.Spec.Endpoints
 			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manila.Namespace+".svc:8786/v1/%(project_id)s"))
 			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manila.Namespace+".svc:8786/v1/%(project_id)s"))
 
-			keystoneEndpoint = th.GetKeystoneEndpoint(types.NamespacedName{Namespace: manila.Namespace, Name: "manilav2"})
+			keystoneEndpoint = keystone.GetKeystoneEndpoint(types.NamespacedName{Namespace: manila.Namespace, Name: "manilav2"})
 			endpoints = keystoneEndpoint.Spec.Endpoints
 			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manila.Namespace+".svc:8786/v2"))
 			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manila.Namespace+".svc:8786/v2"))
