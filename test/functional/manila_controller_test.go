@@ -32,16 +32,14 @@ var _ = Describe("Manila controller", func() {
 		BeforeEach(func() {
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
 		})
-
 		It("initializes the status fields", func() {
 			Eventually(func(g Gomega) {
 				glance := GetManila(manilaName)
-				g.Expect(glance.Status.Conditions).To(HaveLen(12))
+				g.Expect(glance.Status.Conditions).To(HaveLen(13))
 
 				g.Expect(glance.Status.DatabaseHostname).To(Equal(""))
 			}, timeout*2, interval).Should(Succeed())
 		})
-
 		It("is not Ready", func() {
 			th.ExpectCondition(
 				manilaTest.Instance,

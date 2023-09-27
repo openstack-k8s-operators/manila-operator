@@ -62,6 +62,10 @@ status:
         reason: Ready
         status: "True"
         type: Ready
+      - message: CronJob completed
+        reason: Ready
+        status: "True"
+        type: CronJobReady
       - message: DB create completed
         reason: Ready
         status: "True"
