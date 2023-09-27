@@ -121,6 +121,45 @@ status:
       share1: 1
    transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 ---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: manila-cron
+spec:
+  jobTemplate:
+    metadata:
+      labels:
+        service: manila
+    spec:
+      completions: 1
+      parallelism: 1
+      template:
+        spec:
+          containers:
+          - args:
+            - -c
+            - /usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d
+              db purge 30
+            command:
+            - /bin/bash
+            name: manila-cron
+            volumeMounts:
+            - mountPath: /etc/manila/manila.conf.d
+              name: db-purge-config-data
+              readOnly: true
+          serviceAccount: manila-manila
+          serviceAccountName: manila-manila
+          volumes:
+          - name: db-purge-config-data
+            secret:
+              defaultMode: 420
+              items:
+              - key: 00-config.conf
+                path: 00-config.conf
+              secretName: manila-config-data
+  schedule: 1 0 * * *
+  suspend: false
+---
 # when using image digests the containerImage URLs are SHA's so we verify them with a script
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
