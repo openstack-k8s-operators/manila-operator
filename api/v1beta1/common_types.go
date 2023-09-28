@@ -121,6 +121,10 @@ type ManilaDebug struct {
 	// +kubebuilder:default=false
 	// dbSync enable debug
 	DBSync bool `json:"dbSync,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// dbPurge enable debug on the DBPurge CronJob
+	DBPurge bool `json:"dbPurge,omitempty"`
 }
 
 // ManilaServiceDebug indicates whether certain stages of Manila service
