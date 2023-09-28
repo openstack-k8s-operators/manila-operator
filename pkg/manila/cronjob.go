@@ -16,19 +16,17 @@ limitations under the License.
 package manila
 
 import (
-	common "github.com/openstack-k8s-operators/lib-common/modules/common"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
+	"strings"
 )
 
-const (
-	// DBPurgeCommand -
-	DBPurgeCommand = "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d db purge "
-)
+// DBPurgeCommandBase -
+var DBPurgeCommandBase = [...]string{"/usr/bin/manila-manage", "--debug", "--config-dir /etc/manila/manila.conf.d", "db purge "}
 
 // CronJob func
 func CronJob(
@@ -38,13 +36,18 @@ func CronJob(
 ) *batchv1.CronJob {
 	runAsUser := int64(0)
 	var config0644AccessMode int32 = 0644
-
+	var DBPurgeCommand []string = DBPurgeCommandBase[:]
 	args := []string{"-c"}
-	if instance.Spec.Debug.DBSync {
-		args = append(args, common.DebugCommand)
-	} else {
-		args = append(args, DBPurgeCommand+strconv.Itoa(DBPurgeAge))
+
+	if !instance.Spec.Debug.DBPurge {
+		// If debug mode is not requested, remove the --debug option
+		DBPurgeCommand = append(DBPurgeCommandBase[:1], DBPurgeCommandBase[2:]...)
 	}
+	// Build the resulting command
+	DBPurgeCommandString := strings.Join(DBPurgeCommand, " ")
+
+	// Extend the resulting command with the DBPurgeAge int
+	args = append(args, DBPurgeCommandString+strconv.Itoa(DBPurgeAge))
 
 	parallelism := int32(1)
 	completions := int32(1)

@@ -46,6 +46,9 @@ spec:
                 type: string
               debug:
                 properties:
+                  dbPurge:
+                    default: false
+                    type: boolean
                   dbSync:
                     default: false
                     type: boolean
