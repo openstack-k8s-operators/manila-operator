@@ -50,6 +50,7 @@ import (
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/test"
 	common_test "github.com/openstack-k8s-operators/lib-common/modules/test/helpers"
+	mariadb_test "github.com/openstack-k8s-operators/mariadb-operator/api/test/helpers"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 
 	"github.com/openstack-k8s-operators/manila-operator/controllers"
@@ -68,6 +69,7 @@ var (
 	logger     logr.Logger
 	th         *common_test.TestHelper
 	keystone   *keystone_test.TestHelper
+	mariadb    *mariadb_test.TestHelper
 	namespace  string
 	manilaName types.NamespacedName
 	manilaTest ManilaTestData
@@ -156,7 +158,9 @@ var _ = BeforeSuite(func() {
 	th = common_test.NewTestHelper(ctx, k8sClient, timeout, interval, logger)
 	Expect(th).NotTo(BeNil())
 	keystone = keystone_test.NewTestHelper(ctx, k8sClient, timeout, interval, logger)
-	Expect(th).NotTo(BeNil())
+	Expect(keystone).NotTo(BeNil())
+	mariadb = mariadb_test.NewTestHelper(ctx, k8sClient, timeout, interval, logger)
+	Expect(mariadb).NotTo(BeNil())
 
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
