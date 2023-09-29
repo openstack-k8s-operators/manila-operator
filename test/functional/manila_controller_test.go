@@ -117,8 +117,8 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
 			DeferCleanup(
-				th.DeleteDBService,
-				th.CreateDBService(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
 					namespace,
 					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
 					corev1.ServiceSpec{
@@ -130,7 +130,7 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(namespace))
 		})
 		It("Should set DBReady Condition and set DatabaseHostname Status when DB is Created", func() {
-			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			Manila := GetManila(manilaTest.Instance)
 			Expect(Manila.Status.DatabaseHostname).To(Equal("hostname-for-openstack"))
@@ -148,7 +148,7 @@ var _ = Describe("Manila controller", func() {
 			)
 		})
 		It("Should fail if db-sync job fails when DB is Created", func() {
-			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobFailure(manilaTest.ManilaDBSync)
 			th.ExpectCondition(
 				manilaTest.Instance,
@@ -177,7 +177,7 @@ var _ = Describe("Manila controller", func() {
 		BeforeEach(func() {
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
-			DeferCleanup(th.DeleteDBService, th.CreateDBService(
+			DeferCleanup(mariadb.DeleteDBService, mariadb.CreateDBService(
 				manilaTest.Instance.Namespace,
 				GetManila(manilaName).Spec.DatabaseInstance,
 				corev1.ServiceSpec{
@@ -221,8 +221,8 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
 			DeferCleanup(th.DeleteInstance, CreateManilaShare(manilaTest.Instance, GetDefaultManilaShareSpec()))
 			DeferCleanup(
-				th.DeleteDBService,
-				th.CreateDBService(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
 					manilaTest.Instance.Namespace,
 					GetManila(manilaName).Spec.DatabaseInstance,
 					corev1.ServiceSpec{
@@ -232,7 +232,7 @@ var _ = Describe("Manila controller", func() {
 			)
 			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
-			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
@@ -256,8 +256,8 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
-				th.DeleteDBService,
-				th.CreateDBService(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
 					manilaTest.Instance.Namespace,
 					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
 					corev1.ServiceSpec{
@@ -267,18 +267,18 @@ var _ = Describe("Manila controller", func() {
 			)
 			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
-			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 		})
 		It("removes the finalizers from the Manila DB", func() {
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 
-			mDB := th.GetMariaDBDatabase(manilaTest.Instance)
+			mDB := mariadb.GetMariaDBDatabase(manilaTest.Instance)
 			Expect(mDB.Finalizers).To(ContainElement("Manila"))
 
 			th.DeleteInstance(GetManila(manilaTest.Instance))
 
-			mDB = th.GetMariaDBDatabase(manilaTest.Instance)
+			mDB = mariadb.GetMariaDBDatabase(manilaTest.Instance)
 			Expect(mDB.Finalizers).NotTo(ContainElement("Manila"))
 		})
 	})
@@ -329,8 +329,8 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
-				th.DeleteDBService,
-				th.CreateDBService(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
 					manilaTest.Instance.Namespace,
 					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
 					corev1.ServiceSpec{
@@ -346,7 +346,7 @@ var _ = Describe("Manila controller", func() {
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
 			}, timeout, interval).Should(Succeed())
-			th.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 		})
