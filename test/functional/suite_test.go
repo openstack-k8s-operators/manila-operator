@@ -46,6 +46,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
+	infra_test "github.com/openstack-k8s-operators/infra-operator/apis/test/helpers"
 	keystone_test "github.com/openstack-k8s-operators/keystone-operator/api/test/helpers"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/test"
@@ -70,6 +71,7 @@ var (
 	th         *common_test.TestHelper
 	keystone   *keystone_test.TestHelper
 	mariadb    *mariadb_test.TestHelper
+	infra      *infra_test.TestHelper
 	namespace  string
 	manilaName types.NamespacedName
 	manilaTest ManilaTestData
@@ -161,6 +163,8 @@ var _ = BeforeSuite(func() {
 	Expect(keystone).NotTo(BeNil())
 	mariadb = mariadb_test.NewTestHelper(ctx, k8sClient, timeout, interval, logger)
 	Expect(mariadb).NotTo(BeNil())
+	infra = infra_test.NewTestHelper(ctx, k8sClient, timeout, interval, logger)
+	Expect(infra).NotTo(BeNil())
 
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
