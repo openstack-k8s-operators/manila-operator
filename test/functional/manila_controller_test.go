@@ -126,7 +126,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				),
 			)
-			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(namespace))
 		})
 		It("Should set DBReady Condition and set DatabaseHostname Status when DB is Created", func() {
@@ -185,7 +185,7 @@ var _ = Describe("Manila controller", func() {
 				},
 			),
 			)
-			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 		})
 		It("should create config-data and scripts ConfigMaps", func() {
 			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
@@ -230,7 +230,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				),
 			)
-			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
@@ -265,7 +265,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				),
 			)
-			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
@@ -338,7 +338,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				),
 			)
-			th.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
 			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)
