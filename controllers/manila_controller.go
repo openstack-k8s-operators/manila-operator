@@ -36,7 +36,6 @@ import (
 	common_rbac "github.com/openstack-k8s-operators/lib-common/modules/common/rbac"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
-	"github.com/openstack-k8s-operators/lib-common/modules/database"
 	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
@@ -275,7 +274,7 @@ func (r *ManilaReconciler) reconcileDelete(ctx context.Context, instance *manila
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
 
 	// remove db finalizer first
-	db, err := database.GetDatabaseByName(ctx, helper, instance.Name)
+	db, err := mariadbv1.GetDatabaseByName(ctx, helper, instance.Name)
 	if err != nil && !k8s_errors.IsNotFound(err) {
 		return ctrl.Result{}, err
 	}
@@ -305,7 +304,7 @@ func (r *ManilaReconciler) reconcileInit(
 	//
 	// create service DB instance
 	//
-	db := database.NewDatabase(
+	db := mariadbv1.NewDatabase(
 		instance.Name,
 		instance.Spec.DatabaseUser,
 		instance.Spec.Secret,
