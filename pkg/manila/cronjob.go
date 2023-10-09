@@ -34,7 +34,6 @@ func CronJob(
 	labels map[string]string,
 	annotations map[string]string,
 ) *batchv1.CronJob {
-	runAsUser := int64(0)
 	var config0644AccessMode int32 = 0644
 	var DBPurgeCommand []string = DBPurgeCommandBase[:]
 	args := []string{"-c"}
@@ -103,11 +102,9 @@ func CronJob(
 									Command: []string{
 										"/bin/bash",
 									},
-									Args:         args,
-									VolumeMounts: cronJobVolumeMounts,
-									SecurityContext: &corev1.SecurityContext{
-										RunAsUser: &runAsUser,
-									},
+									Args:            args,
+									VolumeMounts:    cronJobVolumeMounts,
+									SecurityContext: GetManilaSecurityContext(),
 								},
 							},
 							Volumes:            cronJobVolume,
