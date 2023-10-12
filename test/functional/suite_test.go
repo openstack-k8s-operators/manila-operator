@@ -49,8 +49,8 @@ import (
 	infra_test "github.com/openstack-k8s-operators/infra-operator/apis/test/helpers"
 	keystone_test "github.com/openstack-k8s-operators/keystone-operator/api/test/helpers"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
+	common_test "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
 	"github.com/openstack-k8s-operators/lib-common/modules/test"
-	common_test "github.com/openstack-k8s-operators/lib-common/modules/test/helpers"
 	mariadb_test "github.com/openstack-k8s-operators/mariadb-operator/api/test/helpers"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 
