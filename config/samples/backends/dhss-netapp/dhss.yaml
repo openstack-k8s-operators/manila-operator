@@ -1,0 +1,42 @@
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+metadata:
+  name: openstack
+spec:
+  secret: osp-secret
+  storageClass: local-storage
+  manila:
+    enabled: true
+    template:
+      manilaAPI:
+        customServiceConfig: |
+          [DEFAULT]
+          debug = true
+          enabled_share_protocols=nfs,cifs
+        replicas: 1
+      manilaScheduler:
+        replicas: 1
+      manilaShares:
+        share1:
+          replicas: 1
+          customServiceConfig: |
+            [DEFAULT]
+            debug = true
+            enabled_share_backends=netapp-dhss
+            [netapp-dhss]
+            driver_handles_share_servers=True
+            share_backend_name=netapp
+            share_driver=manila.share.drivers.netapp.common.NetAppDriver
+            netapp_storage_family=ontap_cluster
+            netapp_transport_type=http
+            network_config_group = membernet
+            [membernet]
+            standalone_network_plugin_segmentation_id = 1010
+            standalone_network_plugin_network_type = vlan
+            standalone_network_plugin_mask = 24
+            standalone_network_plugin_gateway = 10.0.0.1
+            standalone_network_plugin_allowed_ip_ranges = 10.0.0.10-10.0.0.209
+            network_plugin_ipv4_enabled = True
+            network_api_class = manila.network.standalone_network_plugin.StandaloneNetworkPlugin
+          customServiceConfigSecrets:
+            - osp-secret-manila-netapp-dhss

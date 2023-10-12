@@ -1,0 +1,6 @@
+resources:
+  - ../bases/openstack
+  - ./osp-secret-netapp.yaml
+
+patches:
+  - dhss.yaml

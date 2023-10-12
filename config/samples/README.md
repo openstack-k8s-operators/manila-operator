@@ -16,9 +16,10 @@ credentials in a different yaml file, to having to create secrets.
 
 Currently available samples are:
 
+- native cephfs
 - ceph-nfs
-- cephfs
 - netapp
+- netapp-dhss
 - multibackend (a combination of the above)
 
 ## CephFS example
