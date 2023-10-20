@@ -21,3 +21,20 @@ spec:
          cephfs_auth_id=openstack
          cephfs_cluster_name=ceph
          cephfs_protocol_helper_type=CEPHFS
+  extraMounts:
+    - name: v1
+      region: r1
+      extraVol:
+        - propagation:
+          - share1
+          extraVolType: Ceph
+          volumes:
+          - name: ceph
+            projected:
+              sources:
+              - secret:
+                  name: ceph-conf-files
+          mounts:
+          - name: ceph
+            mountPath: "/etc/ceph"
+            readOnly: true
