@@ -44,6 +44,15 @@ spec:
               databaseUser:
                 default: manila
                 type: string
+              dbPurge:
+                properties:
+                  age:
+                    default: 30
+                    type: integer
+                  schedule:
+                    default: 1 0 * * *
+                    type: string
+                type: object
               debug:
                 properties:
                   dbPurge:

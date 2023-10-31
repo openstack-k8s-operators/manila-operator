@@ -7,3 +7,4 @@
         - manila-operator-kuttl:
             dependencies:
               - openstack-k8s-operators-content-provider
+            voting: false

@@ -95,6 +95,10 @@ type ManilaSpec struct {
 	// NodeSelector here acts as a default value and can be overridden by service
 	// specific NodeSelector Settings.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// DBPurge parameters -
+	DBPurge DBPurge `json:"dbPurge,omitempty"`
 }
 
 // ManilaStatus defines the observed state of Manila
@@ -146,6 +150,31 @@ type ManilaList struct {
 
 func init() {
 	SchemeBuilder.Register(&Manila{}, &ManilaList{})
+}
+
+// DBPurge struct is used to model the parameters exposed to the Manila API CronJob
+type DBPurge struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=30
+	// Age is the DBPurgeAge parameter and indicates the number of days of purging DB records
+	Age int `json:"age"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="1 0 * * *"
+	//Schedule defines the crontab format string to schedule the DBPurge cronJob
+	Schedule string `json:"schedule"`
+}
+
+// ManilaDebug contains flags related to multiple debug activities. See the
+// individual comments for what this means for each flag.
+type ManilaDebug struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// DBSync pauses the dbSync container instead of executing the db_sync command.
+	DBSync bool `json:"dbSync,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// DBPurge increases log verbosity by executing the db_purge command with "--debug".
+	DBPurge bool `json:"dbPurge,omitempty"`
 }
 
 // IsReady - returns true if Manila is reconciled successfully

@@ -1,7 +1,7 @@
 ---
 - job:
     name: manila-operator-kuttl
-    parent: cifmw-multinode-kuttl
+    parent: cifmw-base-multinode-kuttl
     attempts: 1
     vars:
       cifmw_kuttl_tests_env_vars:

@@ -23,6 +23,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -34,6 +35,8 @@ type ManilaDefaults struct {
 	APIContainerImageURL       string
 	SchedulerContainerImageURL string
 	ShareContainerImageURL     string
+	DBPurgeAge                 int
+	DBPurgeSchedule            string
 }
 
 var manilaDefaults ManilaDefaults
@@ -41,10 +44,19 @@ var manilaDefaults ManilaDefaults
 // log is for logging in this package.
 var manilalog = logf.Log.WithName("manila-resource")
 
-// SetupManilaDefaults - initialize Manila spec defaults for use with either internal or external webhooks
-func SetupManilaDefaults(defaults ManilaDefaults) {
-	manilaDefaults = defaults
-	manilalog.Info("Manila defaults initialized", "defaults", defaults)
+// SetupDefaults - initializes any CRD field defaults based on environment variables
+// (the defaulting mechanism itself is implemented via webhooks)
+func SetupDefaults() {
+	// Acquire environmental defaults and initialize Manila defaults with them
+	manilaDefaults = ManilaDefaults{
+		APIContainerImageURL:       util.GetEnvVar("RELATED_IMAGE_MANILA_API_IMAGE_URL_DEFAULT", ManilaAPIContainerImage),
+		SchedulerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_MANILA_SCHEDULER_IMAGE_URL_DEFAULT", ManilaSchedulerContainerImage),
+		ShareContainerImageURL:     util.GetEnvVar("RELATED_IMAGE_MANILA_SHARE_IMAGE_URL_DEFAULT", ManilaShareContainerImage),
+		DBPurgeAge:                 DBPurgeDefaultAge,
+		DBPurgeSchedule:            DBPurgeDefaultSchedule,
+	}
+
+	manilalog.Info("Manila defaults initialized", "defaults", manilaDefaults)
 }
 
 // SetupWebhookWithManager sets up the webhook with the Manager
@@ -81,6 +93,14 @@ func (spec *ManilaSpec) Default() {
 			// This is required, as the loop variable is a by-value copy
 			spec.ManilaShares[key] = manilaShare
 		}
+	}
+
+	if spec.DBPurge.Age == 0 {
+		spec.DBPurge.Age = manilaDefaults.DBPurgeAge
+	}
+
+	if spec.DBPurge.Schedule == "" {
+		spec.DBPurge.Schedule = manilaDefaults.DBPurgeSchedule
 	}
 }
 
