@@ -46,6 +46,11 @@ type ManilaSpec struct {
 	// Needed to request a transportURL that is created and used in Manila
 	RabbitMqClusterName string `json:"rabbitMqClusterName"`
 
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=memcached
+	// Memcached instance name.
+	MemcachedInstance string `json:"memcachedInstance"`
+
 	// +kubebuilder:validation:Optional
 	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
 	// actual action pod gets started with sleep infinity

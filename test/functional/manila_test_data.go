@@ -22,10 +22,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	// MemcachedInstance - name of the memcached instance
+	MemcachedInstance = "memcached"
+)
+
 // ManilaTestData is the data structure used to provide input data to envTest
 type ManilaTestData struct {
 	RabbitmqClusterName    string
 	RabbitmqSecretName     string
+	MemcachedInstance      string
 	ManilaDataBaseUser     string
 	ManilaPassword         string
 	ManilaServiceUser      string
@@ -33,6 +39,7 @@ type ManilaTestData struct {
 	ManilaRole             types.NamespacedName
 	ManilaRoleBinding      types.NamespacedName
 	ManilaTransportURL     types.NamespacedName
+	ManilaMemcached        types.NamespacedName
 	ManilaSA               types.NamespacedName
 	ManilaDBSync           types.NamespacedName
 	ManilaKeystoneEndpoint types.NamespacedName
@@ -40,6 +47,7 @@ type ManilaTestData struct {
 	ManilaServiceInternal  types.NamespacedName
 	ManilaConfigSecret     types.NamespacedName
 	ManilaConfigScripts    types.NamespacedName
+	Manila                 types.NamespacedName
 	ManilaAPI              types.NamespacedName
 	ManilaScheduler        types.NamespacedName
 	ManilaShares           []types.NamespacedName
@@ -55,6 +63,10 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 	return ManilaTestData{
 		Instance: m,
 
+		Manila: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      manilaName.Name,
+		},
 		ManilaDBSync: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-db-sync", manilaName.Name),
@@ -93,6 +105,10 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("manila-%s-transport", manilaName.Name),
 		},
+		ManilaMemcached: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      MemcachedInstance,
+		},
 		ManilaConfigSecret: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "config-data"),
@@ -121,6 +137,7 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		},
 		RabbitmqClusterName: "rabbitmq",
 		RabbitmqSecretName:  "rabbitmq-secret",
+		MemcachedInstance:   MemcachedInstance,
 		ManilaDataBaseUser:  "manila",
 		// Password used for both db and service
 		ManilaPassword:    "12345678",

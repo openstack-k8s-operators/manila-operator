@@ -21,13 +21,23 @@ import (
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
+	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 )
 
 var _ = Describe("Manila controller", func() {
+	var memcachedSpec memcachedv1.MemcachedSpec
+
+	BeforeEach(func() {
+		memcachedSpec = memcachedv1.MemcachedSpec{
+			Replicas: ptr.To(int32(3)),
+		}
+	})
+
 	When("Manila CR instance is created", func() {
 		BeforeEach(func() {
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
@@ -35,7 +45,7 @@ var _ = Describe("Manila controller", func() {
 		It("initializes the status fields", func() {
 			Eventually(func(g Gomega) {
 				glance := GetManila(manilaName)
-				g.Expect(glance.Status.Conditions).To(HaveLen(13))
+				g.Expect(glance.Status.Conditions).To(HaveLen(14))
 
 				g.Expect(glance.Status.DatabaseHostname).To(Equal(""))
 			}, timeout*2, interval).Should(Succeed())
@@ -52,6 +62,7 @@ var _ = Describe("Manila controller", func() {
 			Manila := GetManila(manilaTest.Instance)
 			Expect(Manila.Spec.DatabaseInstance).Should(Equal("openstack"))
 			Expect(Manila.Spec.DatabaseUser).Should(Equal(manilaTest.ManilaDataBaseUser))
+			Expect(Manila.Spec.MemcachedInstance).Should(Equal(manilaTest.MemcachedInstance))
 			Expect(Manila.Spec.RabbitMqClusterName).Should(Equal(manilaTest.RabbitmqClusterName))
 			Expect(Manila.Spec.ServiceUser).Should(Equal(manilaTest.ManilaServiceUser))
 		})
@@ -62,6 +73,24 @@ var _ = Describe("Manila controller", func() {
 			Expect(Manila.Status.TransportURLSecret).To(Equal(""))
 			Expect(Manila.Status.ManilaAPIReadyCount).To(Equal(int32(0)))
 			Expect(Manila.Status.ManilaSchedulerReadyCount).To(Equal(int32(0)))
+		})
+		It("should have Unknown Conditions initialized", func() {
+			for _, cond := range []condition.Type{
+				condition.DBReadyCondition,
+				condition.DBSyncReadyCondition,
+				condition.InputReadyCondition,
+				condition.MemcachedReadyCondition,
+				manilav1.ManilaAPIReadyCondition,
+				manilav1.ManilaSchedulerReadyCondition,
+				manilav1.ManilaShareReadyCondition,
+			} {
+				th.ExpectCondition(
+					manilaTest.Manila,
+					ConditionGetterFunc(ManilaConditionGetter),
+					cond,
+					corev1.ConditionUnknown,
+				)
+			}
 		})
 		It("should have a finalizer", func() {
 			// the reconciler loop adds the finalizer so we have to wait for
@@ -103,14 +132,6 @@ var _ = Describe("Manila controller", func() {
 			Expect(binding.RoleRef.Name).To(Equal(role.Name))
 			Expect(binding.Subjects[0].Name).To(Equal(sa.Name))
 		})
-		It("should have Unknown Conditions initialized as transporturl not created", func() {
-			th.ExpectCondition(
-				manilaName,
-				ConditionGetterFunc(ManilaConditionGetter),
-				condition.InputReadyCondition,
-				corev1.ConditionUnknown,
-			)
-		})
 	})
 	When("Manila DB is created", func() {
 		BeforeEach(func() {
@@ -127,6 +148,8 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(namespace))
 		})
 		It("Should set DBReady Condition and set DatabaseHostname Status when DB is Created", func() {
@@ -186,6 +209,8 @@ var _ = Describe("Manila controller", func() {
 			),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, "memcached", memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 		})
 		It("should create config-data and scripts ConfigMaps", func() {
 			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
@@ -231,6 +256,8 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
@@ -266,6 +293,8 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
@@ -339,6 +368,8 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
 			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)

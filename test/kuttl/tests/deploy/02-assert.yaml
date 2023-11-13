@@ -85,6 +85,10 @@ status:
         reason: Ready
         status: "True"
         type: ManilaShareReady
+      - message: " Memcached instance has been provisioned"
+        reason: Ready
+        status: "True"
+        type: MemcachedReady
       - message: NetworkAttachments completed
         reason: Ready
         status: "True"

@@ -1,0 +1,5 @@
+namespace: openstack
+namePrefix: manila-operator-
+bases:
+- ../crd
+- ../rbac
