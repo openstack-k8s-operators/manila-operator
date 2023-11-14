@@ -19,9 +19,11 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
@@ -45,6 +47,7 @@ import (
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -99,6 +102,7 @@ type ManilaReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;create;update;patch;delete;watch
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=memcached.openstack.org,resources=memcacheds,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch
 // +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
@@ -171,6 +175,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 			condition.UnknownCondition(condition.DBReadyCondition, condition.InitReason, condition.DBReadyInitMessage),
 			condition.UnknownCondition(condition.DBSyncReadyCondition, condition.InitReason, condition.DBSyncReadyInitMessage),
 			condition.UnknownCondition(condition.RabbitMqTransportURLReadyCondition, condition.InitReason, condition.RabbitMqTransportURLReadyInitMessage),
+			condition.UnknownCondition(condition.MemcachedReadyCondition, condition.InitReason, condition.MemcachedReadyInitMessage),
 			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaAPIReadyCondition, condition.InitReason, manilav1beta1.ManilaAPIReadyInitMessage),
 			condition.UnknownCondition(manilav1beta1.ManilaSchedulerReadyCondition, condition.InitReason, manilav1beta1.ManilaSchedulerReadyInitMessage),
@@ -251,6 +256,35 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return nil
 	}
 
+	memcachedFn := func(o client.Object) []reconcile.Request {
+		result := []reconcile.Request{}
+
+		// get all Manila CRs
+		manilas := &manilav1beta1.ManilaList{}
+		listOpts := []client.ListOption{
+			client.InNamespace(o.GetNamespace()),
+		}
+		if err := r.Client.List(context.Background(), manilas, listOpts...); err != nil {
+			r.Log.Error(err, "Unable to retrieve Manila CRs %w")
+			return nil
+		}
+
+		for _, cr := range manilas.Items {
+			if o.GetName() == cr.Spec.MemcachedInstance {
+				name := client.ObjectKey{
+					Namespace: o.GetNamespace(),
+					Name:      cr.Name,
+				}
+				r.Log.Info(fmt.Sprintf("Memcached %s is used by Manila CR %s", o.GetName(), cr.Name))
+				result = append(result, reconcile.Request{NamespacedName: name})
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+		return nil
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&manilav1beta1.Manila{}).
 		Owns(&mariadbv1.MariaDBDatabase{}).
@@ -267,6 +301,8 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Watch for TransportURL Secrets which belong to any TransportURLs created by Manila CRs
 		Watches(&source.Kind{Type: &corev1.Secret{}},
 			handler.EnqueueRequestsFromMapFunc(transportURLSecretFn)).
+		Watches(&source.Kind{Type: &memcachedv1.Memcached{}},
+			handler.EnqueueRequestsFromMapFunc(memcachedFn)).
 		Complete(r)
 }
 
@@ -470,6 +506,41 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// end transportURL
 
 	//
+	// Check for required memcached used for caching
+	//
+	memcached, err := r.getManilaMemcached(ctx, helper, instance)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.MemcachedReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.MemcachedReadyWaitingMessage))
+			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("memcached %s not found", instance.Spec.MemcachedInstance)
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.MemcachedReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.MemcachedReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
+	if !memcached.IsReady() {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.MemcachedReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.MemcachedReadyWaitingMessage))
+		return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("memcached %s is not ready", memcached.Name)
+	}
+	// Mark the Memcached Service as Ready if we get to this point with no errors
+	instance.Status.Conditions.MarkTrue(
+		condition.MemcachedReadyCondition, condition.MemcachedReadyMessage)
+	// run check memcached - end
+
+	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
 	ospSecret, hash, err := secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
@@ -507,7 +578,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// - %-config configmap holding minimal manila config required to get the service up, user can add additional files to be added to the service
 	// - parameters which has passwords gets added from the OpenStack secret via the init container
 	//
-	err = r.generateServiceConfig(ctx, helper, instance, &configVars, serviceLabels)
+	err = r.generateServiceConfig(ctx, helper, instance, &configVars, serviceLabels, memcached)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -747,6 +818,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 	instance *manilav1beta1.Manila,
 	envVars *map[string]env.Setter,
 	serviceLabels map[string]string,
+	memcached *memcachedv1.Memcached,
 ) error {
 	//
 	// create Secret required for manila input
@@ -801,6 +873,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 			string(ospSecret.Data[instance.Spec.PasswordSelectors.Database]),
 			instance.Status.DatabaseHostname,
 			manila.DatabaseName),
+		"MemcachedServersWithInet": strings.Join(memcached.Status.ServerListWithInet, ","),
 	}
 
 	configTemplates := []util.Template{
@@ -975,4 +1048,24 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(ctx context.Context, insta
 	})
 
 	return transportURL, op, err
+}
+
+// getManilaMemcached - gets the Memcached instance used for Manila cache backend
+func (r *ManilaReconciler) getManilaMemcached(
+	ctx context.Context,
+	h *helper.Helper,
+	instance *manilav1beta1.Manila,
+) (*memcachedv1.Memcached, error) {
+	memcached := &memcachedv1.Memcached{}
+	err := h.GetClient().Get(
+		ctx,
+		types.NamespacedName{
+			Name:      instance.Spec.MemcachedInstance,
+			Namespace: instance.Namespace,
+		},
+		memcached)
+	if err != nil {
+		return nil, err
+	}
+	return memcached, err
 }

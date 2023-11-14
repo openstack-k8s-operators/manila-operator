@@ -1073,6 +1073,9 @@ spec:
                   - containerImage
                   type: object
                 type: object
+              memcachedInstance:
+                default: memcached
+                type: string
               nodeSelector:
                 additionalProperties:
                   type: string
@@ -1103,6 +1106,7 @@ spec:
             required:
             - manilaAPI
             - manilaScheduler
+            - memcachedInstance
             - rabbitMqClusterName
             type: object
           status:
