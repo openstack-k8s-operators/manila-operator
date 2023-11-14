@@ -1,0 +1,9 @@
+---
+- project:
+    name: openstack-k8s-operators/manila-operator
+    github-check:
+      jobs:
+        - openstack-k8s-operators-content-provider
+        - manila-operator-kuttl:
+            dependencies:
+              - openstack-k8s-operators-content-provider

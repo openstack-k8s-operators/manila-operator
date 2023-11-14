@@ -1,0 +1,12 @@
+---
+- job:
+    name: manila-operator-kuttl
+    parent: cifmw-multinode-kuttl
+    attempts: 1
+    vars:
+      cifmw_kuttl_tests_env_vars:
+        CEPH_HOSTNETWORK: true
+        CEPH_TIMEOUT: 90
+        CEPH_DATASIZE: "2Gi"
+      cifmw_kuttl_tests_operator_list:
+        - manila
