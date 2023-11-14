@@ -531,7 +531,6 @@ func (r *ManilaShareReconciler) getSecret(
 }
 
 // generateServiceConfig - create custom Secret to hold service-specific config
-// TODO add DefaultConfigOverwrite
 func (r *ManilaShareReconciler) generateServiceConfig(
 	ctx context.Context,
 	h *helper.Helper,
@@ -547,10 +546,6 @@ func (r *ManilaShareReconciler) generateServiceConfig(
 	labels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
 	customData := map[string]string{manila.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
-
-	for key, data := range instance.Spec.DefaultConfigOverwrite {
-		customData[key] = data
-	}
 
 	customData[manila.CustomServiceConfigFileName] = instance.Spec.CustomServiceConfig
 

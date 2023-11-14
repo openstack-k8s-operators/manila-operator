@@ -802,10 +802,6 @@ func (r *ManilaAPIReconciler) generateServiceConfig(
 	// customData hold any customization for the service.
 	customData := map[string]string{manila.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
 
-	for key, data := range instance.Spec.DefaultConfigOverwrite {
-		customData[key] = data
-	}
-
 	customData[manila.CustomServiceConfigFileName] = instance.Spec.CustomServiceConfig
 
 	// Fetch the two service config snippets (DefaultsConfigFileName and

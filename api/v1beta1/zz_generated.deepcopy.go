@@ -484,13 +484,6 @@ func (in *ManilaServiceTemplate) DeepCopyInto(out *ManilaServiceTemplate) {
 		}
 	}
 	out.Debug = in.Debug
-	if in.DefaultConfigOverwrite != nil {
-		in, out := &in.DefaultConfigOverwrite, &out.DefaultConfigOverwrite
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	if in.CustomServiceConfigSecrets != nil {
 		in, out := &in.CustomServiceConfigSecrets, &out.CustomServiceConfigSecrets
 		*out = make([]string, len(*in))
@@ -667,13 +660,6 @@ func (in *ManilaSpec) DeepCopyInto(out *ManilaSpec) {
 	*out = *in
 	out.ManilaTemplate = in.ManilaTemplate
 	out.Debug = in.Debug
-	if in.DefaultConfigOverwrite != nil {
-		in, out := &in.DefaultConfigOverwrite, &out.DefaultConfigOverwrite
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
-	}
 	in.ManilaAPI.DeepCopyInto(&out.ManilaAPI)
 	in.ManilaScheduler.DeepCopyInto(&out.ManilaScheduler)
 	if in.ManilaShares != nil {
