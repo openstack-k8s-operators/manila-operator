@@ -16,6 +16,7 @@ limitations under the License.
 package manila
 
 import (
+	"fmt"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -36,7 +37,6 @@ func CronJob(
 ) *batchv1.CronJob {
 	var config0644AccessMode int32 = 0644
 	var DBPurgeCommand []string = DBPurgeCommandBase[:]
-	args := []string{"-c"}
 
 	if !instance.Spec.Debug.DBPurge {
 		// If debug mode is not requested, remove the --debug option
@@ -46,7 +46,7 @@ func CronJob(
 	DBPurgeCommandString := strings.Join(DBPurgeCommand, " ")
 
 	// Extend the resulting command with the DBPurgeAge int
-	args = append(args, DBPurgeCommandString+strconv.Itoa(DBPurgeAge))
+	args := []string{"-c", DBPurgeCommandString + strconv.Itoa(instance.Spec.DBPurge.Age)}
 
 	parallelism := int32(1)
 	completions := int32(1)
@@ -79,11 +79,12 @@ func CronJob(
 
 	cronjob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ServiceName + "-cron",
+			Name:      fmt.Sprintf("%s-db-purge", ServiceName),
 			Namespace: instance.Namespace,
+			Labels:    labels,
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          DBPurgeDefaultSchedule,
+			Schedule:          instance.Spec.DBPurge.Schedule,
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -94,10 +95,14 @@ func CronJob(
 					Parallelism: &parallelism,
 					Completions: &completions,
 					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: annotations,
+							Labels:      labels,
+						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  ServiceName + "-cron",
+									Name:  fmt.Sprintf("%s-db-purge", ServiceName),
 									Image: instance.Spec.ManilaAPI.ContainerImage,
 									Command: []string{
 										"/bin/bash",

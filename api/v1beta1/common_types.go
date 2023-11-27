@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -30,6 +29,10 @@ const (
 	ManilaSchedulerContainerImage = "quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified"
 	// ManilaShareContainerImage is the fall-back container image for ManilaShare
 	ManilaShareContainerImage = "quay.io/podified-antelope-centos9/openstack-manila-share:current-podified"
+	//DBPurgeDefaultAge indicates the number of days of purging DB records
+	DBPurgeDefaultAge = 30
+	//DBPurgeDefaultSchedule is in crontab format, and the default runs the job once every day
+	DBPurgeDefaultSchedule = "1 0 * * *"
 )
 
 // ManilaTemplate defines common input parameters used by all Manila services
@@ -109,19 +112,6 @@ type PasswordSelector struct {
 	Service string `json:"service,omitempty"`
 }
 
-// ManilaDebug indicates whether certain stages of Manila deployment should
-// pause in debug mode
-type ManilaDebug struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	// dbSync enable debug
-	DBSync bool `json:"dbSync,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	// dbPurge enable debug on the DBPurge CronJob
-	DBPurge bool `json:"dbPurge,omitempty"`
-}
-
 // ManilaServiceDebug indicates whether certain stages of Manila service
 // deployment should pause in debug mode
 type ManilaServiceDebug struct {
@@ -129,16 +119,4 @@ type ManilaServiceDebug struct {
 	// +kubebuilder:default=false
 	// service enable debug
 	Service bool `json:"service,omitempty"`
-}
-
-// SetupDefaults - initializes any CRD field defaults based on environment variables (the defaulting mechanism itself is implemented via webhooks)
-func SetupDefaults() {
-	// Acquire environmental defaults and initialize Manila defaults with them
-	manilaDefaults := ManilaDefaults{
-		APIContainerImageURL:       util.GetEnvVar("RELATED_IMAGE_MANILA_API_IMAGE_URL_DEFAULT", ManilaAPIContainerImage),
-		SchedulerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_MANILA_SCHEDULER_IMAGE_URL_DEFAULT", ManilaSchedulerContainerImage),
-		ShareContainerImageURL:     util.GetEnvVar("RELATED_IMAGE_MANILA_SHARE_IMAGE_URL_DEFAULT", ManilaShareContainerImage),
-	}
-
-	SetupManilaDefaults(manilaDefaults)
 }

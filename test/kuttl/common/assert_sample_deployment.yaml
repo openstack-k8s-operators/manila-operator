@@ -128,7 +128,7 @@ status:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: manila-cron
+  name: manila-db-purge
 spec:
   jobTemplate:
     metadata:
@@ -146,7 +146,7 @@ spec:
               db purge 30
             command:
             - /bin/bash
-            name: manila-cron
+            name: manila-db-purge
             volumeMounts:
             - mountPath: /etc/manila/manila.conf.d
               name: db-purge-config-data
