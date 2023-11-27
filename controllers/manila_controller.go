@@ -834,10 +834,6 @@ func (r *ManilaReconciler) generateServiceConfig(
 	// all other files get placed into /etc/<service> to allow overwrite of e.g. policy.json
 	customData := map[string]string{manila.CustomConfigFileName: instance.Spec.CustomServiceConfig}
 
-	for key, data := range instance.Spec.DefaultConfigOverwrite {
-		customData[key] = data
-	}
-
 	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, h, instance.Namespace, map[string]string{})
 	if err != nil {
 		return err
