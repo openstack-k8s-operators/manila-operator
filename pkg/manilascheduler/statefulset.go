@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -73,14 +74,14 @@ func StatefulSet(
 		}
 	} else {
 		args = append(args, ServiceCommand)
-		livenessProbe.Exec = &corev1.ExecAction{
-			Command: []string{
-				"/bin/true",
-			},
+		livenessProbe.HTTPGet = &corev1.HTTPGetAction{
+			Port: intstr.FromInt(8080),
 		}
-		startupProbe.Exec = livenessProbe.Exec
+		startupProbe.HTTPGet = livenessProbe.HTTPGet
 		probeCommand = []string{
-			"/bin/sleep", "infinity",
+			"/usr/local/bin/container-scripts/healthcheck.py",
+			"scheduler",
+			"/etc/manila/manila.conf.d",
 		}
 	}
 
