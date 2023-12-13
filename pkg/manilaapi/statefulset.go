@@ -30,13 +30,13 @@ const (
 	ServiceCommand = "/usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start"
 )
 
-// Deployment func
-func Deployment(
+// StatefulSet func
+func StatefulSet(
 	instance *manilav1.ManilaAPI,
 	configHash string,
 	labels map[string]string,
 	annotations map[string]string,
-) *appsv1.Deployment {
+) *appsv1.StatefulSet {
 	runAsUser := int64(0)
 
 	livenessProbe := &corev1.Probe{
@@ -76,13 +76,13 @@ func Deployment(
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 
-	deployment := &appsv1.Deployment{
+	statefulset := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -141,14 +141,14 @@ func Deployment(
 			},
 		},
 	}
-	deployment.Spec.Template.Spec.Volumes = append(GetVolumes(
+	statefulset.Spec.Template.Spec.Volumes = append(GetVolumes(
 		manila.GetOwningManilaName(instance),
 		instance.Name,
 		instance.Spec.ExtraMounts), GetLogVolume())
 	// If possible two pods of the same service should not
 	// run on the same worker node. If this is not possible
 	// the get still created on the same worker node.
-	deployment.Spec.Template.Spec.Affinity = affinity.DistributePods(
+	statefulset.Spec.Template.Spec.Affinity = affinity.DistributePods(
 		common.AppSelector,
 		[]string{
 			manila.ServiceName,
@@ -156,8 +156,8 @@ func Deployment(
 		corev1.LabelHostname,
 	)
 	if instance.Spec.NodeSelector != nil && len(instance.Spec.NodeSelector) > 0 {
-		deployment.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
+		statefulset.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
 
-	return deployment
+	return statefulset
 }
