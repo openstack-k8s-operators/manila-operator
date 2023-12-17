@@ -382,7 +382,7 @@ var _ = Describe("Manila controller", func() {
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 		})
 		It("Check the resulting endpoints of the generated sub-CRs", func() {
-			th.SimulateDeploymentReadyWithPods(
+			th.SimulateStatefulSetReplicaReadyWithPods(
 				manilaTest.ManilaAPI,
 				map[string][]string{manilaName.Namespace + "/internalapi": {"10.0.0.1"}},
 			)
