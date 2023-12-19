@@ -48,6 +48,7 @@ spec:
                 properties:
                   age:
                     default: 30
+                    minimum: 1
                     type: integer
                   schedule:
                     default: 1 0 * * *
