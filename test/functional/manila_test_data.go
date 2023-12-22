@@ -46,6 +46,7 @@ type ManilaTestData struct {
 	ManilaServicePublic    types.NamespacedName
 	ManilaServiceInternal  types.NamespacedName
 	ManilaConfigSecret     types.NamespacedName
+	ManilaAPIConfigSecret  types.NamespacedName
 	ManilaConfigScripts    types.NamespacedName
 	Manila                 types.NamespacedName
 	ManilaAPI              types.NamespacedName
@@ -112,6 +113,10 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		ManilaConfigSecret: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "config-data"),
+		},
+		ManilaAPIConfigSecret: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "api-config-data"),
 		},
 		ManilaConfigScripts: types.NamespacedName{
 			Namespace: manilaName.Namespace,

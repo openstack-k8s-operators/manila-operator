@@ -75,12 +75,38 @@ func GetDefaultManilaSpec() map[string]interface{} {
 	}
 }
 
+func GetManilaSpec(apiSpec map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"databaseInstance": "openstack",
+		"secret":           SecretName,
+		"manilaAPI":        GetManilaAPISpec(apiSpec),
+		"manilaScheduler":  GetDefaultManilaSchedulerSpec(),
+		"manilaShare":      GetDefaultManilaShareSpec(),
+	}
+}
+
+func GetManilaAPISpec(spec map[string]interface{}) map[string]interface{} {
+	defaultSpec := map[string]interface{}{
+		"secret":             SecretName,
+		"replicas":           1,
+		"containerImage":     manilaTest.ContainerImage,
+		"serviceAccount":     manilaTest.ManilaSA.Name,
+		"transportURLSecret": manilaTest.RabbitmqSecretName,
+	}
+	// append to the defaultSpec map the additional keys passed as input
+	for k, v := range spec {
+		defaultSpec[k] = v
+	}
+	return defaultSpec
+}
+
 func GetDefaultManilaAPISpec() map[string]interface{} {
 	return map[string]interface{}{
-		"secret":         SecretName,
-		"replicas":       1,
-		"containerImage": manilaTest.ContainerImage,
-		"serviceAccount": manilaTest.ManilaSA.Name,
+		"secret":             SecretName,
+		"replicas":           1,
+		"containerImage":     manilaTest.ContainerImage,
+		"serviceAccount":     manilaTest.ManilaSA.Name,
+		"transportURLSecret": manilaTest.RabbitmqSecretName,
 	}
 }
 
@@ -130,15 +156,27 @@ func ManilaConditionGetter(name types.NamespacedName) condition.Conditions {
 }
 
 func CreateManilaAPI(name types.NamespacedName, spec map[string]interface{}) client.Object {
+	parent := GetManila(manilaTest.Instance)
 	raw := map[string]interface{}{
 		"apiVersion": "manila.openstack.org/v1beta1",
 		"kind":       "ManilaAPI",
 		"metadata": map[string]interface{}{
 			"name":      name.Name,
 			"namespace": name.Namespace,
+			"ownerReferences": []map[string]interface{}{
+				{
+					"apiVersion":         "manila.openstack.org/v1beta1",
+					"blockOwnerDeletion": true,
+					"controller":         true,
+					"kind":               "Manila",
+					"name":               "manila",
+					"uid":                parent.ObjectMeta.UID,
+				},
+			},
 		},
 		"spec": spec,
 	}
+
 	return CreateUnstructured(raw)
 }
 
