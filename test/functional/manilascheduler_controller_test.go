@@ -27,19 +27,19 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var _ = Describe("ManilaAPI controller", func() {
+var _ = Describe("ManilaScheduler controller", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
 
 	BeforeEach(func() {
 		memcachedSpec = memcachedv1.MemcachedSpec{
 			Replicas: ptr.To(int32(3)),
 		}
-		apiSpec := GetDefaultManilaAPISpec()
-		apiSpec["customServiceConfig"] = "foo=bar"
+		schedSpec := GetDefaultManilaSchedulerSpec()
+		schedSpec["customServiceConfig"] = "foo=bar"
 		DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 		DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
-		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(apiSpec)))
-		DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
+		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(schedSpec)))
+		DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
 		DeferCleanup(
 			mariadb.DeleteDBService,
 			mariadb.CreateDBService(
@@ -52,17 +52,17 @@ var _ = Describe("ManilaAPI controller", func() {
 		)
 	})
 
-	When("ManilaAPI CR is created", func() {
+	When("ManilaScheduler CR is created", func() {
 		It("is not Ready", func() {
 			th.ExpectCondition(
 				manilaTest.Instance,
-				ConditionGetterFunc(ManilaAPIConditionGetter),
+				ConditionGetterFunc(ManilaSchedulerConditionGetter),
 				condition.ReadyCondition,
 				corev1.ConditionFalse,
 			)
 		})
 		It("has empty Status fields", func() {
-			instance := GetManilaAPI(manilaTest.Instance)
+			instance := GetManilaScheduler(manilaTest.Instance)
 			Expect(instance.Status.Hash).To(BeEmpty())
 			Expect(instance.Status.ReadyCount).To(Equal(int32(0)))
 		})
@@ -82,7 +82,7 @@ var _ = Describe("ManilaAPI controller", func() {
 		It("is not Ready", func() {
 			th.ExpectCondition(
 				manilaTest.Instance,
-				ConditionGetterFunc(ManilaAPIConditionGetter),
+				ConditionGetterFunc(ManilaSchedulerConditionGetter),
 				condition.ReadyCondition,
 				corev1.ConditionFalse,
 			)
@@ -97,90 +97,73 @@ var _ = Describe("ManilaAPI controller", func() {
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 		})
-		It("a manila-api-config-secret containing the config has been created", func() {
+		It("a manila-scheduler-config-secret containing the config has been created", func() {
 			Eventually(func() corev1.Secret {
-				return th.GetSecret(manilaTest.ManilaAPIConfigSecret)
+				return th.GetSecret(manilaTest.ManilaSchedulerConfigSecret)
 			}, timeout, interval).ShouldNot(BeNil())
-			secretDataMap := th.GetSecret(manilaTest.ManilaAPIConfigSecret)
+			secretDataMap := th.GetSecret(manilaTest.ManilaSchedulerConfigSecret)
 			Expect(secretDataMap).ShouldNot(BeNil())
-			// We apply customServiceConfig to the ManilaAPI Pod
+			// We apply customServiceConfig to the ManilaScheduler Pod
 			Expect(secretDataMap.Data).Should(HaveKey("03-config.conf"))
 			//Double check customServiceConfig has been applied
 			configData := string(secretDataMap.Data["03-config.conf"])
 			Expect(configData).Should(ContainSubstring("foo=bar"))
 		})
 
-		When("manila-api-config is ready", func() {
+		When("manila-scheduler-config is ready", func() {
 			BeforeEach(func() {
-				DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
+				DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
 				mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 				keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 				keystone.SimulateKeystoneEndpointReady(manilaTest.Instance)
 			})
-			It("creates a StatefulSet for manila-api service", func() {
-				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
-				ss := th.GetStatefulSet(manilaTest.ManilaAPI)
+			It("creates a StatefulSet for manila-scheduler service", func() {
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+				ss := th.GetStatefulSet(manilaTest.ManilaScheduler)
 				// Check the resulting deployment fields
 				Expect(int(*ss.Spec.Replicas)).To(Equal(1))
-				Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(6))
+				Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(5))
 				Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 				container := ss.Spec.Template.Spec.Containers[1]
-				Expect(container.VolumeMounts).To(HaveLen(7))
+				Expect(container.VolumeMounts).To(HaveLen(6))
 				Expect(container.Image).To(Equal(manilaTest.ContainerImage))
-				Expect(container.LivenessProbe.HTTPGet.Port.IntVal).To(Equal(int32(8786)))
-				Expect(container.ReadinessProbe.HTTPGet.Port.IntVal).To(Equal(int32(8786)))
 			})
 			It("stored the input hash in the Status", func() {
 				Eventually(func(g Gomega) {
-					manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
-					g.Expect(manilaAPI.Status.Hash).Should((HaveKeyWithValue("input", Not(BeEmpty()))))
+					manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
+					g.Expect(manilaScheduler.Status.Hash).Should((HaveKeyWithValue("input", Not(BeEmpty()))))
 				}, timeout, interval).Should(Succeed())
 			})
 			It("reports that input is ready", func() {
 				th.ExpectCondition(
-					manilaTest.Instance,
-					ConditionGetterFunc(ManilaAPIConditionGetter),
+					manilaTest.ManilaScheduler,
+					ConditionGetterFunc(ManilaSchedulerConditionGetter),
 					condition.InputReadyCondition,
 					corev1.ConditionTrue,
 				)
 			})
 		})
 
-		When("manila-api statefulset is ready", func() {
+		When("manila-scheduler StatefulSet is ready", func() {
 			BeforeEach(func() {
-				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+				DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
+				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 				keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+				keystone.SimulateKeystoneEndpointReady(manilaTest.Instance)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
 			})
 			It("reports that StatefulSet Condition is ready", func() {
 				th.ExpectCondition(
-					manilaTest.ManilaAPI,
-					ConditionGetterFunc(ManilaAPIConditionGetter),
+					manilaTest.ManilaScheduler,
+					ConditionGetterFunc(ManilaSchedulerConditionGetter),
 					condition.DeploymentReadyCondition,
 					corev1.ConditionTrue,
 				)
 				// StatefulSet is Ready, check the actual ReadyCount is > 0
-				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
-				Expect(manilaAPI.Status.ReadyCount).To(BeNumerically(">", 0))
-			})
-			It("exposes both internal and public services", func() {
-				apiInstance := th.GetService(manilaTest.ManilaServicePublic)
-				Expect(apiInstance.Labels["service"]).To(Equal(manilaTest.Instance.Name))
-			})
-			It("creates KeystoneEndpoint", func() {
-				th.ExpectCondition(
-					manilaTest.ManilaAPI,
-					ConditionGetterFunc(ManilaAPIConditionGetter),
-					condition.KeystoneEndpointReadyCondition,
-					corev1.ConditionTrue,
-				)
-				keystoneEndpoint := keystone.GetKeystoneEndpoint(manilaTest.ManilaKeystoneEndpoint)
-				endpoints := keystoneEndpoint.Spec.Endpoints
-				// 2 entries are expected: internal and public
-				Expect(endpoints).To(HaveLen(2))
-				Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manilaTest.Instance.Namespace+".svc:8786/v2"))
-				Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaTest.Instance.Namespace+".svc:8786/v2"))
+				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
+				Expect(manilaScheduler.Status.ReadyCount).To(BeNumerically(">", 0))
 			})
 		})
 	})

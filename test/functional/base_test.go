@@ -79,13 +79,13 @@ func GetManilaSpec(apiSpec map[string]interface{}) map[string]interface{} {
 	return map[string]interface{}{
 		"databaseInstance": "openstack",
 		"secret":           SecretName,
-		"manilaAPI":        GetManilaAPISpec(apiSpec),
-		"manilaScheduler":  GetDefaultManilaSchedulerSpec(),
+		"manilaAPI":        GetGenericComponentSpec(apiSpec),
+		"manilaScheduler":  GetGenericComponentSpec(apiSpec),
 		"manilaShare":      GetDefaultManilaShareSpec(),
 	}
 }
 
-func GetManilaAPISpec(spec map[string]interface{}) map[string]interface{} {
+func GetGenericComponentSpec(spec map[string]interface{}) map[string]interface{} {
 	defaultSpec := map[string]interface{}{
 		"secret":             SecretName,
 		"replicas":           1,
@@ -232,6 +232,11 @@ func GetManilaShare(name types.NamespacedName) *manilav1.ManilaShare {
 
 func ManilaAPIConditionGetter(name types.NamespacedName) condition.Conditions {
 	instance := GetManilaAPI(name)
+	return instance.Status.Conditions
+}
+
+func ManilaSchedulerConditionGetter(name types.NamespacedName) condition.Conditions {
+	instance := GetManilaScheduler(name)
 	return instance.Status.Conditions
 }
 
