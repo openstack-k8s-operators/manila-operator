@@ -48,11 +48,13 @@ type ManilaTestData struct {
 	ManilaConfigSecret          types.NamespacedName
 	ManilaAPIConfigSecret       types.NamespacedName
 	ManilaSchedulerConfigSecret types.NamespacedName
+	ManilaShareConfigSecret     types.NamespacedName
 	ManilaConfigScripts         types.NamespacedName
 	Manila                      types.NamespacedName
 	ManilaAPI                   types.NamespacedName
 	ManilaScheduler             types.NamespacedName
 	ManilaShares                []types.NamespacedName
+	ManilaDefaultShare          types.NamespacedName
 	InternalAPINAD              types.NamespacedName
 	ContainerImage              string
 }
@@ -81,14 +83,18 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-scheduler", manilaName.Name),
 		},
+		ManilaDefaultShare: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      fmt.Sprintf("%s-share-share0", manilaName.Name),
+		},
 		ManilaShares: []types.NamespacedName{
 			{
 				Namespace: manilaName.Namespace,
-				Name:      fmt.Sprintf("%s-share-share1", manilaName.Name),
+				Name:      fmt.Sprintf("%s-share-share0", manilaName.Name),
 			},
 			{
 				Namespace: manilaName.Namespace,
-				Name:      fmt.Sprintf("%s-share-share2", manilaName.Name),
+				Name:      fmt.Sprintf("%s-share-share1", manilaName.Name),
 			},
 		},
 		ManilaRole: types.NamespacedName{
@@ -122,6 +128,10 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		ManilaSchedulerConfigSecret: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "scheduler-config-data"),
+		},
+		ManilaShareConfigSecret: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      fmt.Sprintf("%s-share-share0-%s", manilaName.Name, "config-data"),
 		},
 		ManilaConfigScripts: types.NamespacedName{
 			Namespace: manilaName.Namespace,

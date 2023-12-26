@@ -349,7 +349,7 @@ var _ = Describe("Manila controller", func() {
 					"networkAttachments": []string{"internalapi"},
 				},
 				"manilaShares": map[string]interface{}{
-					"share1": map[string]interface{}{
+					"share0": map[string]interface{}{
 						"containerImage":     manilav1.ManilaShareContainerImage,
 						"networkAttachments": []string{"internalapi"},
 					},
