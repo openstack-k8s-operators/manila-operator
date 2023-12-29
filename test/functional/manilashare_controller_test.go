@@ -39,7 +39,9 @@ var _ = Describe("ManilaShare controller", func() {
 		DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 		DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(shareSpec)))
-		DeferCleanup(th.DeleteInstance, CreateManilaShare(manilaTest.ManilaDefaultShare, GetDefaultManilaShareSpec()))
+		for _, share := range manilaTest.ManilaShares {
+			DeferCleanup(th.DeleteInstance, CreateManilaShare(share, GetDefaultManilaShareSpec()))
+		}
 		DeferCleanup(
 			mariadb.DeleteDBService,
 			mariadb.CreateDBService(
@@ -54,17 +56,21 @@ var _ = Describe("ManilaShare controller", func() {
 
 	When("ManilaShare CR is created", func() {
 		It("is not Ready", func() {
-			th.ExpectCondition(
-				manilaTest.ManilaDefaultShare,
-				ConditionGetterFunc(ManilaShareConditionGetter),
-				condition.ReadyCondition,
-				corev1.ConditionFalse,
-			)
+			for _, share := range manilaTest.ManilaShares {
+				th.ExpectCondition(
+					share,
+					ConditionGetterFunc(ManilaShareConditionGetter),
+					condition.ReadyCondition,
+					corev1.ConditionFalse,
+				)
+			}
 		})
 		It("has empty Status fields", func() {
-			instance := GetManilaShare(manilaTest.ManilaDefaultShare)
-			Expect(instance.Status.Hash).To(BeEmpty())
-			Expect(instance.Status.ReadyCount).To(Equal(int32(0)))
+			for _, share := range manilaTest.ManilaShares {
+				instance := GetManilaShare(share)
+				Expect(instance.Status.Hash).To(BeEmpty())
+				Expect(instance.Status.ReadyCount).To(Equal(int32(0)))
+			}
 		})
 	})
 
@@ -80,12 +86,14 @@ var _ = Describe("ManilaShare controller", func() {
 			DeferCleanup(k8sClient.Delete, ctx, secret)
 		})
 		It("is not Ready", func() {
-			th.ExpectCondition(
-				manilaTest.ManilaDefaultShare,
-				ConditionGetterFunc(ManilaShareConditionGetter),
-				condition.ReadyCondition,
-				corev1.ConditionFalse,
-			)
+			for _, share := range manilaTest.ManilaShares {
+				th.ExpectCondition(
+					share,
+					ConditionGetterFunc(ManilaShareConditionGetter),
+					condition.ReadyCondition,
+					corev1.ConditionFalse,
+				)
+			}
 		})
 	})
 	When("the Secret is created with all the expected fields", func() {
@@ -120,30 +128,36 @@ var _ = Describe("ManilaShare controller", func() {
 				keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 			})
 			It("creates a StatefulSet for manila-share service", func() {
-				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaDefaultShare)
-				ss := th.GetStatefulSet(manilaTest.ManilaDefaultShare)
-				// Check the resulting deployment fields
-				Expect(int(*ss.Spec.Replicas)).To(Equal(1))
-				Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(6))
-				Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
+				// for each share:
+				// - check both volumes and containers
+				// - check the Status.Hash and look for the 'input' hash
+				// - chek the condition associated to the input values
+				for _, share := range manilaTest.ManilaShares {
+					th.SimulateStatefulSetReplicaReady(share)
+					ss := th.GetStatefulSet(share)
+					// Check the resulting deployment fields
+					Expect(int(*ss.Spec.Replicas)).To(Equal(1))
+					Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(6))
+					Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
-				container := ss.Spec.Template.Spec.Containers[1]
-				Expect(container.VolumeMounts).To(HaveLen(7))
-				Expect(container.Image).To(Equal(manilaTest.ContainerImage))
-			})
-			It("stored the input hash in the Status", func() {
-				Eventually(func(g Gomega) {
-					manilaShare := GetManilaShare(manilaTest.ManilaDefaultShare)
-					g.Expect(manilaShare.Status.Hash).Should((HaveKeyWithValue("input", Not(BeEmpty()))))
-				}, timeout, interval).Should(Succeed())
-			})
-			It("reports that input is ready", func() {
-				th.ExpectCondition(
-					manilaTest.ManilaDefaultShare,
-					ConditionGetterFunc(ManilaShareConditionGetter),
-					condition.InputReadyCondition,
-					corev1.ConditionTrue,
-				)
+					container := ss.Spec.Template.Spec.Containers[1]
+					Expect(container.VolumeMounts).To(HaveLen(7))
+					Expect(container.Image).To(Equal(manilaTest.ContainerImage))
+
+					// the input hash is stored in the current manilaShare.Status
+					Eventually(func(g Gomega) {
+						manilaShare := GetManilaShare(share)
+						g.Expect(manilaShare.Status.Hash).Should((HaveKeyWithValue("input", Not(BeEmpty()))))
+					}, timeout, interval).Should(Succeed())
+
+					// It reports that input is ready
+					th.ExpectCondition(
+						share,
+						ConditionGetterFunc(ManilaShareConditionGetter),
+						condition.InputReadyCondition,
+						corev1.ConditionTrue,
+					)
+				}
 			})
 		})
 
@@ -157,16 +171,18 @@ var _ = Describe("ManilaShare controller", func() {
 				keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 			})
 			It("reports that StatefulSet Condition is ready", func() {
-				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaDefaultShare)
-				ss := th.GetStatefulSet(manilaTest.ManilaDefaultShare)
-				th.ExpectCondition(
-					manilaTest.ManilaDefaultShare,
-					ConditionGetterFunc(ManilaShareConditionGetter),
-					condition.DeploymentReadyCondition,
-					corev1.ConditionTrue,
-				)
-				// StatefulSet is Ready, check the actual ReadyReplicas is > 0
-				Expect(ss.Status.ReadyReplicas).To(BeNumerically(">", 0))
+				for _, share := range manilaTest.ManilaShares {
+					th.SimulateStatefulSetReplicaReady(share)
+					ss := th.GetStatefulSet(share)
+					th.ExpectCondition(
+						share,
+						ConditionGetterFunc(ManilaShareConditionGetter),
+						condition.DeploymentReadyCondition,
+						corev1.ConditionTrue,
+					)
+					// StatefulSet is Ready, check the actual ReadyReplicas is > 0
+					Expect(ss.Status.ReadyReplicas).To(BeNumerically(">", 0))
+				}
 			})
 		})
 	})

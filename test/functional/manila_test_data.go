@@ -83,10 +83,6 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-scheduler", manilaName.Name),
 		},
-		ManilaDefaultShare: types.NamespacedName{
-			Namespace: manilaName.Namespace,
-			Name:      fmt.Sprintf("%s-share-share0", manilaName.Name),
-		},
 		ManilaShares: []types.NamespacedName{
 			{
 				Namespace: manilaName.Namespace,

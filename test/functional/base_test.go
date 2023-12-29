@@ -79,15 +79,16 @@ func GetManilaSpec(customSpec map[string]interface{}) map[string]interface{} {
 	return map[string]interface{}{
 		"databaseInstance": "openstack",
 		"secret":           SecretName,
-		"manilaAPI":        GetGenericComponentSpec(customSpec),
-		"manilaScheduler":  GetGenericComponentSpec(customSpec),
+		"manilaAPI":        GetManilaCommonSpec(customSpec),
+		"manilaScheduler":  GetManilaCommonSpec(customSpec),
 		"manilaShares": map[string]interface{}{
-			"share0": GetGenericComponentSpec(customSpec),
+			"share0": GetManilaCommonSpec(customSpec),
+			"share1": GetManilaCommonSpec(customSpec),
 		},
 	}
 }
 
-func GetGenericComponentSpec(spec map[string]interface{}) map[string]interface{} {
+func GetManilaCommonSpec(spec map[string]interface{}) map[string]interface{} {
 	defaultSpec := map[string]interface{}{
 		"secret":             SecretName,
 		"replicas":           1,
@@ -158,6 +159,7 @@ func ManilaConditionGetter(name types.NamespacedName) condition.Conditions {
 }
 
 func CreateManilaAPI(name types.NamespacedName, spec map[string]interface{}) client.Object {
+	// we get the parent CR and set ownership to the manilaAPI CR
 	parent := GetManila(manilaTest.Instance)
 	raw := map[string]interface{}{
 		"apiVersion": "manila.openstack.org/v1beta1",
@@ -171,8 +173,8 @@ func CreateManilaAPI(name types.NamespacedName, spec map[string]interface{}) cli
 					"blockOwnerDeletion": true,
 					"controller":         true,
 					"kind":               "Manila",
-					"name":               "manila",
-					"uid":                parent.ObjectMeta.UID,
+					"name":               parent.GetObjectMeta().GetName(),
+					"uid":                parent.GetObjectMeta().GetUID(),
 				},
 			},
 		},
