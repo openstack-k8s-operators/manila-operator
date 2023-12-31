@@ -16,15 +16,11 @@ spec:
       debug = true
    databaseInstance: openstack
    databaseUser: manila
-   debug:
-      dbSync: false
    manilaAPI:
       customServiceConfig: |
          [DEFAULT]
-         enabled_share_protocols = cephfs
-      debug:
-         service: false
-      replicas: 3
+         enabled_share_protocols=nfs,cephfs,cifs
+      replicas: 1
       resources: {}
    manilaScheduler:
       replicas: 1
@@ -44,6 +40,19 @@ spec:
             cephfs_auth_id=openstack
             cephfs_cluster_name=ceph
             cephfs_protocol_helper_type=CEPHFS
+      share1:
+        customServiceConfig: |
+            [DEFAULT]
+            enabled_share_backends=cephfsnfs
+            [cephfsnfs]
+            driver_handles_share_servers=False
+            share_backend_name=cephfs
+            share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+            cephfs_auth_id=openstack
+            cephfs_cluster_name=ceph
+            cephfs_nfs_cluster_id=cephfs
+            cephfs_protocol_helper_type=NFS
+        replicas: 1
    passwordSelectors:
       database: ManilaDatabasePassword
       service: ManilaPassword
@@ -113,11 +122,11 @@ status:
         reason: Ready
         status: "True"
         type: ServiceConfigReady
-   databaseHostname: openstack
-   manilaAPIReadyCount: 3
+   manilaAPIReadyCount: 1
    manilaSchedulerReadyCount: 1
    manilaSharesReadyCounts:
       share0: 1
+      share1: 1
    transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 ---
 apiVersion: manila.openstack.org/v1beta1
@@ -127,18 +136,17 @@ metadata:
       - ManilaAPI
    name: manila-api
 spec:
-   databaseHostname: openstack
    databaseUser: manila
    passwordSelectors:
       database: ManilaDatabasePassword
       service: ManilaPassword
-   replicas: 3
+   replicas: 1
    resources: {}
    secret: osp-secret
    serviceAccount: manila-manila
    serviceUser: manila
 status:
-   readyCount: 3
+   readyCount: 1
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -152,7 +160,7 @@ metadata:
         kind: ManilaAPI
         name: manila-api
 spec:
-   replicas: 3
+   replicas: 1
    template:
       metadata:
          labels:
@@ -162,6 +170,84 @@ spec:
          serviceAccount: manila-manila
          serviceAccountName: manila-manila
 status:
-   availableReplicas: 3
-   readyReplicas: 3
-   replicas: 3
+   availableReplicas: 1
+   readyReplicas: 1
+   replicas: 1
+---
+apiVersion: manila.openstack.org/v1beta1
+kind: ManilaShare
+metadata:
+  name: manila-share-share0
+spec:
+  databaseUser: manila
+  passwordSelectors:
+    database: ManilaDatabasePassword
+    service: ManilaPassword
+  replicas: 1
+  resources: {}
+  secret: osp-secret
+  serviceAccount: manila-manila
+  serviceUser: manila
+  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
+status:
+  conditions:
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: Ready
+  - message: Deployment completed
+    reason: Ready
+    status: "True"
+    type: DeploymentReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: InputReady
+  - message: NetworkAttachments completed
+    reason: Ready
+    status: "True"
+    type: NetworkAttachmentsReady
+  - message: Service config create completed
+    reason: Ready
+    status: "True"
+    type: ServiceConfigReady
+  readyCount: 1
+---
+apiVersion: manila.openstack.org/v1beta1
+kind: ManilaShare
+metadata:
+  name: manila-share-share1
+spec:
+  databaseUser: manila
+  passwordSelectors:
+    database: ManilaDatabasePassword
+    service: ManilaPassword
+  replicas: 1
+  resources: {}
+  secret: osp-secret
+  serviceAccount: manila-manila
+  serviceUser: manila
+  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
+status:
+  conditions:
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: Ready
+  - message: Deployment completed
+    reason: Ready
+    status: "True"
+    type: DeploymentReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: InputReady
+  - message: NetworkAttachments completed
+    reason: Ready
+    status: "True"
+    type: NetworkAttachmentsReady
+  - message: Service config create completed
+    reason: Ready
+    status: "True"
+    type: ServiceConfigReady
+  readyCount: 1

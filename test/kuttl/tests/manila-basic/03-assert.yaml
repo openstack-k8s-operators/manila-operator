@@ -33,7 +33,7 @@ spec:
       replicas: 1
       resources: {}
    manilaShares:
-      share1:
+      share0:
          replicas: 1
          resources: {}
          customServiceConfig: |
@@ -122,7 +122,7 @@ status:
    manilaAPIReadyCount: 1
    manilaSchedulerReadyCount: 1
    manilaSharesReadyCounts:
-      share1: 1
+      share0: 1
    transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 ---
 apiVersion: batch/v1
@@ -183,7 +183,7 @@ commands:
               SERVICE_IMAGE=$(oc get -n $NAMESPACE manilaapi manila-api -o go-template="$template")
               ;;
             SHARE)
-              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilashares manila-share-share1 -o go-template="$template")
+              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilashares manila-share-share0 -o go-template="$template")
               ;;
             SCHEDULER)
               SERVICE_IMAGE=$(oc get -n $NAMESPACE manilascheduler manila-scheduler -o go-template="$template")

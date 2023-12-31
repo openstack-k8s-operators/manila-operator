@@ -19,13 +19,13 @@ spec:
    debug:
       dbSync: false
    manilaAPI:
-      customServiceConfig: |
-         [DEFAULT]
-         enabled_share_protocols = cephfs
-      debug:
-         service: false
-      replicas: 1
-      resources: {}
+       customServiceConfig: |
+          [DEFAULT]
+          enabled_share_protocols=nfs,cephfs,cifs
+       debug:
+          service: false
+       replicas: 1
+       resources: {}
    manilaScheduler:
       customServiceConfig: '# add your customization here'
       debug:
@@ -33,22 +33,32 @@ spec:
       replicas: 1
       resources: {}
    manilaShares:
-      share0:
-         replicas: 1
-         resources: {}
-         customServiceConfig: |
-            [DEFAULT]
-            enabled_share_backends = cephfs
-            [cephfs]
-            driver_handles_share_servers=False
-            share_backend_name=cephfs
-            share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
-            cephfs_conf_path=/etc/ceph/ceph.conf
-            cephfs_auth_id=openstack
-            cephfs_cluster_name=ceph
-            cephfs_protocol_helper_type=CEPHFS
-         debug:
-            service: false
+     share0:
+       customServiceConfig: |
+          [DEFAULT]
+          enabled_share_backends = cephfs
+          [cephfs]
+          driver_handles_share_servers=False
+          share_backend_name=cephfs
+          share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+          cephfs_conf_path=/etc/ceph/ceph.conf
+          cephfs_auth_id=openstack
+          cephfs_cluster_name=ceph
+          cephfs_protocol_helper_type=CEPHFS
+       replicas: 1
+     share1:
+       customServiceConfig: |
+           [DEFAULT]
+           enabled_share_backends=cephfsnfs
+           [cephfsnfs]
+           driver_handles_share_servers=False
+           share_backend_name=cephfs
+           share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+           cephfs_auth_id=openstack
+           cephfs_cluster_name=ceph
+           cephfs_nfs_cluster_id=cephfs
+           cephfs_protocol_helper_type=NFS
+       replicas: 0
    passwordSelectors:
       database: ManilaDatabasePassword
       service: ManilaPassword
@@ -123,6 +133,7 @@ status:
    manilaSchedulerReadyCount: 1
    manilaSharesReadyCounts:
       share0: 1
+      share1: 0
    transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 ---
 apiVersion: batch/v1
@@ -163,6 +174,48 @@ spec:
               secretName: manila-config-data
   schedule: 1 0 * * *
   suspend: false
+---
+apiVersion: manila.openstack.org/v1beta1
+kind: ManilaShare
+metadata:
+  name: manila-share-share0
+spec:
+  databaseHostname: openstack
+  databaseUser: manila
+  debug:
+    service: false
+  passwordSelectors:
+    database: ManilaDatabasePassword
+    service: ManilaPassword
+  replicas: 1
+  resources: {}
+  secret: osp-secret
+  serviceAccount: manila-manila
+  serviceUser: manila
+  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
+status:
+  conditions:
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: Ready
+  - message: Deployment completed
+    reason: Ready
+    status: "True"
+    type: DeploymentReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: InputReady
+  - message: NetworkAttachments completed
+    reason: Ready
+    status: "True"
+    type: NetworkAttachmentsReady
+  - message: Service config create completed
+    reason: Ready
+    status: "True"
+    type: ServiceConfigReady
+  readyCount: 1
 ---
 # when using image digests the containerImage URLs are SHA's so we verify them with a script
 apiVersion: kuttl.dev/v1beta1

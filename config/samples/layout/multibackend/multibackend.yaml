@@ -7,7 +7,7 @@ spec:
   manilaAPI:
       customServiceConfig: |
          [DEFAULT]
-         enabled_share_protocols = cephfs
+         enabled_share_protocols=nfs,cephfs,cifs
   manilaShares:
     share0:
       customServiceConfig: |
@@ -21,12 +21,27 @@ spec:
          cephfs_auth_id=openstack
          cephfs_cluster_name=ceph
          cephfs_protocol_helper_type=CEPHFS
+      replicas: 1
+    share1:
+      customServiceConfig: |
+          [DEFAULT]
+          enabled_share_backends=cephfsnfs
+          [cephfsnfs]
+          driver_handles_share_servers=False
+          share_backend_name=cephfs
+          share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+          cephfs_auth_id=openstack
+          cephfs_cluster_name=ceph
+          cephfs_nfs_cluster_id=cephfs
+          cephfs_protocol_helper_type=NFS
+      replicas: 1
   extraMounts:
     - name: v1
       region: r1
       extraVol:
         - propagation:
           - share0
+          - share1
           extraVolType: Ceph
           volumes:
           - name: ceph
