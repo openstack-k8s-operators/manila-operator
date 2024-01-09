@@ -22,12 +22,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
-	"strings"
 )
-
-// DBPurgeCommandBase -
-var DBPurgeCommandBase = [...]string{"/usr/bin/manila-manage", "--debug", "--config-dir /etc/manila/manila.conf.d", "db purge "}
 
 // CronJob func
 func CronJob(
@@ -35,18 +30,19 @@ func CronJob(
 	labels map[string]string,
 	annotations map[string]string,
 ) *batchv1.CronJob {
+
 	var config0644AccessMode int32 = 0644
-	var DBPurgeCommand []string = DBPurgeCommandBase[:]
-
-	if !instance.Spec.Debug.DBPurge {
-		// If debug mode is not requested, remove the --debug option
-		DBPurgeCommand = append(DBPurgeCommandBase[:1], DBPurgeCommandBase[2:]...)
+	debugArg := ""
+	if instance.Spec.Debug.DBPurge {
+		debugArg = " --debug"
 	}
-	// Build the resulting command
-	DBPurgeCommandString := strings.Join(DBPurgeCommand, " ")
 
-	// Extend the resulting command with the DBPurgeAge int
-	args := []string{"-c", DBPurgeCommandString + strconv.Itoa(instance.Spec.DBPurge.Age)}
+	dbPurgeCommand := fmt.Sprintf(
+		"/usr/bin/manila-manage%s --config-dir /etc/manila/manila.conf.d db purge %d",
+		debugArg,
+		instance.Spec.DBPurge.Age)
+
+	args := []string{"-c", dbPurgeCommand}
 
 	parallelism := int32(1)
 	completions := int32(1)
