@@ -1,2 +1,4 @@
 resources:
-  - manila_v1beta1_manila.yaml
+- manila_v1beta1_manila.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

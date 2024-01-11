@@ -1,6 +1,8 @@
 resources:
-  - ../bases/openstack
-  - ./osp-secret-netapp.yaml
+- ../bases/openstack
+- ./osp-secret-netapp.yaml
 
 patches:
-  - dhss.yaml
+- path: dhss.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization

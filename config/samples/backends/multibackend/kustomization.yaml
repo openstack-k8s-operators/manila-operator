@@ -1,4 +1,4 @@
 resources:
   - ../bases/openstack
 patches:
-  - backend.yaml
+  - path: backend.yaml
