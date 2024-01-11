@@ -75,12 +75,41 @@ func GetDefaultManilaSpec() map[string]interface{} {
 	}
 }
 
+func GetManilaSpec(customSpec map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"databaseInstance": "openstack",
+		"secret":           SecretName,
+		"manilaAPI":        GetManilaCommonSpec(customSpec),
+		"manilaScheduler":  GetManilaCommonSpec(customSpec),
+		"manilaShares": map[string]interface{}{
+			"share0": GetManilaCommonSpec(customSpec),
+			"share1": GetManilaCommonSpec(customSpec),
+		},
+	}
+}
+
+func GetManilaCommonSpec(spec map[string]interface{}) map[string]interface{} {
+	defaultSpec := map[string]interface{}{
+		"secret":             SecretName,
+		"replicas":           1,
+		"containerImage":     manilaTest.ContainerImage,
+		"serviceAccount":     manilaTest.ManilaSA.Name,
+		"transportURLSecret": manilaTest.RabbitmqSecretName,
+	}
+	// append to the defaultSpec map the additional keys passed as input
+	for k, v := range spec {
+		defaultSpec[k] = v
+	}
+	return defaultSpec
+}
+
 func GetDefaultManilaAPISpec() map[string]interface{} {
 	return map[string]interface{}{
-		"secret":         SecretName,
-		"replicas":       1,
-		"containerImage": manilaTest.ContainerImage,
-		"serviceAccount": manilaTest.ManilaSA.Name,
+		"secret":             SecretName,
+		"replicas":           1,
+		"containerImage":     manilaTest.ContainerImage,
+		"serviceAccount":     manilaTest.ManilaSA.Name,
+		"transportURLSecret": manilaTest.RabbitmqSecretName,
 	}
 }
 
@@ -130,15 +159,28 @@ func ManilaConditionGetter(name types.NamespacedName) condition.Conditions {
 }
 
 func CreateManilaAPI(name types.NamespacedName, spec map[string]interface{}) client.Object {
+	// we get the parent CR and set ownership to the manilaAPI CR
+	parent := GetManila(manilaTest.Instance)
 	raw := map[string]interface{}{
 		"apiVersion": "manila.openstack.org/v1beta1",
 		"kind":       "ManilaAPI",
 		"metadata": map[string]interface{}{
 			"name":      name.Name,
 			"namespace": name.Namespace,
+			"ownerReferences": []map[string]interface{}{
+				{
+					"apiVersion":         "manila.openstack.org/v1beta1",
+					"blockOwnerDeletion": true,
+					"controller":         true,
+					"kind":               "Manila",
+					"name":               parent.GetObjectMeta().GetName(),
+					"uid":                parent.GetObjectMeta().GetUID(),
+				},
+			},
 		},
 		"spec": spec,
 	}
+
 	return CreateUnstructured(raw)
 }
 
@@ -194,6 +236,16 @@ func GetManilaShare(name types.NamespacedName) *manilav1.ManilaShare {
 
 func ManilaAPIConditionGetter(name types.NamespacedName) condition.Conditions {
 	instance := GetManilaAPI(name)
+	return instance.Status.Conditions
+}
+
+func ManilaSchedulerConditionGetter(name types.NamespacedName) condition.Conditions {
+	instance := GetManilaScheduler(name)
+	return instance.Status.Conditions
+}
+
+func ManilaShareConditionGetter(name types.NamespacedName) condition.Conditions {
+	instance := GetManilaShare(name)
 	return instance.Status.Conditions
 }
 

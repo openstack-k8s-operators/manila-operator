@@ -29,30 +29,34 @@ const (
 
 // ManilaTestData is the data structure used to provide input data to envTest
 type ManilaTestData struct {
-	RabbitmqClusterName    string
-	RabbitmqSecretName     string
-	MemcachedInstance      string
-	ManilaDataBaseUser     string
-	ManilaPassword         string
-	ManilaServiceUser      string
-	Instance               types.NamespacedName
-	ManilaRole             types.NamespacedName
-	ManilaRoleBinding      types.NamespacedName
-	ManilaTransportURL     types.NamespacedName
-	ManilaMemcached        types.NamespacedName
-	ManilaSA               types.NamespacedName
-	ManilaDBSync           types.NamespacedName
-	ManilaKeystoneEndpoint types.NamespacedName
-	ManilaServicePublic    types.NamespacedName
-	ManilaServiceInternal  types.NamespacedName
-	ManilaConfigSecret     types.NamespacedName
-	ManilaConfigScripts    types.NamespacedName
-	Manila                 types.NamespacedName
-	ManilaAPI              types.NamespacedName
-	ManilaScheduler        types.NamespacedName
-	ManilaShares           []types.NamespacedName
-	InternalAPINAD         types.NamespacedName
-	ContainerImage         string
+	RabbitmqClusterName         string
+	RabbitmqSecretName          string
+	MemcachedInstance           string
+	ManilaDataBaseUser          string
+	ManilaPassword              string
+	ManilaServiceUser           string
+	Instance                    types.NamespacedName
+	ManilaRole                  types.NamespacedName
+	ManilaRoleBinding           types.NamespacedName
+	ManilaTransportURL          types.NamespacedName
+	ManilaMemcached             types.NamespacedName
+	ManilaSA                    types.NamespacedName
+	ManilaDBSync                types.NamespacedName
+	ManilaKeystoneEndpoint      types.NamespacedName
+	ManilaServicePublic         types.NamespacedName
+	ManilaServiceInternal       types.NamespacedName
+	ManilaConfigSecret          types.NamespacedName
+	ManilaAPIConfigSecret       types.NamespacedName
+	ManilaSchedulerConfigSecret types.NamespacedName
+	ManilaShareConfigSecret     types.NamespacedName
+	ManilaConfigScripts         types.NamespacedName
+	Manila                      types.NamespacedName
+	ManilaAPI                   types.NamespacedName
+	ManilaScheduler             types.NamespacedName
+	ManilaShares                []types.NamespacedName
+	ManilaDefaultShare          types.NamespacedName
+	InternalAPINAD              types.NamespacedName
+	ContainerImage              string
 }
 
 // GetManilaTestData is a function that initialize the ManilaTestData
@@ -82,11 +86,11 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		ManilaShares: []types.NamespacedName{
 			{
 				Namespace: manilaName.Namespace,
-				Name:      fmt.Sprintf("%s-share-share1", manilaName.Name),
+				Name:      fmt.Sprintf("%s-share-share0", manilaName.Name),
 			},
 			{
 				Namespace: manilaName.Namespace,
-				Name:      fmt.Sprintf("%s-share-share2", manilaName.Name),
+				Name:      fmt.Sprintf("%s-share-share1", manilaName.Name),
 			},
 		},
 		ManilaRole: types.NamespacedName{
@@ -112,6 +116,18 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		ManilaConfigSecret: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "config-data"),
+		},
+		ManilaAPIConfigSecret: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "api-config-data"),
+		},
+		ManilaSchedulerConfigSecret: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      fmt.Sprintf("%s-%s", manilaName.Name, "scheduler-config-data"),
+		},
+		ManilaShareConfigSecret: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      fmt.Sprintf("%s-share-share0-%s", manilaName.Name, "config-data"),
 		},
 		ManilaConfigScripts: types.NamespacedName{
 			Namespace: manilaName.Namespace,
