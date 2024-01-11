@@ -1,0 +1,167 @@
+#
+# Check for:
+#
+# - 1 manilaAPI
+# - 2 manilaScheduler
+# - 3 manilaShares
+# - 4 extraMounts
+
+apiVersion: manila.openstack.org/v1beta1
+kind: Manila
+metadata:
+   name: manila
+spec:
+   customServiceConfig: |
+      [DEFAULT]
+      debug = true
+   databaseInstance: openstack
+   databaseUser: manila
+   debug:
+      dbSync: false
+   manilaAPI:
+      customServiceConfig: |
+         [DEFAULT]
+         enabled_share_protocols = cephfs
+      debug:
+         service: false
+      replicas: 3
+      resources: {}
+   manilaScheduler:
+      replicas: 1
+      resources: {}
+   manilaShares:
+      share0:
+         replicas: 1
+         resources: {}
+         customServiceConfig: |
+            [DEFAULT]
+            enabled_share_backends = cephfs
+            [cephfs]
+            driver_handles_share_servers=False
+            share_backend_name=cephfs
+            share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+            cephfs_conf_path=/etc/ceph/ceph.conf
+            cephfs_auth_id=openstack
+            cephfs_cluster_name=ceph
+            cephfs_protocol_helper_type=CEPHFS
+   passwordSelectors:
+      database: ManilaDatabasePassword
+      service: ManilaPassword
+   preserveJobs: false
+   rabbitMqClusterName: rabbitmq
+   secret: osp-secret
+   serviceUser: manila
+status:
+   conditions:
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: Ready
+      - message: CronJob completed
+        reason: Ready
+        status: "True"
+        type: CronJobReady
+      - message: DB create completed
+        reason: Ready
+        status: "True"
+        type: DBReady
+      - message: DBsync completed
+        reason: Ready
+        status: "True"
+        type: DBSyncReady
+      - message: Input data complete
+        reason: Ready
+        status: "True"
+        type: InputReady
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: ManilaAPIReady
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: ManilaSchedulerReady
+      - message: Deployment completed
+        reason: Ready
+        status: "True"
+        type: ManilaShareReady
+      - message: " Memcached instance has been provisioned"
+        reason: Ready
+        status: "True"
+        type: MemcachedReady
+      - message: NetworkAttachments completed
+        reason: Ready
+        status: "True"
+        type: NetworkAttachmentsReady
+      - message: RabbitMqTransportURL successfully created
+        reason: Ready
+        status: "True"
+        type: RabbitMqTransportURLReady
+      - message: RoleBinding created
+        reason: Ready
+        status: "True"
+        type: RoleBindingReady
+      - message: Role created
+        reason: Ready
+        status: "True"
+        type: RoleReady
+      - message: ServiceAccount created
+        reason: Ready
+        status: "True"
+        type: ServiceAccountReady
+      - message: Service config create completed
+        reason: Ready
+        status: "True"
+        type: ServiceConfigReady
+   databaseHostname: openstack
+   manilaAPIReadyCount: 3
+   manilaSchedulerReadyCount: 1
+   manilaSharesReadyCounts:
+      share0: 1
+   transportURLSecret: rabbitmq-transport-url-manila-manila-transport
+---
+apiVersion: manila.openstack.org/v1beta1
+kind: ManilaAPI
+metadata:
+   finalizers:
+      - ManilaAPI
+   name: manila-api
+spec:
+   databaseHostname: openstack
+   databaseUser: manila
+   passwordSelectors:
+      database: ManilaDatabasePassword
+      service: ManilaPassword
+   replicas: 3
+   resources: {}
+   secret: osp-secret
+   serviceAccount: manila-manila
+   serviceUser: manila
+status:
+   readyCount: 3
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+   labels:
+      component: manila-api
+      service: manila
+   name: manila-api
+   ownerReferences:
+      - apiVersion: manila.openstack.org/v1beta1
+        kind: ManilaAPI
+        name: manila-api
+spec:
+   replicas: 3
+   template:
+      metadata:
+         labels:
+            component: manila-api
+            service: manila
+      spec:
+         serviceAccount: manila-manila
+         serviceAccountName: manila-manila
+status:
+   availableReplicas: 3
+   readyReplicas: 3
+   replicas: 3

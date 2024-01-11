@@ -1,0 +1,2 @@
+resources:
+  - manila_v1beta1_manila.yaml
