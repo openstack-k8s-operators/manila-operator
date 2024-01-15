@@ -34,7 +34,6 @@
 # configuration directory (defaults to /etc/manila/manila.conf.d)
 
 from http import server
-import logging
 import signal
 import subprocess
 import sys
