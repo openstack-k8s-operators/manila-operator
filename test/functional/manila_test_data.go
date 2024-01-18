@@ -19,12 +19,19 @@ package functional
 
 import (
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
 	// MemcachedInstance - name of the memcached instance
 	MemcachedInstance = "memcached"
+	//PublicCertSecretName -
+	PublicCertSecretName = "public-tls-certs"
+	//InternalCertSecretName -
+	InternalCertSecretName = "internal-tls-certs"
+	//CABundleSecretName -
+	CABundleSecretName = "combined-ca-bundle"
 )
 
 // ManilaTestData is the data structure used to provide input data to envTest
@@ -57,6 +64,9 @@ type ManilaTestData struct {
 	ManilaDefaultShare          types.NamespacedName
 	InternalAPINAD              types.NamespacedName
 	ContainerImage              string
+	CABundleSecret              types.NamespacedName
+	InternalCertSecret          types.NamespacedName
+	PublicCertSecret            types.NamespacedName
 }
 
 // GetManilaTestData is a function that initialize the ManilaTestData
@@ -159,5 +169,18 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		ManilaPassword:    "12345678",
 		ManilaServiceUser: "manila",
 		ContainerImage:    "test://manila",
+		CABundleSecret: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      CABundleSecretName,
+		},
+
+		InternalCertSecret: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      InternalCertSecretName,
+		},
+		PublicCertSecret: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      PublicCertSecretName,
+		},
 	}
 }

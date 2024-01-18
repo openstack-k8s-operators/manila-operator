@@ -211,6 +211,10 @@ status:
     reason: Ready
     status: "True"
     type: ServiceConfigReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: TLSInputReady
   readyCount: 1
 ---
 apiVersion: manila.openstack.org/v1beta1
@@ -250,4 +254,8 @@ status:
     reason: Ready
     status: "True"
     type: ServiceConfigReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: TLSInputReady
   readyCount: 1

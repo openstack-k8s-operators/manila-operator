@@ -16,6 +16,8 @@ import (
 	common "github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	manila "github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 
@@ -36,7 +38,7 @@ func StatefulSet(
 	configHash string,
 	labels map[string]string,
 	annotations map[string]string,
-) *appsv1.StatefulSet {
+) (*appsv1.StatefulSet, error) {
 	runAsUser := int64(0)
 
 	livenessProbe := &corev1.Probe{
@@ -54,11 +56,46 @@ func StatefulSet(
 	//
 	// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 	//
+
 	livenessProbe.HTTPGet = &corev1.HTTPGetAction{
 		Path: "/healthcheck",
 		Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(manila.ManilaPublicPort)},
 	}
 	readinessProbe.HTTPGet = livenessProbe.HTTPGet
+
+	if instance.Spec.TLS.API.Enabled(service.EndpointPublic) {
+		livenessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		readinessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+	}
+
+	// create Volume and VolumeMounts
+	volumes := append(GetVolumes(manila.GetOwningManilaName(instance), instance.Name, instance.Spec.ExtraMounts), GetLogVolume())
+	volumeMounts := append(GetVolumeMounts(instance.Spec.ExtraMounts), GetLogVolumeMount())
+
+	// add CA cert if defined
+	if instance.Spec.TLS.CaBundleSecretName != "" {
+		volumes = append(volumes, instance.Spec.TLS.CreateVolume())
+		volumeMounts = append(volumeMounts, instance.Spec.TLS.CreateVolumeMounts(nil)...)
+	}
+
+	for _, endpt := range []service.Endpoint{service.EndpointInternal, service.EndpointPublic} {
+		if instance.Spec.TLS.API.Enabled(endpt) {
+			var tlsEndptCfg tls.GenericService
+			switch endpt {
+			case service.EndpointPublic:
+				tlsEndptCfg = instance.Spec.TLS.API.Public
+			case service.EndpointInternal:
+				tlsEndptCfg = instance.Spec.TLS.API.Internal
+			}
+
+			svc, err := tlsEndptCfg.ToService()
+			if err != nil {
+				return nil, err
+			}
+			volumes = append(volumes, svc.CreateVolume(endpt.String()))
+			volumeMounts = append(volumeMounts, svc.CreateVolumeMounts(endpt.String())...)
+		}
+	}
 
 	envVars := map[string]env.Setter{}
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
@@ -116,23 +153,20 @@ func StatefulSet(
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser: &runAsUser,
 							},
-							Env: env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts: append(GetVolumeMounts(instance.Spec.ExtraMounts),
-								[]corev1.VolumeMount{GetLogVolumeMount()}...),
+							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:   volumeMounts,
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
 						},
 					},
 					NodeSelector: instance.Spec.NodeSelector,
+					Volumes:      volumes,
 				},
 			},
 		},
 	}
-	statefulset.Spec.Template.Spec.Volumes = append(GetVolumes(
-		manila.GetOwningManilaName(instance),
-		instance.Name,
-		instance.Spec.ExtraMounts), GetLogVolume())
+
 	// If possible two pods of the same service should not
 	// run on the same worker node. If this is not possible
 	// the get still created on the same worker node.
@@ -147,5 +181,5 @@ func StatefulSet(
 		statefulset.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
 
-	return statefulset
+	return statefulset, nil
 }

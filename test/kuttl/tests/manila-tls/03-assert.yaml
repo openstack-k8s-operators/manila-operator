@@ -1,0 +1,535 @@
+apiVersion: manila.openstack.org/v1beta1
+kind: Manila
+metadata:
+  name: manila
+  namespace: manila-kuttl-tests
+spec:
+  customServiceConfig: |
+    [DEFAULT]
+    debug = true
+  databaseInstance: openstack
+  databaseUser: manila
+  dbPurge:
+    age: 30
+    schedule: 1 0 * * *
+  extraMounts:
+  - extraVol:
+    - extraVolType: Ceph
+      mounts:
+      - mountPath: /etc/ceph
+        name: ceph
+        readOnly: true
+      propagation:
+      - share0
+      volumes:
+      - name: ceph
+        projected:
+          sources:
+          - secret:
+              name: ceph-conf-files
+    name: v1
+    region: r1
+  manilaAPI:
+    customServiceConfig: |
+      [DEFAULT]
+      enabled_share_protocols = cephfs
+    override: {}
+    replicas: 1
+    resources: {}
+    tls:
+      api:
+        internal:
+          secretName: cert-manila-internal-svc
+        public:
+          secretName: cert-manila-public-svc
+      caBundleSecretName: combined-ca-bundle
+  manilaScheduler:
+    customServiceConfig: '# add your customization here'
+    replicas: 1
+    resources: {}
+  manilaShares:
+    share0:
+      customServiceConfig: |
+        [DEFAULT]
+        enabled_share_backends = cephfs
+        [cephfs]
+        driver_handles_share_servers=False
+        share_backend_name=cephfs
+        share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+        cephfs_conf_path=/etc/ceph/ceph.conf
+        cephfs_auth_id=openstack
+        cephfs_cluster_name=ceph
+        cephfs_protocol_helper_type=CEPHFS
+      replicas: 1
+      resources: {}
+  memcachedInstance: memcached
+  passwordSelectors:
+    database: ManilaDatabasePassword
+    service: ManilaPassword
+  preserveJobs: false
+  rabbitMqClusterName: rabbitmq
+  secret: osp-secret
+  serviceUser: manila
+status:
+  conditions:
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: Ready
+  - message: CronJob completed
+    reason: Ready
+    status: "True"
+    type: CronJobReady
+  - message: DB create completed
+    reason: Ready
+    status: "True"
+    type: DBReady
+  - message: DBsync completed
+    reason: Ready
+    status: "True"
+    type: DBSyncReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: InputReady
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: ManilaAPIReady
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: ManilaSchedulerReady
+  - message: Deployment completed
+    reason: Ready
+    status: "True"
+    type: ManilaShareReady
+  - message: " Memcached instance has been provisioned"
+    reason: Ready
+    status: "True"
+    type: MemcachedReady
+  - message: NetworkAttachments completed
+    reason: Ready
+    status: "True"
+    type: NetworkAttachmentsReady
+  - message: RabbitMqTransportURL successfully created
+    reason: Ready
+    status: "True"
+    type: RabbitMqTransportURLReady
+  - message: RoleBinding created
+    reason: Ready
+    status: "True"
+    type: RoleBindingReady
+  - message: Role created
+    reason: Ready
+    status: "True"
+    type: RoleReady
+  - message: ServiceAccount created
+    reason: Ready
+    status: "True"
+    type: ServiceAccountReady
+  - message: Service config create completed
+    reason: Ready
+    status: "True"
+    type: ServiceConfigReady
+  databaseHostname: openstack.manila-kuttl-tests.svc
+  manilaAPIReadyCount: 1
+  manilaSchedulerReadyCount: 1
+  manilaSharesReadyCounts:
+    share0: 1
+  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: manila-db-purge
+spec:
+  jobTemplate:
+    metadata:
+      labels:
+        service: manila
+    spec:
+      completions: 1
+      parallelism: 1
+      template:
+        spec:
+          containers:
+          - args:
+            - -c
+            - /usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d
+              db purge 30
+            command:
+            - /bin/bash
+            name: manila-db-purge
+            volumeMounts:
+            - mountPath: /etc/manila/manila.conf.d
+              name: db-purge-config-data
+              readOnly: true
+            - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+              name: combined-ca-bundle
+              readOnly: true
+          serviceAccount: manila-manila
+          serviceAccountName: manila-manila
+          volumes:
+          - name: db-purge-config-data
+            secret:
+              defaultMode: 420
+              items:
+              - key: 00-config.conf
+                path: 00-config.conf
+              secretName: manila-config-data
+          - name: combined-ca-bundle
+            secret:
+              defaultMode: 292
+              secretName: combined-ca-bundle
+  schedule: 1 0 * * *
+  suspend: false
+---
+apiVersion: manila.openstack.org/v1beta1
+kind: ManilaShare
+metadata:
+  name: manila-share-share0
+spec:
+  databaseHostname: openstack.manila-kuttl-tests.svc
+  databaseUser: manila
+  passwordSelectors:
+    database: ManilaDatabasePassword
+    service: ManilaPassword
+  replicas: 1
+  resources: {}
+  secret: osp-secret
+  serviceAccount: manila-manila
+  serviceUser: manila
+  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
+status:
+  conditions:
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: Ready
+  - message: Deployment completed
+    reason: Ready
+    status: "True"
+    type: DeploymentReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: InputReady
+  - message: NetworkAttachments completed
+    reason: Ready
+    status: "True"
+    type: NetworkAttachmentsReady
+  - message: Service config create completed
+    reason: Ready
+    status: "True"
+    type: ServiceConfigReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: TLSInputReady
+  readyCount: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: manila-api
+  namespace: manila-kuttl-tests
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: manila-api
+      service: manila
+  template:
+    metadata:
+      labels:
+        component: manila-api
+        service: manila
+    spec:
+      serviceAccountName: manila-manila
+      containers:
+      - args:
+        - --single-child
+        - --
+        - /usr/bin/tail
+        - -n+1
+        - -F
+        - /var/log/manila/manila-api.log
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log/manila
+      - args:
+          - -c
+          - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        volumeMounts:
+        - mountPath: /etc/machine-id
+          name: etc-machine-id
+          readOnly: true
+        - mountPath: /etc/localtime
+          name: etc-localtime
+          readOnly: true
+        - mountPath: /var/lib/config-data/default
+          name: config-data
+        - mountPath: /usr/local/bin/container-scripts
+          name: scripts
+        - mountPath: /etc/manila/manila.conf.d
+          name: config-data-custom
+          readOnly: true
+        - mountPath: /var/lib/kolla/config_files/config.json
+          name: config-data
+          readOnly: true
+          subPath: manila-api-config.json
+        - mountPath: /var/log/manila
+          name: logs
+        - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+          name: combined-ca-bundle
+          readOnly: true
+        - mountPath: /var/lib/config-data/tls/certs/internal.crt
+          name: internal-tls-certs
+          readOnly: true
+          subPath: tls.crt
+        - mountPath: /var/lib/config-data/tls/private/internal.key
+          name: internal-tls-certs
+          readOnly: true
+          subPath: tls.key
+        - mountPath: /var/lib/config-data/tls/certs/public.crt
+          name: public-tls-certs
+          readOnly: true
+          subPath: tls.crt
+        - mountPath: /var/lib/config-data/tls/private/public.key
+          name: public-tls-certs
+          readOnly: true
+          subPath: tls.key
+      volumes:
+      - name: etc-machine-id
+        hostPath:
+          path: /etc/machine-id
+      - name: etc-localtime
+        hostPath:
+          path: /etc/localtime
+      - name: scripts
+        secret:
+          secretName: manila-scripts
+      - name: config-data
+        secret:
+          secretName: manila-config-data
+      - name: config-data-custom
+        secret:
+          secretName: manila-api-config-data
+      - name: logs
+        emptyDir: {}
+      - name: combined-ca-bundle
+        secret:
+          defaultMode: 292
+          secretName: combined-ca-bundle
+      - name: internal-tls-certs
+        secret:
+          defaultMode: 256
+          secretName: cert-manila-internal-svc
+      - name: public-tls-certs
+        secret:
+          defaultMode: 256
+          secretName: cert-manila-public-svc
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: manila-share-share0
+  namespace: manila-kuttl-tests
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: manila-share
+      service: manila
+  template:
+    metadata:
+      labels:
+        component: manila-share
+        service: manila
+    spec:
+      serviceAccountName: manila-manila
+      containers:
+      - args:
+        - -c
+        - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        volumeMounts:
+        - mountPath: /etc/machine-id
+          name: etc-machine-id
+        - mountPath: /etc/localtime
+          name: etc-localtime
+          readOnly: true
+        - mountPath: /var/lib/config-data/default
+          name: config-data
+          readOnly: true
+        - mountPath: /usr/local/bin/container-scripts
+          name: scripts
+          readOnly: true
+        - mountPath: /etc/ceph
+          name: ceph
+          readOnly: true
+        - mountPath: /etc/manila/manila.conf.d
+          name: config-data-custom
+          readOnly: true
+        - mountPath: /var/lib/manila
+          name: var-lib-manila
+        - mountPath: /var/lib/kolla/config_files/config.json
+          name: config-data
+          readOnly: true
+          subPath: manila-share-config.json
+        - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+          name: combined-ca-bundle
+          readOnly: true
+          subPath: tls-ca-bundle.pem
+      - command:
+        - /usr/local/bin/container-scripts/healthcheck.py
+        - share
+        - /etc/manila/manila.conf.d
+        volumeMounts:
+        - mountPath: /etc/machine-id
+          name: etc-machine-id
+        - mountPath: /etc/localtime
+          name: etc-localtime
+          readOnly: true
+        - mountPath: /var/lib/config-data/default
+          name: config-data
+          readOnly: true
+        - mountPath: /usr/local/bin/container-scripts
+          name: scripts
+          readOnly: true
+        - mountPath: /etc/ceph
+          name: ceph
+          readOnly: true
+        - mountPath: /etc/manila/manila.conf.d
+          name: config-data-custom
+          readOnly: true
+        - mountPath: /var/lib/manila
+          name: var-lib-manila
+        - mountPath: /var/lib/kolla/config_files/config.json
+          name: config-data
+          readOnly: true
+          subPath: manila-share-config.json
+        - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+          name: combined-ca-bundle
+          readOnly: true
+          subPath: tls-ca-bundle.pem
+      volumes:
+        - name: etc-machine-id
+          hostPath:
+            path: /etc/machine-id
+        - name: etc-localtime
+          hostPath:
+            path: /etc/localtime
+        - name: scripts
+          secret:
+            secretName: manila-scripts
+        - name: config-data
+          secret:
+            secretName: manila-config-data
+        - name: ceph
+          projected:
+            sources:
+            - secret:
+                name: ceph-conf-files
+        - name: var-lib-manila
+          hostPath:
+            path: /var/lib/manila
+        - name: config-data-custom
+          secret:
+            secretName: manila-share-share0-config-data
+        - name: combined-ca-bundle
+          secret:
+            secretName: combined-ca-bundle
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: manila-scheduler
+  namespace: manila-kuttl-tests
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: manila-scheduler
+      service: manila
+  template:
+    metadata:
+      labels:
+        component: manila-scheduler
+        service: manila
+    spec:
+      serviceAccountName: manila-manila
+      containers:
+      - args:
+        - -c
+        - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        volumeMounts:
+        - mountPath: /etc/machine-id
+          name: etc-machine-id
+        - mountPath: /etc/localtime
+          name: etc-localtime
+          readOnly: true
+        - mountPath: /var/lib/config-data/default
+          name: config-data
+          readOnly: true
+        - mountPath: /usr/local/bin/container-scripts
+          name: scripts
+          readOnly: true
+        - mountPath: /etc/manila/manila.conf.d
+          name: config-data-custom
+          readOnly: true
+        - mountPath: /var/lib/kolla/config_files/config.json
+          name: config-data
+          readOnly: true
+          subPath: manila-scheduler-config.json
+        - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+          name: combined-ca-bundle
+          readOnly: true
+          subPath: tls-ca-bundle.pem
+      - command:
+        - /usr/local/bin/container-scripts/healthcheck.py
+        - scheduler
+        - /etc/manila/manila.conf.d
+        volumeMounts:
+        - mountPath: /etc/machine-id
+          name: etc-machine-id
+          readOnly: true
+        - mountPath: /etc/localtime
+          name: etc-localtime
+          readOnly: true
+        - mountPath: /var/lib/config-data/default
+          name: config-data
+          readOnly: true
+        - mountPath: /usr/local/bin/container-scripts
+          name: scripts
+          readOnly: true
+        - mountPath: /etc/manila/manila.conf.d
+          name: config-data-custom
+          readOnly: true
+        - mountPath: /var/lib/kolla/config_files/config.json
+          name: config-data
+          readOnly: true
+          subPath: manila-scheduler-config.json
+        - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+          name: combined-ca-bundle
+          readOnly: true
+          subPath: tls-ca-bundle.pem
+      volumes:
+        - name: etc-machine-id
+          hostPath:
+            path: /etc/machine-id
+        - name: etc-localtime
+          hostPath:
+            path: /etc/localtime
+        - name: scripts
+          secret:
+            secretName: manila-scripts
+        - name: config-data
+          secret:
+            secretName: manila-config-data
+        - name: config-data-custom
+          secret:
+            secretName: manila-scheduler-config-data
+        - name: combined-ca-bundle
+          secret:
+            secretName: combined-ca-bundle
