@@ -3,7 +3,7 @@
     "github>openstack-k8s-operators/renovate-config:default.json5"
   ],
   "constraints": {
-    "go": "1.19"
+    "go": "1.21"
   },
   "baseBranches": ["main"],
   "useBaseBranchConfig": "merge",

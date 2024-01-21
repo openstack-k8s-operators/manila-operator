@@ -1,6 +1,6 @@
 module github.com/openstack-k8s-operators/manila-operator/api
 
-go 1.19
+go 1.21
 
 require (
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.3.1-0.20240110131857-e70e1dec4d14
