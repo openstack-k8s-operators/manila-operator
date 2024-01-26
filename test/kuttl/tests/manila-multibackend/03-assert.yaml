@@ -129,7 +129,7 @@ status:
         reason: Ready
         status: "True"
         type: ServiceConfigReady
-   databaseHostname: openstack
+   databaseHostname: openstack.manila-kuttl-tests.svc
    manilaAPIReadyCount: 1
    manilaSchedulerReadyCount: 1
    manilaSharesReadyCounts:

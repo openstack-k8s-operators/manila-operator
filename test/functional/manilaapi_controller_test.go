@@ -94,6 +94,7 @@ var _ = Describe("ManilaAPI controller", func() {
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(namespace))
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 		})
@@ -114,6 +115,7 @@ var _ = Describe("ManilaAPI controller", func() {
 			BeforeEach(func() {
 				DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
 				mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+				mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 				keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 				keystone.SimulateKeystoneEndpointReady(manilaTest.Instance)
