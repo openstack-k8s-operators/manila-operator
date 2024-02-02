@@ -59,32 +59,16 @@ func StatefulSet(
 		InitialDelaySeconds: 5,
 	}
 
-	args := []string{"-c"}
+	args := []string{"-c", ServiceCommand}
 	var probeCommand []string
-	// When debugging the service container will run kolla_set_configs and
-	// sleep forever and the probe container will just sleep forever.
-	if instance.Spec.Debug.Service {
-		args = append(args, common.DebugCommand)
-		livenessProbe.Exec = &corev1.ExecAction{
-			Command: []string{
-				"/bin/true",
-			},
-		}
-		startupProbe.Exec = livenessProbe.Exec
-		probeCommand = []string{
-			"/bin/sleep", "infinity",
-		}
-	} else {
-		args = append(args, ServiceCommand)
-		livenessProbe.HTTPGet = &corev1.HTTPGetAction{
-			Port: intstr.FromInt(8080),
-		}
-		startupProbe.HTTPGet = livenessProbe.HTTPGet
-		probeCommand = []string{
-			"/usr/local/bin/container-scripts/healthcheck.py",
-			"share",
-			"/etc/manila/manila.conf.d",
-		}
+	livenessProbe.HTTPGet = &corev1.HTTPGetAction{
+		Port: intstr.FromInt(8080),
+	}
+	startupProbe.HTTPGet = livenessProbe.HTTPGet
+	probeCommand = []string{
+		"/usr/local/bin/container-scripts/healthcheck.py",
+		"share",
+		"/etc/manila/manila.conf.d",
 	}
 
 	envVars := map[string]env.Setter{}

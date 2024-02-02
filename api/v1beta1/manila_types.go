@@ -163,10 +163,6 @@ type DBPurge struct {
 type ManilaDebug struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	// DBSync pauses the dbSync container instead of executing the db_sync command.
-	DBSync bool `json:"dbSync,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
 	// DBPurge increases log verbosity by executing the db_purge command with "--debug".
 	DBPurge bool `json:"dbPurge,omitempty"`
 }

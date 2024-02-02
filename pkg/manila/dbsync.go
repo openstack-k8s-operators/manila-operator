@@ -1,7 +1,6 @@
 package manila
 
 import (
-	common "github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -64,13 +63,7 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 		},
 	}
 
-	args := []string{"-c"}
-	if instance.Spec.Debug.DBSync {
-		args = append(args, common.DebugCommand)
-	} else {
-		args = append(args, DBSyncCommand)
-	}
-
+	args := []string{"-c", DBSyncCommand}
 	runAsUser := int64(0)
 	envVars := map[string]env.Setter{}
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")

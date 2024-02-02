@@ -1,6 +1,4 @@
 #
-# Check for:
-#
 # - 1 manilaAPI
 # - 2 manilaScheduler
 # - 3 manilaShares
@@ -16,20 +14,14 @@ spec:
       debug = true
    databaseInstance: openstack
    databaseUser: manila
-   debug:
-      dbSync: false
    manilaAPI:
        customServiceConfig: |
           [DEFAULT]
           enabled_share_protocols=nfs,cephfs,cifs
-       debug:
-          service: false
        replicas: 1
        resources: {}
    manilaScheduler:
       customServiceConfig: '# add your customization here'
-      debug:
-         service: false
       replicas: 1
       resources: {}
    manilaShares:
@@ -182,8 +174,6 @@ metadata:
 spec:
   databaseHostname: openstack
   databaseUser: manila
-  debug:
-    service: false
   passwordSelectors:
     database: ManilaDatabasePassword
     service: ManilaPassword
