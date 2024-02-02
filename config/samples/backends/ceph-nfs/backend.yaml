@@ -30,6 +30,8 @@ spec:
               cephfs_nfs_cluster_id=cephfs
               cephfs_protocol_helper_type=NFS
           replicas: 1
+          networkAttachments:
+          - storage
   extraMounts:
     - name: v1
       region: r1

@@ -18,6 +18,8 @@ spec:
         replicas: 1
       manilaShares:
         share1:
+          networkAttachments:
+          - storage
           customServiceConfig: |
             [DEFAULT]
             debug = true
