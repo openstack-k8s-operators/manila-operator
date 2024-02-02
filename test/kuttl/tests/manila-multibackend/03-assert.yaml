@@ -16,20 +16,14 @@ spec:
       debug = true
    databaseInstance: openstack
    databaseUser: manila
-   debug:
-      dbSync: false
    manilaAPI:
       customServiceConfig: |
          [DEFAULT]
          enabled_share_protocols=nfs,cephfs,cifs
-      debug:
-         service: false
       replicas: 1
       resources: {}
    manilaScheduler:
       customServiceConfig: '# add your customization here'
-      debug:
-         service: false
       replicas: 1
       resources: {}
    manilaShares:

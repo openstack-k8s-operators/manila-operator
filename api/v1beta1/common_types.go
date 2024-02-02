@@ -73,11 +73,6 @@ type ManilaServiceTemplate struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
-	// actual action pod gets started with sleep infinity
-	Debug ManilaServiceDebug `json:"debug,omitempty"`
-
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="# add your customization here"
 	// CustomServiceConfig - customize the service config using this parameter to change service defaults,
 	// or overwrite rendered information using raw OpenStack config format. The content gets added to
@@ -110,13 +105,4 @@ type PasswordSelector struct {
 	// +kubebuilder:default="ManilaPassword"
 	// Service - Selector to get the manila service password from the Secret
 	Service string `json:"service,omitempty"`
-}
-
-// ManilaServiceDebug indicates whether certain stages of Manila service
-// deployment should pause in debug mode
-type ManilaServiceDebug struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	// service enable debug
-	Service bool `json:"service,omitempty"`
 }

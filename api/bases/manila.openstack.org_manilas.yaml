@@ -58,9 +58,6 @@ spec:
                   dbPurge:
                     default: false
                     type: boolean
-                  dbSync:
-                    default: false
-                    type: boolean
                 type: object
               extraMounts:
                 items:
@@ -829,12 +826,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  debug:
-                    properties:
-                      service:
-                        default: false
-                        type: boolean
-                    type: object
                   networkAttachments:
                     items:
                       type: string
@@ -945,12 +936,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  debug:
-                    properties:
-                      service:
-                        default: false
-                        type: boolean
-                    type: object
                   networkAttachments:
                     items:
                       type: string
@@ -1011,12 +996,6 @@ spec:
                       items:
                         type: string
                       type: array
-                    debug:
-                      properties:
-                        service:
-                          default: false
-                          type: boolean
-                      type: object
                     networkAttachments:
                       items:
                         type: string

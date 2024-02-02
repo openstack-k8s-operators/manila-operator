@@ -16,14 +16,10 @@ spec:
       debug = true
    databaseInstance: openstack
    databaseUser: manila
-   debug:
-      dbSync: false
    manilaAPI:
       customServiceConfig: |
          [DEFAULT]
          enabled_share_protocols = cephfs
-      debug:
-         service: false
       replicas: 3
       resources: {}
    manilaScheduler:
