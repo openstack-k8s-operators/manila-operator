@@ -16,6 +16,8 @@ limitations under the License.
 package functional
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
@@ -154,9 +156,11 @@ var _ = Describe("Manila controller", func() {
 		})
 		It("Should set DBReady Condition and set DatabaseHostname Status when DB is Created", func() {
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			Manila := GetManila(manilaTest.Instance)
-			Expect(Manila.Status.DatabaseHostname).To(Equal("hostname-for-openstack"))
+			Expect(Manila.Status.DatabaseHostname).To(
+				Equal(fmt.Sprintf("hostname-for-openstack.%s.svc", manilaTest.Instance.Namespace)))
 			th.ExpectCondition(
 				manilaName,
 				ConditionGetterFunc(ManilaConditionGetter),
@@ -172,6 +176,7 @@ var _ = Describe("Manila controller", func() {
 		})
 		It("Should fail if db-sync job fails when DB is Created", func() {
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 			th.SimulateJobFailure(manilaTest.ManilaDBSync)
 			th.ExpectCondition(
 				manilaTest.Instance,
@@ -260,6 +265,7 @@ var _ = Describe("Manila controller", func() {
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
@@ -297,6 +303,7 @@ var _ = Describe("Manila controller", func() {
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 		})
 		It("removes the finalizers from the Manila DB", func() {
@@ -378,6 +385,7 @@ var _ = Describe("Manila controller", func() {
 				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
 			}, timeout, interval).Should(Succeed())
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 		})
