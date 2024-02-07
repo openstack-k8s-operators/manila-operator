@@ -20,6 +20,8 @@ spec:
         containerImage: quay.io/tripleozedcentos9/openstack-manila-scheduler:current-tripleo
       manilaShares:
         share1:
+          networkAttachments:
+          - storage
           customServiceConfig: |
               [DEFAULT]
               enabled_share_backends=cephfsnfs
@@ -34,6 +36,8 @@ spec:
           containerImage: quay.io/tripleozedcentos9/openstack-manila-share:current-tripleo
           replicas: 1
         share2:
+          networkAttachments:
+          - storage
           customServiceConfig: |
               [DEFAULT]
               enabled_share_backends=cephfs
@@ -51,6 +55,8 @@ spec:
           containerImage: quay.io/tripleozedcentos9/openstack-manila-share:current-tripleo
           replicas: 1
         share3:
+          networkAttachments:
+          - storage
           customServiceConfig: |
             [DEFAULT]
             debug = true
