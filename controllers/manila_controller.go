@@ -56,7 +56,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // GetClient -
@@ -247,7 +246,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// reconciliation for a Manila CR that does not need it.
 	//
 	// TODO: We also need a watch func to monitor for changes to the secret referenced by Manila.Spec.Secret
-	transportURLSecretFn := func(o client.Object) []reconcile.Request {
+	transportURLSecretFn := func(ctx context.Context, o client.Object) []reconcile.Request {
 		result := []reconcile.Request{}
 
 		// get all Manila CRs
@@ -281,7 +280,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return nil
 	}
 
-	memcachedFn := func(o client.Object) []reconcile.Request {
+	memcachedFn := func(ctx context.Context, o client.Object) []reconcile.Request {
 		result := []reconcile.Request{}
 
 		// get all Manila CRs
@@ -325,9 +324,9 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
 		// Watch for TransportURL Secrets which belong to any TransportURLs created by Manila CRs
-		Watches(&source.Kind{Type: &corev1.Secret{}},
+		Watches(&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(transportURLSecretFn)).
-		Watches(&source.Kind{Type: &memcachedv1.Memcached{}},
+		Watches(&memcachedv1.Memcached{},
 			handler.EnqueueRequestsFromMapFunc(memcachedFn)).
 		Complete(r)
 }
@@ -500,7 +499,6 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	//
 
 	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance)
-
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.RabbitMqTransportURLReadyCondition,
@@ -883,7 +881,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 		return err
 	}
 
-	//templateParameters := make(map[string]interface{})
+	// templateParameters := make(map[string]interface{})
 	templateParameters := map[string]interface{}{
 		"ServiceUser":         instance.Spec.ServiceUser,
 		"ServicePassword":     string(ospSecret.Data[instance.Spec.PasswordSelectors.Service]),
@@ -961,7 +959,6 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 }
 
 func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
-
 	deployment := &manilav1beta1.ManilaAPI{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-api", instance.Name),

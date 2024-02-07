@@ -56,7 +56,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // ManilaAPIReconciler reconciles a ManilaAPI object
@@ -67,21 +66,19 @@ type ManilaAPIReconciler struct {
 	Log     logr.Logger
 }
 
-var (
-	keystoneServices = []map[string]string{
-		{
-			"type": manila.ServiceTypeV2,
-			"name": manila.ServiceNameV2,
-			"desc": "Manila V2 Service",
-		},
-		{
-			// This is deprecated, will be removed after all dependencies are removed upstream
-			"type": manila.ServiceType,
-			"name": manila.ServiceName,
-			"desc": "Manila V1 Service",
-		},
-	}
-)
+var keystoneServices = []map[string]string{
+	{
+		"type": manila.ServiceTypeV2,
+		"name": manila.ServiceNameV2,
+		"desc": "Manila V2 Service",
+	},
+	{
+		// This is deprecated, will be removed after all dependencies are removed upstream
+		"type": manila.ServiceType,
+		"name": manila.ServiceName,
+		"desc": "Manila V1 Service",
+	},
+}
 
 //+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=manila.openstack.org,resources=manilaapis/status,verbs=get;update;patch
@@ -210,10 +207,9 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
 	// Watch for changes to any CustomServiceConfigSecrets. Global secrets
 	// (e.g. TransportURLSecret) are handled by the top Manila controller.
-	secretFn := func(o client.Object) []reconcile.Request {
+	secretFn := func(ctx context.Context, o client.Object) []reconcile.Request {
 		var namespace string = o.GetNamespace()
 		var secretName string = o.GetName()
 		result := []reconcile.Request{}
@@ -319,17 +315,17 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.Service{}).
 		// watch the secrets we don't own
-		Watches(&source.Kind{Type: &corev1.Secret{}},
+		Watches(&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(secretFn)).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Complete(r)
 }
 
-func (r *ManilaAPIReconciler) findObjectsForSrc(src client.Object) []reconcile.Request {
+func (r *ManilaAPIReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
 	l := log.FromContext(context.Background()).WithName("Controllers").WithName("ManilaAPI")
@@ -634,8 +630,8 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	parentManilaName := manila.GetOwningManilaName(instance)
 
 	parentSecrets := []string{
-		fmt.Sprintf("%s-scripts", parentManilaName),     //ScriptsSecret
-		fmt.Sprintf("%s-config-data", parentManilaName), //ConfigSecret
+		fmt.Sprintf("%s-scripts", parentManilaName),     // ScriptsSecret
+		fmt.Sprintf("%s-config-data", parentManilaName), // ConfigSecret
 	}
 
 	for _, parentSecret := range parentSecrets {
