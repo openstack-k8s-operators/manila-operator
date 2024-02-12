@@ -405,7 +405,7 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 
 	serviceLabels := map[string]string{
 		common.AppSelector:       manila.ServiceName,
-		common.ComponentSelector: manilashare.Component,
+		common.ComponentSelector: manilashare.ComponentName,
 	}
 	//
 	// create service Secrets for manila-share service

@@ -700,7 +700,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	//
 	serviceLabels := map[string]string{
 		common.AppSelector:       manila.ServiceName,
-		common.ComponentSelector: manilaapi.Component,
+		common.ComponentSelector: manilaapi.ComponentName,
 	}
 	//
 	// create custom config for this manila service

@@ -13,6 +13,6 @@ limitations under the License.
 package manilascheduler
 
 const (
-	// Component -
-	Component = "manila-scheduler"
+	// ComponentName -
+	ComponentName = "manila-scheduler"
 )

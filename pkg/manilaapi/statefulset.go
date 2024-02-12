@@ -13,8 +13,6 @@ limitations under the License.
 package manilaapi
 
 import (
-	common "github.com/openstack-k8s-operators/lib-common/modules/common"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
@@ -144,7 +142,7 @@ func StatefulSet(
 							Resources:    instance.Spec.Resources,
 						},
 						{
-							Name: manila.ServiceName + "-api",
+							Name: ComponentName,
 							Command: []string{
 								"/bin/bash",
 							},
@@ -160,25 +158,12 @@ func StatefulSet(
 							LivenessProbe:  livenessProbe,
 						},
 					},
+					Affinity:     manila.GetPodAffinity(ComponentName),
 					NodeSelector: instance.Spec.NodeSelector,
 					Volumes:      volumes,
 				},
 			},
 		},
-	}
-
-	// If possible two pods of the same service should not
-	// run on the same worker node. If this is not possible
-	// the get still created on the same worker node.
-	statefulset.Spec.Template.Spec.Affinity = affinity.DistributePods(
-		common.AppSelector,
-		[]string{
-			manila.ServiceName,
-		},
-		corev1.LabelHostname,
-	)
-	if instance.Spec.NodeSelector != nil && len(instance.Spec.NodeSelector) > 0 {
-		statefulset.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
 
 	return statefulset, nil
