@@ -13,6 +13,6 @@ limitations under the License.
 package manilashare
 
 const (
-	// Component -
-	Component = "manila-share"
+	// ComponentName -
+	ComponentName = "manila-share"
 )

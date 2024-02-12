@@ -13,8 +13,6 @@ limitations under the License.
 package manilascheduler
 
 import (
-	common "github.com/openstack-k8s-operators/lib-common/modules/common"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	manila "github.com/openstack-k8s-operators/manila-operator/pkg/manila"
@@ -105,7 +103,7 @@ func StatefulSet(
 					ServiceAccountName: instance.Spec.ServiceAccount,
 					Containers: []corev1.Container{
 						{
-							Name: manila.ServiceName + "-scheduler",
+							Name: ComponentName,
 							Command: []string{
 								"/bin/bash",
 							},
@@ -131,25 +129,12 @@ func StatefulSet(
 							VolumeMounts: volumeMounts,
 						},
 					},
+					Affinity:     manila.GetPodAffinity(ComponentName),
 					NodeSelector: instance.Spec.NodeSelector,
 					Volumes:      volumes,
 				},
 			},
 		},
-	}
-
-	// If possible two pods of the same service should not
-	// run on the same worker node. If this is not possible
-	// the get still created on the same worker node.
-	statefulset.Spec.Template.Spec.Affinity = affinity.DistributePods(
-		common.AppSelector,
-		[]string{
-			manila.ServiceName,
-		},
-		corev1.LabelHostname,
-	)
-	if instance.Spec.NodeSelector != nil && len(instance.Spec.NodeSelector) > 0 {
-		statefulset.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
 
 	return statefulset

@@ -13,8 +13,8 @@ limitations under the License.
 package manilaapi
 
 const (
-	// Component -
-	Component = "manila-api"
+	// ComponentName -
+	ComponentName = "manila-api"
 
 	//LogFile -
 	LogFile = "/var/log/manila/manila-api.log"

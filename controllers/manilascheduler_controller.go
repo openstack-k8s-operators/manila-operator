@@ -409,7 +409,7 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	//
 	serviceLabels := map[string]string{
 		common.AppSelector:       manila.ServiceName,
-		common.ComponentSelector: manilascheduler.Component,
+		common.ComponentSelector: manilascheduler.ComponentName,
 	}
 	//
 	// create custom Secrets for manila-scheduler service

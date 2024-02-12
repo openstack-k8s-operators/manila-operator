@@ -1,6 +1,9 @@
 package manila
 
 import (
+	common "github.com/openstack-k8s-operators/lib-common/modules/common"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -37,4 +40,18 @@ func GetManilaSecurityContext() *corev1.SecurityContext {
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
 	}
+}
+
+// GetPodAffinity - Returns a corev1.Affinity reference for the specified component.
+func GetPodAffinity(componentName string) *corev1.Affinity {
+	// If possible two pods of the same component (e.g manila-share) should not
+	// run on the same worker node. If this is not possible they get still
+	// created on the same worker node.
+	return affinity.DistributePods(
+		common.ComponentSelector,
+		[]string{
+			componentName,
+		},
+		corev1.LabelHostname,
+	)
 }
