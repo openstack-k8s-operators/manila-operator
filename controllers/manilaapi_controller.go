@@ -21,11 +21,16 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/go-logr/logr"
 
@@ -40,6 +45,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/statefulset"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
@@ -178,6 +184,7 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			condition.UnknownCondition(condition.KeystoneServiceReadyCondition, condition.InitReason, ""),
 			condition.UnknownCondition(condition.KeystoneEndpointReadyCondition, condition.InitReason, ""),
 			condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
+			condition.UnknownCondition(condition.TLSInputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 		)
 
 		instance.Status.Conditions.Init(&cl)
@@ -256,6 +263,54 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return nil
 	}
 
+	// index passwordSecretField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &manilav1beta1.ManilaAPI{}, passwordSecretField, func(rawObj client.Object) []string {
+		// Extract the secret name from the spec, if one is provided
+		cr := rawObj.(*manilav1beta1.ManilaAPI)
+		if cr.Spec.Secret == "" {
+			return nil
+		}
+		return []string{cr.Spec.Secret}
+	}); err != nil {
+		return err
+	}
+
+	// index caBundleSecretNameField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &manilav1beta1.ManilaAPI{}, caBundleSecretNameField, func(rawObj client.Object) []string {
+		// Extract the secret name from the spec, if one is provided
+		cr := rawObj.(*manilav1beta1.ManilaAPI)
+		if cr.Spec.TLS.CaBundleSecretName == "" {
+			return nil
+		}
+		return []string{cr.Spec.TLS.CaBundleSecretName}
+	}); err != nil {
+		return err
+	}
+
+	// index tlsAPIInternalField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &manilav1beta1.ManilaAPI{}, tlsAPIInternalField, func(rawObj client.Object) []string {
+		// Extract the secret name from the spec, if one is provided
+		cr := rawObj.(*manilav1beta1.ManilaAPI)
+		if cr.Spec.TLS.API.Internal.SecretName == nil {
+			return nil
+		}
+		return []string{*cr.Spec.TLS.API.Internal.SecretName}
+	}); err != nil {
+		return err
+	}
+
+	// index tlsAPIPublicField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &manilav1beta1.ManilaAPI{}, tlsAPIPublicField, func(rawObj client.Object) []string {
+		// Extract the secret name from the spec, if one is provided
+		cr := rawObj.(*manilav1beta1.ManilaAPI)
+		if cr.Spec.TLS.API.Public.SecretName == nil {
+			return nil
+		}
+		return []string{*cr.Spec.TLS.API.Public.SecretName}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&manilav1beta1.ManilaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
@@ -266,7 +321,45 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// watch the secrets we don't own
 		Watches(&source.Kind{Type: &corev1.Secret{}},
 			handler.EnqueueRequestsFromMapFunc(secretFn)).
+		Watches(
+			&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+func (r *ManilaAPIReconciler) findObjectsForSrc(src client.Object) []reconcile.Request {
+	requests := []reconcile.Request{}
+
+	l := log.FromContext(context.Background()).WithName("Controllers").WithName("ManilaAPI")
+
+	for _, field := range manilaAPIWatchFields {
+		crList := &manilav1beta1.ManilaAPIList{}
+		listOps := &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(field, src.GetName()),
+			Namespace:     src.GetNamespace(),
+		}
+		err := r.List(context.TODO(), crList, listOps)
+		if err != nil {
+			return []reconcile.Request{}
+		}
+
+		for _, item := range crList.Items {
+			l.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
+
+			requests = append(requests,
+				reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      item.GetName(),
+						Namespace: item.GetNamespace(),
+					},
+				},
+			)
+		}
+	}
+
+	return requests
 }
 
 func (r *ManilaAPIReconciler) reconcileDelete(ctx context.Context, instance *manilav1beta1.ManilaAPI, helper *helper.Helper) (ctrl.Result, error) {
@@ -422,7 +515,12 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		}
 		// create service - end
 
-		// TODO: TLS, pass in https as protocol
+		// if TLS is enabled
+		if instance.Spec.TLS.API.Enabled(endpointType) {
+			// set endpoint protocol to https
+			data.Protocol = ptr.To(service.ProtocolHTTPS)
+		}
+
 		apiEndpointsV2[string(endpointType)], err = svc.GetAPIEndpoint(
 			svcOverride.EndpointURL, data.Protocol, data.Path)
 		if err != nil {
@@ -540,9 +638,6 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 		fmt.Sprintf("%s-config-data", parentManilaName), //ConfigSecret
 	}
 
-	//
-	// Create Secrets required as input for the Service and calculate an overall hash of hashes
-	//
 	for _, parentSecret := range parentSecrets {
 		ctrlResult, err = r.getSecret(ctx, helper, instance, parentSecret, &configVars)
 		if err != nil {
@@ -551,13 +646,64 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	}
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
+	//
+	// TLS input validation
+	//
+	// Validate the CA cert secret if provided
+	if instance.Spec.TLS.CaBundleSecretName != "" {
+		hash, ctrlResult, err := tls.ValidateCACertSecret(
+			ctx,
+			helper.GetClient(),
+			types.NamespacedName{
+				Name:      instance.Spec.TLS.CaBundleSecretName,
+				Namespace: instance.Namespace,
+			},
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.TLSInputReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.TLSInputErrorMessage,
+				err.Error()))
+			return ctrlResult, err
+		} else if (ctrlResult != ctrl.Result{}) {
+			return ctrlResult, nil
+		}
+
+		if hash != "" {
+			configVars[tls.CABundleKey] = env.SetValue(hash)
+		}
+
+		// Validate API service certs secrets
+		certsHash, ctrlResult, err := instance.Spec.TLS.API.ValidateCertSecrets(ctx, helper, instance.Namespace)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.TLSInputReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.TLSInputErrorMessage,
+				err.Error()))
+			return ctrlResult, err
+		} else if (ctrlResult != ctrl.Result{}) {
+			return ctrlResult, nil
+		}
+
+		configVars[tls.TLSHashName] = env.SetValue(certsHash)
+	}
+
+	// all cert input checks out so report InputReady
+	instance.Status.Conditions.MarkTrue(condition.TLSInputReadyCondition, condition.InputReadyMessage)
+
+	//
+	// Create secrets required as input for the Service and calculate an overall hash of hashes
+	//
 	serviceLabels := map[string]string{
 		common.AppSelector:       manila.ServiceName,
 		common.ComponentSelector: manilaapi.Component,
 	}
-
 	//
-	// create Secrets for manila-api service
+	// create custom config for this manila service
 	//
 	err = r.generateServiceConfig(ctx, helper, instance, &configVars, serviceLabels)
 	if err != nil {
@@ -569,8 +715,6 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-
-	//
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
@@ -652,12 +796,20 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	//
 
 	// Define a new Statefulset
-	ssDef := statefulset.NewStatefulSet(
-		manilaapi.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations),
-		time.Duration(5)*time.Second,
-	)
+	ssDef, err := manilaapi.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.DeploymentReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.DeploymentReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
 
-	ctrlResult, err = ssDef.CreateOrPatch(ctx, helper)
+	ss := statefulset.NewStatefulSet(ssDef, time.Duration(5)*time.Second)
+
+	ctrlResult, err = ss.CreateOrPatch(ctx, helper)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DeploymentReadyCondition,
@@ -674,7 +826,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 			condition.DeploymentReadyRunningMessage))
 		return ctrlResult, nil
 	}
-	instance.Status.ReadyCount = ssDef.GetStatefulSet().Status.ReadyReplicas
+	instance.Status.ReadyCount = ss.GetStatefulSet().Status.ReadyReplicas
 
 	networkReady := false
 	networkAttachmentStatus := map[string][]string{}

@@ -1,0 +1,22 @@
+apiVersion: manila.openstack.org/v1beta1
+kind: Manila
+metadata:
+  name: manila
+  namespace: openstack
+spec:
+  serviceUser: manila
+  customServiceConfig: |
+    [DEFAULT]
+    debug = true
+  databaseInstance: openstack
+  secret: osp-secret
+  databaseUser: manila
+  rabbitMqClusterName: rabbitmq
+  manilaAPI:
+    tls:
+        api:
+          internal:
+            secretName: cert-manila-internal-svc
+          public:
+            secretName: cert-manila-public-svc
+        caBundleSecretName: combined-ca-bundle

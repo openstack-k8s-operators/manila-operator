@@ -15,7 +15,9 @@ package functional
 
 import (
 	"fmt"
+
 	. "github.com/onsi/gomega"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -101,6 +103,15 @@ func GetManilaCommonSpec(spec map[string]interface{}) map[string]interface{} {
 		defaultSpec[k] = v
 	}
 	return defaultSpec
+}
+
+func GetTLSManilaSpec() map[string]interface{} {
+	return map[string]interface{}{
+		"databaseInstance": "openstack",
+		"secret":           SecretName,
+		"manilaAPI":        GetTLSManilaAPISpec(),
+		"manilaScheduler":  GetDefaultManilaSchedulerSpec(),
+	}
 }
 
 func GetDefaultManilaAPISpec() map[string]interface{} {
@@ -232,6 +243,25 @@ func GetManilaShare(name types.NamespacedName) *manilav1.ManilaShare {
 		g.Expect(k8sClient.Get(ctx, name, instance)).Should(Succeed())
 	}, timeout, interval).Should(Succeed())
 	return instance
+}
+
+func GetTLSManilaAPISpec() map[string]interface{} {
+	spec := GetDefaultManilaAPISpec()
+	maps.Copy(spec, map[string]interface{}{
+		"tls": map[string]interface{}{
+			"api": map[string]interface{}{
+				"internal": map[string]interface{}{
+					"secretName": InternalCertSecretName,
+				},
+				"public": map[string]interface{}{
+					"secretName": PublicCertSecretName,
+				},
+			},
+			"caBundleSecretName": CABundleSecretName,
+		},
+	})
+
+	return spec
 }
 
 func ManilaAPIConditionGetter(name types.NamespacedName) condition.Conditions {

@@ -207,6 +207,10 @@ status:
     reason: Ready
     status: "True"
     type: ServiceConfigReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: TLSInputReady
   readyCount: 1
 ---
 # when using image digests the containerImage URLs are SHA's so we verify them with a script

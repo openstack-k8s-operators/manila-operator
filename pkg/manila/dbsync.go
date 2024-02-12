@@ -34,6 +34,10 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 							Key:  DefaultsConfigFileName,
 							Path: DefaultsConfigFileName,
 						},
+						{
+							Key:  CustomConfigFileName,
+							Path: CustomConfigFileName,
+						},
 					},
 				},
 			},
@@ -64,6 +68,13 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 	}
 
 	args := []string{"-c", DBSyncCommand}
+
+	// add CA cert if defined
+	if instance.Spec.ManilaAPI.TLS.CaBundleSecretName != "" {
+		dbSyncVolume = append(dbSyncVolume, instance.Spec.ManilaAPI.TLS.CreateVolume())
+		dbSyncMounts = append(dbSyncMounts, instance.Spec.ManilaAPI.TLS.CreateVolumeMounts(nil)...)
+	}
+
 	runAsUser := int64(0)
 	envVars := map[string]env.Setter{}
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")

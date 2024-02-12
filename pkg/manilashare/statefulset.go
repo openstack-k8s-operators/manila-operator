@@ -83,10 +83,21 @@ func StatefulSet(
 	envVars["MALLOC_MMAP_THRESHOLD_"] = env.SetValue("131072")
 	envVars["MALLOC_TRIM_THRESHOLD_"] = env.SetValue("262144")
 
+	volumes := GetVolumes(
+		manila.GetOwningManilaName(instance),
+		instance.Name,
+		instance.Spec.ExtraMounts)
+
 	volumeMounts := GetVolumeMounts(
 		instance.Name,
 		instance.Spec.ExtraMounts,
 	)
+
+	// Add the CA bundle
+	if instance.Spec.TLS.CaBundleSecretName != "" {
+		volumes = append(volumes, instance.Spec.TLS.CreateVolume())
+		volumeMounts = append(volumeMounts, instance.Spec.TLS.CreateVolumeMounts(nil)...)
+	}
 
 	statefulset := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -136,15 +147,12 @@ func StatefulSet(
 						},
 					},
 					NodeSelector: instance.Spec.NodeSelector,
+					Volumes:      volumes,
 				},
 			},
 		},
 	}
-	statefulset.Spec.Template.Spec.Volumes = GetVolumes(
-		manila.GetOwningManilaName(instance),
-		instance.Name,
-		instance.Spec.ExtraMounts,
-	)
+
 	// If possible two pods of the same service should not
 	// run on the same worker node. If this is not possible
 	// the get still created on the same worker node.

@@ -17,6 +17,7 @@ package manila
 
 import (
 	"fmt"
+
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -71,6 +72,12 @@ func CronJob(
 			MountPath: "/etc/manila/manila.conf.d",
 			ReadOnly:  true,
 		},
+	}
+
+	// add CA cert if defined
+	if instance.Spec.ManilaAPI.TLS.CaBundleSecretName != "" {
+		cronJobVolume = append(cronJobVolume, instance.Spec.ManilaAPI.TLS.CreateVolume())
+		cronJobVolumeMounts = append(cronJobVolumeMounts, instance.Spec.ManilaAPI.TLS.CreateVolumeMounts(nil)...)
 	}
 
 	cronjob := &batchv1.CronJob{

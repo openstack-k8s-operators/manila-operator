@@ -1,0 +1,47 @@
+apiVersion: manila.openstack.org/v1beta1
+kind: Manila
+metadata:
+  name: manila
+  namespace: openstack
+spec:
+  manilaAPI:
+    tls:
+      api:
+        internal:
+          secretName: cert-manila-internal-svc
+        public:
+          secretName: cert-manila-public-svc
+      caBundleSecretName: combined-ca-bundle
+    customServiceConfig: |
+        [DEFAULT]
+        enabled_share_protocols = cephfs
+  manilaShares:
+    share0:
+      customServiceConfig: |
+         [DEFAULT]
+         enabled_share_backends = cephfs
+         [cephfs]
+         driver_handles_share_servers=False
+         share_backend_name=cephfs
+         share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+         cephfs_conf_path=/etc/ceph/ceph.conf
+         cephfs_auth_id=openstack
+         cephfs_cluster_name=ceph
+         cephfs_protocol_helper_type=CEPHFS
+  extraMounts:
+    - name: v1
+      region: r1
+      extraVol:
+        - propagation:
+          - share0
+          extraVolType: Ceph
+          volumes:
+          - name: ceph
+            projected:
+              sources:
+              - secret:
+                  name: ceph-conf-files
+          mounts:
+          - name: ceph
+            mountPath: "/etc/ceph"
+            readOnly: true
