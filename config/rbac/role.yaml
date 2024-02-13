@@ -265,6 +265,12 @@ rules:
 - apiGroups:
   - mariadb.openstack.org
   resources:
+  - mariadbaccounts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - mariadb.openstack.org
+  resources:
   - mariadbdatabases
   verbs:
   - create
@@ -274,6 +280,12 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - mariadb.openstack.org
+  resources:
+  - mariadbdatabases/finalizers
+  verbs:
+  - update
 - apiGroups:
   - memcached.openstack.org
   resources:
