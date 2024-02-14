@@ -38,6 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	networkv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	manila "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
@@ -172,14 +175,16 @@ var _ = BeforeSuite(func() {
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
-		// NOTE(gibi): disable metrics reporting in test to allow
-		// parallel test execution. Otherwise each instance would like to
-		// bind to the same port
-		MetricsBindAddress: "0",
-		Host:               webhookInstallOptions.LocalServingHost,
-		Port:               webhookInstallOptions.LocalServingPort,
-		CertDir:            webhookInstallOptions.LocalServingCertDir,
-		LeaderElection:     false,
+		Metrics: metricsserver.Options{
+			BindAddress: "0",
+		},
+		WebhookServer: webhook.NewServer(
+			webhook.Options{
+				Host:    webhookInstallOptions.LocalServingHost,
+				Port:    webhookInstallOptions.LocalServingPort,
+				CertDir: webhookInstallOptions.LocalServingCertDir,
+			}),
+		LeaderElection: false,
 	})
 
 	Expect(err).ToNot(HaveOccurred())
@@ -267,6 +272,6 @@ var _ = BeforeEach(func() {
 	manilaTest = GetManilaTestData(manilaName)
 
 	DeferCleanup(th.DeleteNamespace, namespace)
-	//Let's create the osp-secret in advance (in common to all the test cases)
+	// Let's create the osp-secret in advance (in common to all the test cases)
 	DeferCleanup(k8sClient.Delete, ctx, CreateManilaSecret(manilaName.Namespace, SecretName))
 })
