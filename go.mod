@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/go-logr/logr v1.4.1
-	github.com/onsi/ginkgo/v2 v2.14.0
+	github.com/onsi/ginkgo/v2 v2.15.0
 	github.com/onsi/gomega v1.30.0
 	github.com/openstack-k8s-operators/infra-operator/apis v0.3.1-0.20240214153927-179defb96a33
 	github.com/openstack-k8s-operators/keystone-operator/api v0.3.1-0.20240214165457-55af8e58473d
