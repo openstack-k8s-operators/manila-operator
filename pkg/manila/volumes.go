@@ -1,10 +1,11 @@
 package manila
 
 import (
+	"strconv"
+
 	"github.com/openstack-k8s-operators/lib-common/modules/storage"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	"strconv"
 )
 
 // GetVolumes -
@@ -84,6 +85,12 @@ func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts, svc []storage.Pro
 		{
 			Name:      "scripts",
 			MountPath: "/usr/local/bin/container-scripts",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "config-data",
+			MountPath: "/etc/my.cnf",
+			SubPath:   "my.cnf",
 			ReadOnly:  true,
 		},
 		/*{

@@ -216,13 +216,18 @@ var _ = Describe("Manila controller", func() {
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, "memcached", memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 		})
 		It("should create config-data and scripts ConfigMaps", func() {
 			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPI)
-			Eventually(func() corev1.Secret {
-				return th.GetSecret(manilaTest.ManilaConfigSecret)
-			}, timeout, interval).ShouldNot(BeNil())
+
+			secretDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
+			Expect(secretDataMap).ShouldNot(BeNil())
+			myCnf := string(secretDataMap.Data["my.cnf"])
+			Expect(myCnf).To(
+				ContainSubstring("[client]\nssl=0"))
 			Eventually(func() corev1.Secret {
 				return th.GetSecret(manilaTest.ManilaConfigScripts)
 			}, timeout, interval).ShouldNot(BeNil())
@@ -466,7 +471,7 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
-			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBTLSDatabaseCompleted(manilaTest.Instance)
 			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 		})
@@ -516,16 +521,30 @@ var _ = Describe("Manila controller", func() {
 			)
 		})
 
+		It("should create config-data and scripts ConfigMaps", func() {
+			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPI)
+
+			secretDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
+			Expect(secretDataMap).ShouldNot(BeNil())
+			myCnf := string(secretDataMap.Data["my.cnf"])
+			Expect(myCnf).To(
+				ContainSubstring("[client]\nssl-ca=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\nssl=1"))
+			Eventually(func() corev1.Secret {
+				return th.GetSecret(manilaTest.ManilaConfigScripts)
+			}, timeout, interval).ShouldNot(BeNil())
+		})
+
 		It("Creates ManilaAPI", func() {
 			DeferCleanup(k8sClient.Delete, ctx, th.CreateCABundleSecret(manilaTest.CABundleSecret))
 			DeferCleanup(k8sClient.Delete, ctx, th.CreateCertSecret(manilaTest.InternalCertSecret))
 			DeferCleanup(k8sClient.Delete, ctx, th.CreateCertSecret(manilaTest.PublicCertSecret))
 			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 
-			ManilaAPIExists(manilaTest.Instance)
+			ManilaAPIExists(manilaTest.ManilaAPI)
 
 			d := th.GetStatefulSet(manilaTest.ManilaAPI)
-			// Check the resulting deployment fields
+			// Check the resulting deployment fieldsq
 			Expect(int(*d.Spec.Replicas)).To(Equal(1))
 
 			Expect(d.Spec.Template.Spec.Volumes).To(HaveLen(9))

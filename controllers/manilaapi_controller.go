@@ -50,6 +50,7 @@ import (
 	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 	manilaapi "github.com/openstack-k8s-operators/manila-operator/pkg/manilaapi"
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -940,8 +941,20 @@ func (r *ManilaAPIReconciler) generateServiceConfig(
 
 	labels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
+	db, err := mariadbv1.GetDatabaseByName(ctx, h, manila.DatabaseName)
+	if err != nil {
+		return err
+	}
+	var tlsCfg *tls.Service
+	if instance.Spec.TLS.CaBundleSecretName != "" {
+		tlsCfg = &tls.Service{}
+	}
+
 	// customData hold any customization for the service.
-	customData := map[string]string{manila.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
+	customData := map[string]string{
+		manila.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig,
+		"my.cnf":                           db.GetDatabaseClientConfig(tlsCfg), //(mschuppert) for now just get the default my.cnf
+	}
 
 	customData[manila.CustomServiceConfigFileName] = instance.Spec.CustomServiceConfig
 

@@ -20,6 +20,7 @@ package functional
 import (
 	"fmt"
 
+	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -47,6 +48,7 @@ type ManilaTestData struct {
 	ManilaRoleBinding           types.NamespacedName
 	ManilaTransportURL          types.NamespacedName
 	ManilaMemcached             types.NamespacedName
+	ManilaDatabaseName          types.NamespacedName
 	ManilaSA                    types.NamespacedName
 	ManilaDBSync                types.NamespacedName
 	ManilaKeystoneEndpoint      types.NamespacedName
@@ -80,6 +82,10 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		Manila: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      manilaName.Name,
+		},
+		ManilaDatabaseName: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      manila.DatabaseName,
 		},
 		ManilaDBSync: types.NamespacedName{
 			Namespace: manilaName.Namespace,

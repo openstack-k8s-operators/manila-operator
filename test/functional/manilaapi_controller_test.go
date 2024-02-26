@@ -24,6 +24,7 @@ import (
 
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	"k8s.io/utils/ptr"
 )
 
@@ -50,6 +51,10 @@ var _ = Describe("ManilaAPI controller", func() {
 				},
 			),
 		)
+		mariadb.CreateMariaDBDatabase(manilaTest.Instance.Namespace, manilaTest.Instance.Name, mariadbv1.MariaDBDatabaseSpec{})
+		mariadb.CreateMariaDBAccount(manilaTest.Instance.Namespace, manilaTest.Instance.Name, mariadbv1.MariaDBAccountSpec{})
+		mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+		mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 	})
 
 	When("ManilaAPI CR is created", func() {
@@ -109,6 +114,11 @@ var _ = Describe("ManilaAPI controller", func() {
 			//Double check customServiceConfig has been applied
 			configData := string(secretDataMap.Data["03-config.conf"])
 			Expect(configData).Should(ContainSubstring("foo=bar"))
+
+			Expect(secretDataMap.Data).Should(HaveKey("my.cnf"))
+			configData = string(secretDataMap.Data["my.cnf"])
+			Expect(configData).To(
+				ContainSubstring("[client]\nssl=0"))
 		})
 
 		When("manila-api-config is ready", func() {
@@ -129,7 +139,7 @@ var _ = Describe("ManilaAPI controller", func() {
 				Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 				container := ss.Spec.Template.Spec.Containers[1]
-				Expect(container.VolumeMounts).To(HaveLen(7))
+				Expect(container.VolumeMounts).To(HaveLen(8))
 				Expect(container.Image).To(Equal(manilaTest.ContainerImage))
 				Expect(container.LivenessProbe.HTTPGet.Port.IntVal).To(Equal(int32(8786)))
 				Expect(container.ReadinessProbe.HTTPGet.Port.IntVal).To(Equal(int32(8786)))
