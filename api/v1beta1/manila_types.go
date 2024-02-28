@@ -32,6 +32,40 @@ const (
 
 // ManilaSpec defines the desired state of Manila
 type ManilaSpec struct {
+	ManilaSpecBase `json:",inline"`
+
+	// +kubebuilder:validation:Required
+	// ManilaAPI - Spec definition for the API service of this Manila deployment
+	ManilaAPI ManilaAPITemplate `json:"manilaAPI"`
+
+	// +kubebuilder:validation:Required
+	// ManilaScheduler - Spec definition for the Scheduler service of this Manila deployment
+	ManilaScheduler ManilaSchedulerTemplate `json:"manilaScheduler"`
+
+	// +kubebuilder:validation:Optional
+	// ManilaShares - Map of chosen names to spec definitions for the Share(s) service(s) of this Manila deployment
+	ManilaShares map[string]ManilaShareTemplate `json:"manilaShares,omitempty"`
+}
+
+// ManilaSpecCore defines the desired state of Manila. This version is used by OpenStackControlplane
+type ManilaSpecCore struct {
+	ManilaSpecBase `json:",inline"`
+
+	// +kubebuilder:validation:Required
+	// ManilaAPI - Spec definition for the API service of this Manila deployment
+	ManilaAPI ManilaAPITemplateCore `json:"manilaAPI"`
+
+	// +kubebuilder:validation:Required
+	// ManilaScheduler - Spec definition for the Scheduler service of this Manila deployment
+	ManilaScheduler ManilaSchedulerTemplateCore `json:"manilaScheduler"`
+
+	// +kubebuilder:validation:Optional
+	// ManilaShares - Map of chosen names to spec definitions for the Share(s) service(s) of this Manila deployment
+	ManilaShares map[string]ManilaShareTemplateCore `json:"manilaShares,omitempty"`
+}
+
+// ManilaSpecBase -
+type ManilaSpecBase struct {
 	ManilaTemplate `json:",inline"`
 
 	// +kubebuilder:validation:Required
@@ -67,18 +101,6 @@ type ManilaSpec struct {
 	// or overwrite rendered information using raw OpenStack config format. The content gets added to
 	// to /etc/<service>/<service>.conf.d directory a custom config file.
 	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
-
-	// +kubebuilder:validation:Required
-	// ManilaAPI - Spec definition for the API service of this Manila deployment
-	ManilaAPI ManilaAPITemplate `json:"manilaAPI"`
-
-	// +kubebuilder:validation:Required
-	// ManilaScheduler - Spec definition for the Scheduler service of this Manila deployment
-	ManilaScheduler ManilaSchedulerTemplate `json:"manilaScheduler"`
-
-	// +kubebuilder:validation:Optional
-	// ManilaShares - Map of chosen names to spec definitions for the Share(s) service(s) of this Manila deployment
-	ManilaShares map[string]ManilaShareTemplate `json:"manilaShares,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials

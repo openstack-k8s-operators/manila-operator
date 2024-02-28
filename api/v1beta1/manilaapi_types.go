@@ -25,6 +25,15 @@ import (
 
 // ManilaAPITemplate defines the input parameter for the ManilaAPI service
 type ManilaAPITemplate struct {
+	ManilaAPITemplateCore `json:",inline"`
+
+	// +kubebuilder:validation:Required
+	// ContainerImage - Manila API Container Image URL
+	ContainerImage string `json:"containerImage"`
+}
+
+// ManilaAPITemplateCore -
+type ManilaAPITemplateCore struct {
 
 	// Common input parameters collected in the ManilaServiceTemplate
 	ManilaServiceTemplate `json:",inline"`

@@ -80,6 +80,7 @@ func (r *Manila) Default() {
 
 // Default - set defaults for this Manila spec
 func (spec *ManilaSpec) Default() {
+	// only put container image validations here
 	if spec.ManilaAPI.ContainerImage == "" {
 		spec.ManilaAPI.ContainerImage = manilaDefaults.APIContainerImageURL
 	}
@@ -95,6 +96,12 @@ func (spec *ManilaSpec) Default() {
 			spec.ManilaShares[key] = manilaShare
 		}
 	}
+	spec.ManilaSpecBase.Default()
+
+}
+
+// Default - set defaults for this Manila spec base
+func (spec *ManilaSpecBase) Default() {
 
 	if spec.DBPurge.Age == 0 {
 		spec.DBPurge.Age = manilaDefaults.DBPurgeAge
@@ -103,6 +110,12 @@ func (spec *ManilaSpec) Default() {
 	if spec.DBPurge.Schedule == "" {
 		spec.DBPurge.Schedule = manilaDefaults.DBPurgeSchedule
 	}
+}
+
+// Default - set defaults for this Manila spec core. This version is used by OpenStackControlplane
+func (spec *ManilaSpecCore) Default() {
+
+	spec.ManilaSpecBase.Default()
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.

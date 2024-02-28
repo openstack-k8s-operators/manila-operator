@@ -27,6 +27,15 @@ import (
 
 // ManilaSchedulerTemplate defines the input parameter for the ManilaScheduler service
 type ManilaSchedulerTemplate struct {
+	ManilaSchedulerTemplateCore `json:",inline"`
+
+	// +kubebuilder:validation:Required
+	// ContainerImage - Manila API Container Image URL
+	ContainerImage string `json:"containerImage"`
+}
+
+// ManilaSchedulerTemplateCore -
+type ManilaSchedulerTemplateCore struct {
 
 	// Common input parameters collected in the ManilaServiceTemplate
 	ManilaServiceTemplate `json:",inline"`
