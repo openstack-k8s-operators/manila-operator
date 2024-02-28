@@ -51,6 +51,7 @@ import (
 	manilav1beta1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 	manilascheduler "github.com/openstack-k8s-operators/manila-operator/pkg/manilascheduler"
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 )
 
 // GetClient -
@@ -646,7 +647,19 @@ func (r *ManilaSchedulerReconciler) generateServiceConfig(
 
 	labels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
-	customData := map[string]string{manila.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
+	db, err := mariadbv1.GetDatabaseByName(ctx, h, manila.DatabaseName)
+	if err != nil {
+		return err
+	}
+	var tlsCfg *tls.Service
+	if instance.Spec.TLS.CaBundleSecretName != "" {
+		tlsCfg = &tls.Service{}
+	}
+
+	customData := map[string]string{
+		manila.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig,
+		"my.cnf":                           db.GetDatabaseClientConfig(tlsCfg), //(mschuppert) for now just get the default my.cnf
+	}
 
 	customData[manila.CustomServiceConfigFileName] = instance.Spec.CustomServiceConfig
 

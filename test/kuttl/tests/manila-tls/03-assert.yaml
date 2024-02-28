@@ -272,6 +272,10 @@ spec:
           name: config-data
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
+        - mountPath: /etc/my.cnf
+          name: config-data
+          readOnly: true
+          subPath: my.cnf
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
@@ -365,6 +369,10 @@ spec:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
+        - mountPath: /etc/my.cnf
+          name: config-data
+          readOnly: true
+          subPath: my.cnf
         - mountPath: /etc/ceph
           name: ceph
           readOnly: true
@@ -397,6 +405,10 @@ spec:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
+        - mountPath: /etc/my.cnf
+          name: config-data
+          readOnly: true
+          subPath: my.cnf
         - mountPath: /etc/ceph
           name: ceph
           readOnly: true
@@ -475,6 +487,10 @@ spec:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
+        - mountPath: /etc/my.cnf
+          name: config-data
+          readOnly: true
+          subPath: my.cnf
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
@@ -503,6 +519,10 @@ spec:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
+        - mountPath: /etc/my.cnf
+          name: config-data
+          readOnly: true
+          subPath: my.cnf
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true

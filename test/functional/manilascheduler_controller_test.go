@@ -19,6 +19,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -50,6 +51,10 @@ var _ = Describe("ManilaScheduler controller", func() {
 				},
 			),
 		)
+		mariadb.CreateMariaDBDatabase(manilaTest.Instance.Namespace, manilaTest.Instance.Name, mariadbv1.MariaDBDatabaseSpec{})
+		mariadb.CreateMariaDBAccount(manilaTest.Instance.Namespace, manilaTest.Instance.Name, mariadbv1.MariaDBAccountSpec{})
+		mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+		mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
 	})
 
 	When("ManilaScheduler CR is created", func() {
@@ -109,6 +114,11 @@ var _ = Describe("ManilaScheduler controller", func() {
 			//Double check customServiceConfig has been applied
 			configData := string(secretDataMap.Data["03-config.conf"])
 			Expect(configData).Should(ContainSubstring("foo=bar"))
+
+			Expect(secretDataMap.Data).Should(HaveKey("my.cnf"))
+			configData = string(secretDataMap.Data["my.cnf"])
+			Expect(configData).To(
+				ContainSubstring("[client]\nssl=0"))
 		})
 
 		When("manila-scheduler-config is ready", func() {
@@ -129,7 +139,7 @@ var _ = Describe("ManilaScheduler controller", func() {
 				Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 				container := ss.Spec.Template.Spec.Containers[1]
-				Expect(container.VolumeMounts).To(HaveLen(6))
+				Expect(container.VolumeMounts).To(HaveLen(7))
 				Expect(container.Image).To(Equal(manilaTest.ContainerImage))
 			})
 			It("stored the input hash in the Status", func() {
