@@ -63,10 +63,6 @@ type ManilaTemplate struct {
 // Manila service
 type ManilaServiceTemplate struct {
 
-	// +kubebuilder:validation:Required
-	// ContainerImage - Manila API Container Image URL
-	ContainerImage string `json:"containerImage"`
-
 	// +kubebuilder:validation:Optional
 	// NodeSelector to target subset of worker nodes running this service. Setting here overrides
 	// any global NodeSelector settings within the Manila CR.

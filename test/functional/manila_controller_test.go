@@ -241,8 +241,8 @@ var _ = Describe("Manila controller", func() {
 		})
 		It("has the expected container image defaults", func() {
 			manilaDefault := GetManila(manilaTest.Instance)
-			Expect(manilaDefault.Spec.ManilaAPI.ManilaServiceTemplate.ContainerImage).To(Equal(util.GetEnvVar("RELATED_IMAGE_MANILA_API_IMAGE_URL_DEFAULT", manilav1.ManilaAPIContainerImage)))
-			Expect(manilaDefault.Spec.ManilaScheduler.ManilaServiceTemplate.ContainerImage).To(Equal(util.GetEnvVar("RELATED_IMAGE_MANILA_SCHEDULER_IMAGE_URL_DEFAULT", manilav1.ManilaSchedulerContainerImage)))
+			Expect(manilaDefault.Spec.ManilaAPI.ContainerImage).To(Equal(util.GetEnvVar("RELATED_IMAGE_MANILA_API_IMAGE_URL_DEFAULT", manilav1.ManilaAPIContainerImage)))
+			Expect(manilaDefault.Spec.ManilaScheduler.ContainerImage).To(Equal(util.GetEnvVar("RELATED_IMAGE_MANILA_SCHEDULER_IMAGE_URL_DEFAULT", manilav1.ManilaSchedulerContainerImage)))
 			for _, share := range manilaDefault.Spec.ManilaShares {
 				Expect(share.ContainerImage).To(Equal(util.GetEnvVar("RELATED_IMAGE_MANILA_SHARE_IMAGE_URL_DEFAULT", manilav1.ManilaShareContainerImage)))
 			}

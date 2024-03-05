@@ -29,6 +29,17 @@ import (
 type ManilaShareTemplate struct {
 
 	// Common input parameters collected in the ManilaServiceTemplate
+	ManilaShareTemplateCore `json:",inline"`
+
+	// +kubebuilder:validation:Required
+	// ContainerImage - Manila API Container Image URL
+	ContainerImage string `json:"containerImage"`
+}
+
+// ManilaShareTemplateCore -
+type ManilaShareTemplateCore struct {
+
+	// Common input parameters collected in the ManilaServiceTemplate
 	ManilaServiceTemplate `json:",inline"`
 
 	// +kubebuilder:validation:Optional
