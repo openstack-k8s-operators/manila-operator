@@ -49,10 +49,10 @@ spec:
                 items:
                   type: string
                 type: array
-              databaseHostname:
-                type: string
-              databaseUser:
+              databaseAccount:
                 default: manila
+                type: string
+              databaseHostname:
                 type: string
               extraMounts:
                 items:
@@ -871,12 +871,8 @@ spec:
                 type: object
               passwordSelectors:
                 default:
-                  database: ManilaDatabasePassword
                   service: ManilaPassword
                 properties:
-                  database:
-                    default: ManilaDatabasePassword
-                    type: string
                   service:
                     default: ManilaPassword
                     type: string

@@ -33,9 +33,8 @@ func CreateManilaSecret(namespace string, name string) *corev1.Secret {
 	return th.CreateSecret(
 		types.NamespacedName{Namespace: namespace, Name: name},
 		map[string][]byte{
-			"ManilaPassword":         []byte(manilaTest.ManilaPassword),
-			"ManilaDatabasePassword": []byte(manilaTest.ManilaPassword),
-			"MetadataSecret":         []byte(manilaTest.ManilaPassword),
+			"ManilaPassword": []byte(manilaTest.ManilaPassword),
+			"MetadataSecret": []byte(manilaTest.ManilaPassword),
 		},
 	)
 }

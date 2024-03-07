@@ -644,7 +644,7 @@ func (r *ManilaShareReconciler) generateServiceConfig(
 
 	labels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
-	db, err := mariadbv1.GetDatabaseByName(ctx, h, manila.DatabaseName)
+	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, h, manila.DatabaseCRName, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
 		return err
 	}

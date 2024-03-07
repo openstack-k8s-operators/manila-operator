@@ -15,7 +15,7 @@ spec:
       [DEFAULT]
       debug = true
    databaseInstance: openstack
-   databaseUser: manila
+   databaseAccount: manila
    manilaAPI:
       customServiceConfig: |
          [DEFAULT]
@@ -54,7 +54,6 @@ spec:
             cephfs_protocol_helper_type=NFS
         replicas: 1
    passwordSelectors:
-      database: ManilaDatabasePassword
       service: ManilaPassword
    preserveJobs: false
    rabbitMqClusterName: rabbitmq
@@ -94,6 +93,10 @@ status:
         reason: Ready
         status: "True"
         type: ManilaShareReady
+      - message: MariaDBAccount creation complete
+        reason: Ready
+        status: "True"
+        type: MariaDBAccountReady
       - message: " Memcached instance has been provisioned"
         reason: Ready
         status: "True"
@@ -136,9 +139,8 @@ metadata:
       - ManilaAPI
    name: manila-api
 spec:
-   databaseUser: manila
+   databaseAccount: manila
    passwordSelectors:
-      database: ManilaDatabasePassword
       service: ManilaPassword
    replicas: 1
    resources: {}
@@ -179,9 +181,8 @@ kind: ManilaShare
 metadata:
   name: manila-share-share0
 spec:
-  databaseUser: manila
+  databaseAccount: manila
   passwordSelectors:
-    database: ManilaDatabasePassword
     service: ManilaPassword
   replicas: 1
   resources: {}
@@ -222,9 +223,8 @@ kind: ManilaShare
 metadata:
   name: manila-share-share1
 spec:
-  databaseUser: manila
+  databaseAccount: manila
   passwordSelectors:
-    database: ManilaDatabasePassword
     service: ManilaPassword
   replicas: 1
   resources: {}

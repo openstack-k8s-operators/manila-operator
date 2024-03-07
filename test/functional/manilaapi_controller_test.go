@@ -51,10 +51,14 @@ var _ = Describe("ManilaAPI controller", func() {
 				},
 			),
 		)
-		mariadb.CreateMariaDBDatabase(manilaTest.Instance.Namespace, manilaTest.Instance.Name, mariadbv1.MariaDBDatabaseSpec{})
-		mariadb.CreateMariaDBAccount(manilaTest.Instance.Namespace, manilaTest.Instance.Name, mariadbv1.MariaDBAccountSpec{})
-		mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
-		mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
+		mariadb.CreateMariaDBDatabase(manilaTest.ManilaDatabaseName.Namespace, manilaTest.ManilaDatabaseName.Name, mariadbv1.MariaDBDatabaseSpec{})
+
+		dbAccount, dbSecret := mariadb.CreateMariaDBAccountAndSecret(manilaTest.ManilaDatabaseAccount, mariadbv1.MariaDBAccountSpec{})
+		DeferCleanup(k8sClient.Delete, ctx, dbAccount)
+		DeferCleanup(k8sClient.Delete, ctx, dbSecret)
+
+		mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+		mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
 	})
 
 	When("ManilaAPI CR is created", func() {
@@ -98,8 +102,6 @@ var _ = Describe("ManilaAPI controller", func() {
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(namespace))
-			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
-			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 		})
@@ -124,8 +126,6 @@ var _ = Describe("ManilaAPI controller", func() {
 		When("manila-api-config is ready", func() {
 			BeforeEach(func() {
 				DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
-				mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
-				mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
 				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 				keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 				keystone.SimulateKeystoneEndpointReady(manilaTest.Instance)
