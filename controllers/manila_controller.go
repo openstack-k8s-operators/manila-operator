@@ -850,7 +850,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 		"KeystonePublicURL":   keystonePublicURL,
 		"KeystoneInternalURL": keystoneInternalURL,
 		"TransportURL":        string(transportURLSecret.Data["transport_url"]),
-		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s?read_default_file=/etc/my.cnf",
 			instance.Spec.DatabaseUser,
 			string(ospSecret.Data[instance.Spec.PasswordSelectors.Database]),
 			instance.Status.DatabaseHostname,
