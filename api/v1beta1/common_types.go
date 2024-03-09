@@ -45,17 +45,16 @@ type ManilaTemplate struct {
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=manila
-	// DatabaseUser - optional username used for manila DB, defaults to manila
-	// TODO: -> implement needs work in mariadb-operator, right now only manila
-	DatabaseUser string `json:"databaseUser,omitempty"`
+	// DatabaseAccount - optional MariaDBAccount CR name used for manila DB, defaults to manila
+	DatabaseAccount string `json:"databaseAccount"`
 
 	// +kubebuilder:validation:Optional
-	// Secret containing OpenStack password information for ManilaDatabasePassword, AdminPassword
+	// Secret containing OpenStack password information for AdminPassword
 	Secret string `json:"secret,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={database: ManilaDatabasePassword, service: ManilaPassword}
-	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
+	// +kubebuilder:default={service: ManilaPassword}
+	// PasswordSelectors - Selectors to identify the ServiceUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 }
 
@@ -92,11 +91,6 @@ type ManilaServiceTemplate struct {
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
 type PasswordSelector struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="ManilaDatabasePassword"
-	// Database - Selector to get the manila database user password from the Secret
-	// TODO: not used, need change in mariadb-operator
-	Database string `json:"database,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="ManilaPassword"
 	// Service - Selector to get the manila service password from the Secret

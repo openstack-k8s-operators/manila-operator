@@ -15,7 +15,7 @@ spec:
       [DEFAULT]
       debug = true
    databaseInstance: openstack
-   databaseUser: manila
+   databaseAccount: manila
    manilaAPI:
       customServiceConfig: |
          [DEFAULT]
@@ -42,7 +42,6 @@ spec:
             cephfs_cluster_name=ceph
             cephfs_protocol_helper_type=CEPHFS
    passwordSelectors:
-      database: ManilaDatabasePassword
       service: ManilaPassword
    preserveJobs: false
    rabbitMqClusterName: rabbitmq
@@ -82,6 +81,10 @@ status:
         reason: Ready
         status: "True"
         type: ManilaShareReady
+      - message: MariaDBAccount creation complete
+        reason: Ready
+        status: "True"
+        type: MariaDBAccountReady
       - message: " Memcached instance has been provisioned"
         reason: Ready
         status: "True"

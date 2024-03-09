@@ -40,7 +40,6 @@ type ManilaTestData struct {
 	RabbitmqClusterName         string
 	RabbitmqSecretName          string
 	MemcachedInstance           string
-	ManilaDataBaseUser          string
 	ManilaPassword              string
 	ManilaServiceUser           string
 	Instance                    types.NamespacedName
@@ -49,6 +48,7 @@ type ManilaTestData struct {
 	ManilaTransportURL          types.NamespacedName
 	ManilaMemcached             types.NamespacedName
 	ManilaDatabaseName          types.NamespacedName
+	ManilaDatabaseAccount       types.NamespacedName
 	ManilaSA                    types.NamespacedName
 	ManilaDBSync                types.NamespacedName
 	ManilaKeystoneEndpoint      types.NamespacedName
@@ -85,7 +85,11 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		},
 		ManilaDatabaseName: types.NamespacedName{
 			Namespace: manilaName.Namespace,
-			Name:      manila.DatabaseName,
+			Name:      manila.DatabaseCRName,
+		},
+		ManilaDatabaseAccount: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      "manila",
 		},
 		ManilaDBSync: types.NamespacedName{
 			Namespace: manilaName.Namespace,
@@ -170,8 +174,7 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		RabbitmqClusterName: "rabbitmq",
 		RabbitmqSecretName:  "rabbitmq-secret",
 		MemcachedInstance:   MemcachedInstance,
-		ManilaDataBaseUser:  "manila",
-		// Password used for both db and service
+		// Password used for service
 		ManilaPassword:    "12345678",
 		ManilaServiceUser: "manila",
 		ContainerImage:    "test://manila",

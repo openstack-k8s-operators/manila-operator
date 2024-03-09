@@ -25,8 +25,14 @@ const (
 	ServiceNameV2 = "manilav2"
 	// ServiceTypeV2 - API V2 service type, supported
 	ServiceTypeV2 = "sharev2"
-	// DatabaseName -
+
+	// DatabaseName - Name of the database used in CREATE DATABASE statement
 	DatabaseName = "manila"
+	// DatabaseCRName - Name of the MariaDBDatabase CR
+	DatabaseCRName = "manila"
+	// DatabaseUsernamePrefix - used by EnsureMariaDBAccount when a new username
+	// is to be generated, e.g. "manila_e5a4", "manila_78bc", etc
+	DatabaseUsernamePrefix = "manila"
 
 	// ManilaPublicPort -
 	ManilaPublicPort int32 = 8786

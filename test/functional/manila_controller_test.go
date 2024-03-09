@@ -21,6 +21,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
+	mariadb_test "github.com/openstack-k8s-operators/mariadb-operator/api/test/helpers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -29,6 +30,7 @@ import (
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 )
 
 var _ = Describe("Manila controller", func() {
@@ -63,7 +65,7 @@ var _ = Describe("Manila controller", func() {
 		It("should have the Spec fields initialized", func() {
 			Manila := GetManila(manilaTest.Instance)
 			Expect(Manila.Spec.DatabaseInstance).Should(Equal("openstack"))
-			Expect(Manila.Spec.DatabaseUser).Should(Equal(manilaTest.ManilaDataBaseUser))
+			Expect(Manila.Spec.DatabaseAccount).Should(Equal(manilaTest.ManilaDatabaseAccount.Name))
 			Expect(Manila.Spec.MemcachedInstance).Should(Equal(manilaTest.MemcachedInstance))
 			Expect(Manila.Spec.RabbitMqClusterName).Should(Equal(manilaTest.RabbitmqClusterName))
 			Expect(Manila.Spec.ServiceUser).Should(Equal(manilaTest.ManilaServiceUser))
@@ -155,8 +157,8 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(namespace))
 		})
 		It("Should set DBReady Condition and set DatabaseHostname Status when DB is Created", func() {
-			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
-			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			Manila := GetManila(manilaTest.Instance)
 			Expect(Manila.Status.DatabaseHostname).To(
@@ -175,8 +177,8 @@ var _ = Describe("Manila controller", func() {
 			)
 		})
 		It("Should fail if db-sync job fails when DB is Created", func() {
-			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
-			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 			th.SimulateJobFailure(manilaTest.ManilaDBSync)
 			th.ExpectCondition(
 				manilaTest.Instance,
@@ -216,8 +218,8 @@ var _ = Describe("Manila controller", func() {
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, "memcached", memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
-			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
-			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 		})
 		It("should create config-data and scripts ConfigMaps", func() {
 			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
@@ -269,8 +271,8 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
-			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
-			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
@@ -307,19 +309,19 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
-			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
-			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 		})
 		It("removes the finalizers from the Manila DB", func() {
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 
-			mDB := mariadb.GetMariaDBDatabase(manilaTest.Instance)
+			mDB := mariadb.GetMariaDBDatabase(manilaTest.ManilaDatabaseName)
 			Expect(mDB.Finalizers).To(ContainElement("Manila"))
 
 			th.DeleteInstance(GetManila(manilaTest.Instance))
 
-			mDB = mariadb.GetMariaDBDatabase(manilaTest.Instance)
+			mDB = mariadb.GetMariaDBDatabase(manilaTest.ManilaDatabaseName)
 			Expect(mDB.Finalizers).NotTo(ContainElement("Manila"))
 		})
 	})
@@ -389,8 +391,8 @@ var _ = Describe("Manila controller", func() {
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
 			}, timeout, interval).Should(Succeed())
-			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.Instance)
-			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 		})
@@ -471,8 +473,8 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
-			mariadb.SimulateMariaDBTLSDatabaseCompleted(manilaTest.Instance)
-			mariadb.SimulateMariaDBAccountCompleted(manilaTest.Instance)
+			mariadb.SimulateMariaDBTLSDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
 		})
 
@@ -618,4 +620,86 @@ var _ = Describe("Manila controller", func() {
 			Expect(endpoints).To(HaveKeyWithValue("internal", "https://manila-internal."+namespace+".svc:8786/v2"))
 		})
 	})
+
+	// Run MariaDBAccount suite tests.  these are pre-packaged ginkgo tests
+	// that exercise standard account create / update patterns that should be
+	// common to all controllers that ensure MariaDBAccount CRs.
+	mariadbSuite := &mariadb_test.MariaDBTestHarness{
+		PopulateHarness: func(harness *mariadb_test.MariaDBTestHarness) {
+			harness.Setup(
+				"Manila",
+				manilaTest.Instance.Namespace,
+				manilaTest.Instance.Name,
+				"Manila",
+				mariadb, timeout, interval,
+			)
+		},
+
+		// Generate a fully running service given an accountName
+		// needs to make it all the way to the end where the mariadb finalizers
+		// are removed from unused accounts since that's part of what we are testing
+		SetupCR: func(accountName types.NamespacedName) {
+			memcachedSpec = memcachedv1.MemcachedSpec{
+				Replicas: ptr.To(int32(3)),
+			}
+
+			spec := GetDefaultManilaSpec()
+			spec["databaseAccount"] = accountName.Name
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
+			DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManilaShare(manilaTest.Instance, GetDefaultManilaShareSpec()))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaName).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(accountName)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+		},
+		// Change the account name in the service to a new name
+		UpdateAccount: func(newAccountName types.NamespacedName) {
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaName)
+				manila.Spec.DatabaseAccount = newAccountName.Name
+				g.Expect(th.K8sClient.Update(ctx, manila)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+		},
+		// delete the CR instance to exercise finalizer removal
+		DeleteCR: func() {
+			th.DeleteInstance(GetManila(manilaName))
+		},
+	}
+
+	mariadbSuite.RunBasicSuite()
+
+	mariadbSuite.RunURLAssertSuite(func(accountName types.NamespacedName, username string, password string) {
+		Eventually(func(g Gomega) {
+			secretDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
+
+			conf := secretDataMap.Data["00-config.conf"]
+
+			g.Expect(string(conf)).Should(
+				ContainSubstring(fmt.Sprintf("connection = mysql+pymysql://%s:%s@hostname-for-openstack.%s.svc/%s?read_default_file=/etc/my.cnf",
+					username, password, namespace, manila.DatabaseName)))
+
+		}).Should(Succeed())
+
+	})
+
 })

@@ -10,7 +10,7 @@ spec:
     debug = true
   databaseInstance: openstack
   secret: osp-secret
-  databaseUser: manila
+  databaseAccount: manila
   rabbitMqClusterName: rabbitmq
   manilaAPI:
     tls:
