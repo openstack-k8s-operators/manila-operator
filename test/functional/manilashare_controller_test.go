@@ -33,7 +33,9 @@ var _ = Describe("ManilaShare controller", func() {
 
 	BeforeEach(func() {
 		memcachedSpec = memcachedv1.MemcachedSpec{
-			Replicas: ptr.To(int32(3)),
+			MemcachedSpecCore: memcachedv1.MemcachedSpecCore{
+				Replicas: ptr.To[int32](3),
+			},
 		}
 		shareSpec := GetDefaultManilaShareSpec()
 		shareSpec["customServiceConfig"] = "foo=bar"

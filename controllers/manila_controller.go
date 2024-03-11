@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -49,7 +48,6 @@ import (
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -473,7 +471,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	//
 	// Check for required memcached used for caching
 	//
-	memcached, err := r.getManilaMemcached(ctx, helper, instance)
+	memcached, err := memcachedv1.GetMemcachedByName(ctx, helper, instance.Spec.MemcachedInstance, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			instance.Status.Conditions.Set(condition.FalseCondition(
@@ -866,7 +864,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 			string(databaseSecret.Data[mariadbv1.DatabasePasswordSelector]),
 			instance.Status.DatabaseHostname,
 			manila.DatabaseCRName),
-		"MemcachedServersWithInet": strings.Join(memcached.Status.ServerListWithInet, ","),
+		"MemcachedServersWithInet": memcached.GetMemcachedServerListWithInetString(),
 	}
 
 	// create httpd  vhost template parameters
@@ -1057,26 +1055,6 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(ctx context.Context, insta
 	})
 
 	return transportURL, op, err
-}
-
-// getManilaMemcached - gets the Memcached instance used for Manila cache backend
-func (r *ManilaReconciler) getManilaMemcached(
-	ctx context.Context,
-	h *helper.Helper,
-	instance *manilav1beta1.Manila,
-) (*memcachedv1.Memcached, error) {
-	memcached := &memcachedv1.Memcached{}
-	err := h.GetClient().Get(
-		ctx,
-		types.NamespacedName{
-			Name:      instance.Spec.MemcachedInstance,
-			Namespace: instance.Namespace,
-		},
-		memcached)
-	if err != nil {
-		return nil, err
-	}
-	return memcached, err
 }
 
 func (r *ManilaReconciler) ensureDB(
