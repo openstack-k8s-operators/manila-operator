@@ -38,7 +38,9 @@ var _ = Describe("Manila controller", func() {
 
 	BeforeEach(func() {
 		memcachedSpec = memcachedv1.MemcachedSpec{
-			Replicas: ptr.To(int32(3)),
+			MemcachedSpecCore: memcachedv1.MemcachedSpecCore{
+				Replicas: ptr.To[int32](3),
+			},
 		}
 	})
 
@@ -640,7 +642,9 @@ var _ = Describe("Manila controller", func() {
 		// are removed from unused accounts since that's part of what we are testing
 		SetupCR: func(accountName types.NamespacedName) {
 			memcachedSpec = memcachedv1.MemcachedSpec{
-				Replicas: ptr.To(int32(3)),
+				MemcachedSpecCore: memcachedv1.MemcachedSpecCore{
+					Replicas: ptr.To[int32](3),
+				},
 			}
 
 			spec := GetDefaultManilaSpec()
