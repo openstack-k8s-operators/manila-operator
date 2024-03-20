@@ -18,21 +18,37 @@ spec:
       displayName: Manila API
       kind: ManilaAPI
       name: manilaapis.manila.openstack.org
+      specDescriptors:
+      - description: TLS - Parameters related to the TLS
+        displayName: TLS
+        path: tls
       version: v1beta1
     - description: Manila is the Schema for the manilas API
       displayName: Manila
       kind: Manila
       name: manilas.manila.openstack.org
+      specDescriptors:
+      - description: TLS - Parameters related to the TLS
+        displayName: TLS
+        path: manilaAPI.tls
       version: v1beta1
     - description: ManilaScheduler is the Schema for the manilaschedulers API
       displayName: Manila Scheduler
       kind: ManilaScheduler
       name: manilaschedulers.manila.openstack.org
+      specDescriptors:
+      - description: TLS - Parameters related to the TLS
+        displayName: TLS
+        path: tls
       version: v1beta1
     - description: ManilaShare is the Schema for the manilashares API
       displayName: Manila Share
       kind: ManilaShare
       name: manilashares.manila.openstack.org
+      specDescriptors:
+      - description: TLS - Parameters related to the TLS
+        displayName: TLS
+        path: tls
       version: v1beta1
   description: Manila Operator
   displayName: Manila Operator
