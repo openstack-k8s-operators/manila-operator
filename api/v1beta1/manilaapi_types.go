@@ -130,7 +130,7 @@ func init() {
 	SchemeBuilder.Register(&ManilaAPI{}, &ManilaAPIList{})
 }
 
-// IsReady - returns true if ManilaAPI is reconciled successfully
+// IsReady - returns true if service is ready to serve requests
 func (instance ManilaAPI) IsReady() bool {
-	return instance.Status.Conditions.IsTrue(condition.ReadyCondition)
+	return instance.Status.ReadyCount == *instance.Spec.Replicas
 }

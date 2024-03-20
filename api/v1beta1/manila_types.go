@@ -190,9 +190,11 @@ type ManilaDebug struct {
 	DBPurge bool `json:"dbPurge,omitempty"`
 }
 
-// IsReady - returns true if Manila is reconciled successfully
+// IsReady - returns true if all subresources Ready condition is true
 func (instance Manila) IsReady() bool {
-	return instance.Status.Conditions.IsTrue(condition.ReadyCondition)
+	return instance.Status.Conditions.IsTrue(ManilaAPIReadyCondition) &&
+		instance.Status.Conditions.IsTrue(ManilaSchedulerReadyCondition) &&
+		instance.Status.Conditions.IsTrue(ManilaShareReadyCondition)
 }
 
 // ManilaExtraVolMounts exposes additional parameters processed by the manila-operator

@@ -123,7 +123,7 @@ func init() {
 	SchemeBuilder.Register(&ManilaShare{}, &ManilaShareList{})
 }
 
-// IsReady - returns true if ManilaShare is reconciled successfully
+// IsReady - returns true if service is ready to serve requests
 func (instance ManilaShare) IsReady() bool {
-	return instance.Status.Conditions.IsTrue(condition.ReadyCondition)
+	return instance.Status.ReadyCount == *instance.Spec.Replicas
 }
