@@ -172,6 +172,7 @@ func init() {
 type DBPurge struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=30
+	// +kubebuilder:validation:Minimum=1
 	// Age is the DBPurgeAge parameter and indicates the number of days of purging DB records
 	Age int `json:"age"`
 	// +kubebuilder:validation:Optional
