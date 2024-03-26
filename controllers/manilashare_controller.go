@@ -387,6 +387,11 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 				err.Error()))
 			return ctrlResult, err
 		} else if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.MarkFalse(
+				condition.TLSInputReadyCondition,
+				condition.InitReason,
+				condition.SeverityInfo,
+				condition.InputReadyInitMessage)
 			return ctrlResult, nil
 		}
 
@@ -429,6 +434,12 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 			err.Error()))
 		return ctrl.Result{}, err
 	} else if hashChanged {
+		r.Log.Info(fmt.Sprintf("%s... requeueing", condition.ServiceConfigReadyInitMessage))
+		instance.Status.Conditions.MarkFalse(
+			condition.ServiceConfigReadyCondition,
+			condition.InitReason,
+			condition.SeverityInfo,
+			condition.ServiceConfigReadyInitMessage)
 		// Hash changed and instance status should be updated (which will be done by main defer func),
 		// so we need to return and reconcile again
 		return ctrl.Result{}, nil
@@ -464,8 +475,14 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 
 	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
-			instance.Spec.NetworkAttachments, err)
+		error := fmt.Errorf("failed create network annotation from %s: %w", instance.Spec.NetworkAttachments, err)
+		instance.Status.Conditions.MarkFalse(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			error)
+		return ctrl.Result{}, error
 	}
 
 	// Handle service init
@@ -534,7 +551,14 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 			instance.Status.ReadyCount,
 		)
 		if err != nil {
-			return ctrl.Result{}, err
+			error := fmt.Errorf("verifying API NetworkAttachments (%s) %w", instance.Spec.NetworkAttachments, err)
+			instance.Status.Conditions.MarkFalse(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				error.Error())
+			return ctrl.Result{}, error
 		}
 	} else {
 		networkReady = true
@@ -555,14 +579,22 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 		return ctrl.Result{}, err
 	}
 
-	if instance.Status.ReadyCount > 0 || *instance.Spec.Replicas == 0 {
+	if instance.Status.ReadyCount > 0 {
 		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
-	} else {
+
+	} else if *instance.Spec.Replicas > 0 {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DeploymentReadyCondition,
 			condition.RequestedReason,
 			condition.SeverityInfo,
 			condition.DeploymentReadyRunningMessage))
+
+	} else {
+		instance.Status.Conditions.MarkFalse(
+			condition.DeploymentReadyCondition,
+			condition.NotRequestedReason,
+			condition.SeverityInfo,
+			condition.DeploymentReadyInitMessage)
 	}
 	// create StatefulSet - end
 

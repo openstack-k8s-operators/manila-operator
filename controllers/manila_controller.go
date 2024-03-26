@@ -571,6 +571,12 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	} else if hashChanged {
+		r.Log.Info(fmt.Sprintf("%s... requeueing", condition.ServiceConfigReadyInitMessage))
+		instance.Status.Conditions.MarkFalse(
+			condition.ServiceConfigReadyCondition,
+			condition.InitReason,
+			condition.SeverityInfo,
+			condition.ServiceConfigReadyInitMessage)
 		// Hash changed and instance status should be updated (which will be done by main defer func),
 		// so we need to return and reconcile again
 		return ctrl.Result{}, nil
@@ -583,7 +589,8 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
 	//
 
-	// networks to attach to
+	// Check networks that the DBSync job will use in reconcileInit. The ones from the API service are always enough,
+	// it doesn't need the storage specific ones that manila-share may have.
 	for _, netAtt := range instance.Spec.ManilaAPI.NetworkAttachments {
 		_, err := nad.GetNADWithName(ctx, helper, netAtt, instance.Namespace)
 		if err != nil {
@@ -608,8 +615,15 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.ManilaAPI.NetworkAttachments)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
+		error := fmt.Errorf("failed create network annotation from %s: %w",
 			instance.Spec.ManilaAPI.NetworkAttachments, err)
+		instance.Status.Conditions.MarkFalse(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			error.Error())
+		return ctrl.Result{}, error
 	}
 	instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 
