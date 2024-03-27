@@ -142,20 +142,19 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		return ctrl.Result{}, err
 	}
 
+	// initialize status
+	isNewInstance := instance.Status.Conditions == nil
+	if isNewInstance {
+		instance.Status.Conditions = condition.Conditions{}
+	}
+
+	// Save a copy of the condtions so that we can restore the LastTransitionTime
+	// when a condition's state doesn't change.
+	savedConditions := instance.Status.Conditions.DeepCopy()
+
 	// Always patch the instance status when exiting this function so we can persist any changes.
 	defer func() {
-		// update the Ready condition based on the sub conditions
-		if instance.Status.Conditions.AllSubConditionIsTrue() {
-			instance.Status.Conditions.MarkTrue(
-				condition.ReadyCondition, condition.ReadyMessage)
-		} else {
-			// something is not ready so reset the Ready condition
-			instance.Status.Conditions.MarkUnknown(
-				condition.ReadyCondition, condition.InitReason, condition.ReadyInitMessage)
-			// and recalculate it based on the state of the rest of the conditions
-			instance.Status.Conditions.Set(
-				instance.Status.Conditions.Mirror(condition.ReadyCondition))
-		}
+		condition.RestoreLastTransitionTimes(&instance.Status.Conditions, savedConditions)
 		err := helper.PatchInstance(ctx, instance)
 		if err != nil {
 			_err = err
@@ -163,38 +162,33 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		}
 	}()
 
+	// Always initialize conditions used later as Status=Unknown
+	// except ReadyCondition which is False unless proven otherwise
+	cl := condition.CreateList(
+		condition.FalseCondition(condition.ReadyCondition, condition.InitReason, condition.SeverityInfo, condition.ReadyInitMessage),
+		condition.UnknownCondition(condition.DBReadyCondition, condition.InitReason, condition.DBReadyInitMessage),
+		condition.UnknownCondition(condition.DBSyncReadyCondition, condition.InitReason, condition.DBSyncReadyInitMessage),
+		condition.UnknownCondition(condition.RabbitMqTransportURLReadyCondition, condition.InitReason, condition.RabbitMqTransportURLReadyInitMessage),
+		condition.UnknownCondition(condition.MemcachedReadyCondition, condition.InitReason, condition.MemcachedReadyInitMessage),
+		condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
+		condition.UnknownCondition(manilav1beta1.ManilaAPIReadyCondition, condition.InitReason, manilav1beta1.ManilaAPIReadyInitMessage),
+		condition.UnknownCondition(manilav1beta1.ManilaSchedulerReadyCondition, condition.InitReason, manilav1beta1.ManilaSchedulerReadyInitMessage),
+		condition.UnknownCondition(manilav1beta1.ManilaShareReadyCondition, condition.InitReason, manilav1beta1.ManilaShareReadyInitMessage),
+		condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
+		// service account, role, rolebinding conditions
+		condition.UnknownCondition(condition.ServiceAccountReadyCondition, condition.InitReason, condition.ServiceAccountReadyInitMessage),
+		condition.UnknownCondition(condition.RoleReadyCondition, condition.InitReason, condition.RoleReadyInitMessage),
+		condition.UnknownCondition(condition.RoleBindingReadyCondition, condition.InitReason, condition.RoleBindingReadyInitMessage),
+		condition.UnknownCondition(condition.CronJobReadyCondition, condition.InitReason, condition.CronJobReadyInitMessage),
+	)
+	instance.Status.Conditions.Init(&cl)
+
 	// If we're not deleting this and the service object doesn't have our finalizer, add it.
-	if instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer()) {
+	if (instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer())) || isNewInstance {
+		// Register overall status immediately to have an early feedback e.g. in the cli
 		return ctrl.Result{}, nil
 	}
 
-	// initialize status
-
-	if instance.Status.Conditions == nil {
-		instance.Status.Conditions = condition.Conditions{}
-		// initialize conditions used later as Status=Unknown
-		cl := condition.CreateList(
-			condition.UnknownCondition(condition.DBReadyCondition, condition.InitReason, condition.DBReadyInitMessage),
-			condition.UnknownCondition(condition.DBSyncReadyCondition, condition.InitReason, condition.DBSyncReadyInitMessage),
-			condition.UnknownCondition(condition.RabbitMqTransportURLReadyCondition, condition.InitReason, condition.RabbitMqTransportURLReadyInitMessage),
-			condition.UnknownCondition(condition.MemcachedReadyCondition, condition.InitReason, condition.MemcachedReadyInitMessage),
-			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
-			condition.UnknownCondition(manilav1beta1.ManilaAPIReadyCondition, condition.InitReason, manilav1beta1.ManilaAPIReadyInitMessage),
-			condition.UnknownCondition(manilav1beta1.ManilaSchedulerReadyCondition, condition.InitReason, manilav1beta1.ManilaSchedulerReadyInitMessage),
-			condition.UnknownCondition(manilav1beta1.ManilaShareReadyCondition, condition.InitReason, manilav1beta1.ManilaShareReadyInitMessage),
-			condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
-			// service account, role, rolebinding conditions
-			condition.UnknownCondition(condition.ServiceAccountReadyCondition, condition.InitReason, condition.ServiceAccountReadyInitMessage),
-			condition.UnknownCondition(condition.RoleReadyCondition, condition.InitReason, condition.RoleReadyInitMessage),
-			condition.UnknownCondition(condition.RoleBindingReadyCondition, condition.InitReason, condition.RoleBindingReadyInitMessage),
-			condition.UnknownCondition(condition.CronJobReadyCondition, condition.InitReason, condition.CronJobReadyInitMessage),
-		)
-
-		instance.Status.Conditions.Init(&cl)
-
-		// Register overall status immediately to have an early feedback e.g. in the cli
-		return ctrl.Result{}, err
-	}
 	if instance.Status.Hash == nil {
 		instance.Status.Hash = map[string]string{}
 	}
@@ -577,6 +571,12 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	} else if hashChanged {
+		r.Log.Info(fmt.Sprintf("%s... requeueing", condition.ServiceConfigReadyInitMessage))
+		instance.Status.Conditions.MarkFalse(
+			condition.ServiceConfigReadyCondition,
+			condition.InitReason,
+			condition.SeverityInfo,
+			condition.ServiceConfigReadyInitMessage)
 		// Hash changed and instance status should be updated (which will be done by main defer func),
 		// so we need to return and reconcile again
 		return ctrl.Result{}, nil
@@ -589,7 +589,8 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
 	//
 
-	// networks to attach to
+	// Check networks that the DBSync job will use in reconcileInit. The ones from the API service are always enough,
+	// it doesn't need the storage specific ones that manila-share may have.
 	for _, netAtt := range instance.Spec.ManilaAPI.NetworkAttachments {
 		_, err := nad.GetNADWithName(ctx, helper, netAtt, instance.Namespace)
 		if err != nil {
@@ -614,8 +615,15 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.ManilaAPI.NetworkAttachments)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
+		error := fmt.Errorf("failed create network annotation from %s: %w",
 			instance.Spec.ManilaAPI.NetworkAttachments, err)
+		instance.Status.Conditions.MarkFalse(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			error.Error())
+		return ctrl.Result{}, error
 	}
 	instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 
@@ -771,6 +779,10 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// create CronJob - end
 
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
+	// update the overall status condition if service is ready
+	if instance.IsReady() {
+		instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
+	}
 	return ctrl.Result{}, nil
 }
 

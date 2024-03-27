@@ -119,20 +119,21 @@ func (r *ManilaSchedulerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, err
 	}
 
+	//
+	// initialize status
+	//
+	isNewInstance := instance.Status.Conditions == nil
+	if isNewInstance {
+		instance.Status.Conditions = condition.Conditions{}
+	}
+
+	// Save a copy of the condtions so that we can restore the LastTransitionTime
+	// when a condition's state doesn't change.
+	savedConditions := instance.Status.Conditions.DeepCopy()
+
 	// Always patch the instance status when exiting this function so we can persist any changes.
 	defer func() {
-		// update the Ready condition based on the sub conditions
-		if instance.Status.Conditions.AllSubConditionIsTrue() {
-			instance.Status.Conditions.MarkTrue(
-				condition.ReadyCondition, condition.ReadyMessage)
-		} else {
-			// something is not ready so reset the Ready condition
-			instance.Status.Conditions.MarkUnknown(
-				condition.ReadyCondition, condition.InitReason, condition.ReadyInitMessage)
-			// and recalculate it based on the state of the rest of the conditions
-			instance.Status.Conditions.Set(
-				instance.Status.Conditions.Mirror(condition.ReadyCondition))
-		}
+		condition.RestoreLastTransitionTimes(&instance.Status.Conditions, savedConditions)
 		err := helper.PatchInstance(ctx, instance)
 		if err != nil {
 			_err = err
@@ -140,30 +141,24 @@ func (r *ManilaSchedulerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}()
 
+	// Always initialize conditions used later as Status=Unknown
+	// except ReadyCondition which is False unless proven otherwise
+	cl := condition.CreateList(
+		condition.FalseCondition(condition.ReadyCondition, condition.InitReason, condition.SeverityInfo, condition.ReadyInitMessage),
+		condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
+		condition.UnknownCondition(condition.ServiceConfigReadyCondition, condition.InitReason, condition.ServiceConfigReadyInitMessage),
+		condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
+		condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
+		condition.UnknownCondition(condition.TLSInputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
+	)
+	instance.Status.Conditions.Init(&cl)
+
 	// If we're not deleting this and the service object doesn't have our finalizer, add it.
-	if instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer()) {
+	if (instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer())) || isNewInstance {
+		// Register overall status immediately to have an early feedback e.g. in the cli
 		return ctrl.Result{}, nil
 	}
 
-	//
-	// initialize status
-	//
-	if instance.Status.Conditions == nil {
-		instance.Status.Conditions = condition.Conditions{}
-		// initialize conditions used later as Status=Unknown
-		cl := condition.CreateList(
-			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
-			condition.UnknownCondition(condition.ServiceConfigReadyCondition, condition.InitReason, condition.ServiceConfigReadyInitMessage),
-			condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
-			condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
-			condition.UnknownCondition(condition.TLSInputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
-		)
-
-		instance.Status.Conditions.Init(&cl)
-
-		// Register overall status immediately to have an early feedback e.g. in the cli
-		return ctrl.Result{}, err
-	}
 	if instance.Status.Hash == nil {
 		instance.Status.Hash = map[string]string{}
 	}
@@ -393,6 +388,11 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 				err.Error()))
 			return ctrlResult, err
 		} else if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.MarkFalse(
+				condition.TLSInputReadyCondition,
+				condition.InitReason,
+				condition.SeverityInfo,
+				condition.InputReadyInitMessage)
 			return ctrlResult, nil
 		}
 
@@ -438,6 +438,12 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 			err.Error()))
 		return ctrl.Result{}, err
 	} else if hashChanged {
+		r.Log.Info(fmt.Sprintf("%s... requeueing", condition.ServiceConfigReadyInitMessage))
+		instance.Status.Conditions.MarkFalse(
+			condition.ServiceConfigReadyCondition,
+			condition.InitReason,
+			condition.SeverityInfo,
+			condition.ServiceConfigReadyInitMessage)
 		// Hash changed and instance status should be updated (which will be done by main defer func),
 		// so we need to return and reconcile again
 		return ctrl.Result{}, nil
@@ -473,8 +479,14 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 
 	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
-			instance.Spec.NetworkAttachments, err)
+		error := fmt.Errorf("failed create network annotation from %s: %w", instance.Spec.NetworkAttachments, err)
+		instance.Status.Conditions.MarkFalse(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			error)
+		return ctrl.Result{}, error
 	}
 
 	// Handle service init
@@ -542,7 +554,14 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 			instance.Status.ReadyCount,
 		)
 		if err != nil {
-			return ctrl.Result{}, err
+			error := fmt.Errorf("verifying API NetworkAttachments (%s) %w", instance.Spec.NetworkAttachments, err)
+			instance.Status.Conditions.MarkFalse(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				error.Error())
+			return ctrl.Result{}, error
 		}
 	} else {
 		networkReady = true
@@ -565,16 +584,27 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 
 	if instance.Status.ReadyCount > 0 {
 		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
-	} else {
+
+	} else if *instance.Spec.Replicas > 0 {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DeploymentReadyCondition,
 			condition.RequestedReason,
 			condition.SeverityInfo,
 			condition.DeploymentReadyRunningMessage))
+
+	} else {
+		instance.Status.Conditions.MarkFalse(
+			condition.DeploymentReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.DeploymentReadyRunningMessage)
 	}
 	// create StatefulSet - end
 
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
+	if instance.IsReady() {
+		instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -585,6 +615,7 @@ func (r *ManilaSchedulerReconciler) reconcileUpdate(ctx context.Context, instanc
 	// - delete dbsync hash from status to rerun it?
 
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' update successfully", instance.Name))
+	// update the overall status condition if service is ready
 	return ctrl.Result{}, nil
 }
 
