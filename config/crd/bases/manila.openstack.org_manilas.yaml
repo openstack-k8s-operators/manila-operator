@@ -1137,6 +1137,9 @@ spec:
                   format: int32
                   type: integer
                 type: object
+              observedGeneration:
+                format: int64
+                type: integer
               transportURLSecret:
                 type: string
             type: object

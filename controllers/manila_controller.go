@@ -780,6 +780,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	// update the overall status condition if service is ready
+	instance.Status.ObservedGeneration = instance.Generation
 	if instance.IsReady() {
 		instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
 	}
