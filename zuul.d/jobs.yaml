@@ -12,3 +12,27 @@
         MANILA_IMG: "{{ content_provider_registry_ip }}:5001/podified-antelope-centos9/manila-operator-index:{{ cifmw_repo_setup_full_hash }}"
       cifmw_kuttl_tests_operator_list:
         - manila
+
+- job:
+    name: manila-operator-tempest
+    parent: cifmw-base-multinode-tempest
+    attempts: 1
+    vars:
+      cifmw_set_openstack_containers_registry: "{{ content_provider_registry_ip | default('nowhere') | trim }}:5001"
+      cifmw_set_openstack_containers_tag_from_md5: true
+      cifmw_set_openstack_containers_dlrn_md5_path: "~/ci-framework-data/artifacts/repositories/delorean.repo.md5"
+      cifmw_tempest_default_groups:
+         - manila-operator
+      cifmw_extras:
+        - '@scenarios/centos-9/ci.yml'
+        - '@scenarios/centos-9/multinode-ci.yml'
+        - '@scenarios/centos-9/ceph_backends.yml'
+    irrelevant-files:
+      - ^ci_framework/roles/.*_build
+      - ^ci_framework/roles/build.*
+      - ^ci_framework/roles/local_env_vm
+      - ^ci/templates
+      - ^docs
+      - ^.*/*.md
+      - ^OWNERS
+      - ^.github
