@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -105,6 +104,7 @@ func (r *ManilaSchedulerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		r.Log.Error(err, fmt.Sprintf("could not fetch ManilaScheduler instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -116,6 +116,7 @@ func (r *ManilaSchedulerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		r.Log,
 	)
 	if err != nil {
+		r.Log.Error(err, fmt.Sprintf("could not instantiate helper for instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -465,7 +466,7 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 					condition.SeverityInfo,
 					condition.NetworkAttachmentsReadyWaitingMessage,
 					netAtt))
-				return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("network-attachment-definition %s not found", netAtt)
+				return manila.ResultRequeue, fmt.Errorf("network-attachment-definition %s not found", netAtt)
 			}
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NetworkAttachmentsReadyCondition,
@@ -497,22 +498,6 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 		return ctrlResult, nil
 	}
 
-	// Handle service update
-	ctrlResult, err = r.reconcileUpdate(ctx, instance, helper)
-	if err != nil {
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
-	}
-
-	// Handle service upgrade
-	ctrlResult, err = r.reconcileUpgrade(ctx, instance, helper)
-	if err != nil {
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
-	}
-
 	//
 	// normal reconcile tasks
 	//
@@ -520,7 +505,7 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	// Deploy a statefulset
 	ss := statefulset.NewStatefulSet(
 		manilascheduler.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations),
-		time.Duration(5)*time.Second,
+		manila.ShortDuration,
 	)
 
 	ctrlResult, err = ss.CreateOrPatch(ctx, helper)
@@ -608,27 +593,6 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	return ctrl.Result{}, nil
 }
 
-func (r *ManilaSchedulerReconciler) reconcileUpdate(ctx context.Context, instance *manilav1beta1.ManilaScheduler, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' update", instance.Name))
-
-	// TODO: should have minor update tasks if required
-	// - delete dbsync hash from status to rerun it?
-
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' update successfully", instance.Name))
-	// update the overall status condition if service is ready
-	return ctrl.Result{}, nil
-}
-
-func (r *ManilaSchedulerReconciler) reconcileUpgrade(ctx context.Context, instance *manilav1beta1.ManilaScheduler, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' upgrade", instance.Name))
-
-	// TODO: should have major version upgrade tasks
-	// -delete dbsync hash from status to rerun it?
-
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' upgrade successfully", instance.Name))
-	return ctrl.Result{}, nil
-}
-
 // getSecret - get the specified secret, and add its hash to envVars
 func (r *ManilaSchedulerReconciler) getSecret(
 	ctx context.Context,
@@ -645,7 +609,7 @@ func (r *ManilaSchedulerReconciler) getSecret(
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("Secret %s not found", secretName)
+			return manila.ResultRequeue, fmt.Errorf("Secret %s not found", secretName)
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
