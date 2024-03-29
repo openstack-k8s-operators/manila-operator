@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -127,6 +126,7 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		r.Log.Error(err, fmt.Sprintf("could not fetch ManilaAPI instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -138,6 +138,7 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		r.Log,
 	)
 	if err != nil {
+		r.Log.Error(err, fmt.Sprintf("could not instantiate helper for instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -562,7 +563,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 			PasswordSelector:   instance.Spec.PasswordSelectors.Service,
 		}
 
-		ksSvcObj := keystonev1.NewKeystoneService(ksSvcSpec, instance.Namespace, serviceLabels, time.Duration(10)*time.Second)
+		ksSvcObj := keystonev1.NewKeystoneService(ksSvcSpec, instance.Namespace, serviceLabels, manila.NormalDuration)
 		ctrlResult, err := ksSvcObj.CreateOrPatch(ctx, helper)
 		if err != nil {
 			instance.Status.Conditions.MarkFalse(
@@ -595,7 +596,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 			instance.Namespace,
 			ksEndptSpec,
 			serviceLabels,
-			time.Duration(10)*time.Second)
+			manila.NormalDuration)
 		ctrlResult, err = ksEndptObj.CreateOrPatch(ctx, helper)
 		if err != nil {
 			instance.Status.Conditions.MarkFalse(
@@ -781,7 +782,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 					condition.SeverityInfo,
 					condition.NetworkAttachmentsReadyWaitingMessage,
 					netAtt))
-				return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("network-attachment-definition %s not found", netAtt)
+				return manila.ResultRequeue, fmt.Errorf("network-attachment-definition %s not found", netAtt)
 			}
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NetworkAttachmentsReadyCondition,
@@ -813,22 +814,6 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 		return ctrlResult, nil
 	}
 
-	// Handle service update
-	ctrlResult, err = r.reconcileUpdate(ctx, instance, helper)
-	if err != nil {
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
-	}
-
-	// Handle service upgrade
-	ctrlResult, err = r.reconcileUpgrade(ctx, instance, helper)
-	if err != nil {
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
-	}
-
 	//
 	// normal reconcile tasks
 	//
@@ -845,7 +830,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 		return ctrl.Result{}, err
 	}
 
-	ss := statefulset.NewStatefulSet(ssDef, time.Duration(5)*time.Second)
+	ss := statefulset.NewStatefulSet(ssDef, manila.ShortDuration)
 
 	ctrlResult, err = ss.CreateOrPatch(ctx, helper)
 	if err != nil {
@@ -933,26 +918,6 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	return ctrl.Result{}, nil
 }
 
-func (r *ManilaAPIReconciler) reconcileUpdate(ctx context.Context, instance *manilav1beta1.ManilaAPI, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' update", instance.Name))
-
-	// TODO: should have minor update tasks if required
-	// - delete dbsync hash from status to rerun it?
-
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' update successfully", instance.Name))
-	return ctrl.Result{}, nil
-}
-
-func (r *ManilaAPIReconciler) reconcileUpgrade(ctx context.Context, instance *manilav1beta1.ManilaAPI, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' upgrade", instance.Name))
-
-	// TODO: should have major version upgrade tasks
-	// -delete dbsync hash from status to rerun it?
-
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' upgrade successfully", instance.Name))
-	return ctrl.Result{}, nil
-}
-
 // getSecret - get the specified secret, and add its hash to envVars
 func (r *ManilaAPIReconciler) getSecret(
 	ctx context.Context,
@@ -969,7 +934,7 @@ func (r *ManilaAPIReconciler) getSecret(
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("Secret %s not found", secretName)
+			return manila.ResultRequeue, fmt.Errorf("Secret %s not found", secretName)
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
