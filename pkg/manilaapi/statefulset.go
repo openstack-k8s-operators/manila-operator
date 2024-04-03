@@ -40,14 +40,14 @@ func StatefulSet(
 	runAsUser := int64(0)
 
 	livenessProbe := &corev1.Probe{
-		TimeoutSeconds:      5,
-		PeriodSeconds:       3,
-		InitialDelaySeconds: 5,
+		TimeoutSeconds:      10,
+		PeriodSeconds:       10,
+		InitialDelaySeconds: 10,
 	}
 	readinessProbe := &corev1.Probe{
-		TimeoutSeconds:      5,
-		PeriodSeconds:       5,
-		InitialDelaySeconds: 5,
+		TimeoutSeconds:      10,
+		PeriodSeconds:       10,
+		InitialDelaySeconds: 10,
 	}
 
 	args := []string{"-c", ServiceCommand}
