@@ -219,11 +219,9 @@ type ManilaExtraVolMounts struct {
 func (c *ManilaExtraVolMounts) Propagate(svc []storage.PropagationType) []storage.VolMounts {
 
 	var vl []storage.VolMounts
-
 	for _, gv := range c.VolMounts {
 		vl = append(vl, gv.Propagate(svc)...)
 	}
-
 	return vl
 }
 

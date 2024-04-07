@@ -156,6 +156,7 @@ func (r *ManilaSchedulerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		condition.UnknownCondition(condition.TLSInputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 	)
 	instance.Status.Conditions.Init(&cl)
+	instance.Status.ObservedGeneration = instance.Generation
 
 	// If we're not deleting this and the service object doesn't have our finalizer, add it.
 	if (instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer())) || isNewInstance {
@@ -570,16 +571,15 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 		return ctrl.Result{}, err
 	}
 
-	if instance.Status.ReadyCount > 0 {
+	if instance.Status.ReadyCount > 0 &&
+		(ss.GetStatefulSet().Generation <= ss.GetStatefulSet().Status.ObservedGeneration) {
 		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
-
 	} else if *instance.Spec.Replicas > 0 {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DeploymentReadyCondition,
 			condition.RequestedReason,
 			condition.SeverityInfo,
 			condition.DeploymentReadyRunningMessage))
-
 	} else {
 		instance.Status.Conditions.MarkFalse(
 			condition.DeploymentReadyCondition,

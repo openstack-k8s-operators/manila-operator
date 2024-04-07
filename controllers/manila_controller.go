@@ -187,6 +187,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		condition.UnknownCondition(condition.CronJobReadyCondition, condition.InitReason, condition.CronJobReadyInitMessage),
 	)
 	instance.Status.Conditions.Init(&cl)
+	instance.Status.ObservedGeneration = instance.Generation
 
 	// If we're not deleting this and the service object doesn't have our finalizer, add it.
 	if (instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer())) || isNewInstance {
@@ -655,7 +656,24 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	if op != controllerutil.OperationResultNone {
+	apiObsGen, err := r.checkManilaAPIGeneration(instance)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			manilav1beta1.ManilaAPIReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			manilav1beta1.ManilaAPIReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, nil
+	}
+	if !apiObsGen {
+		instance.Status.Conditions.Set(condition.UnknownCondition(
+			manilav1beta1.ManilaAPIReadyCondition,
+			condition.InitReason,
+			manilav1beta1.ManilaAPIReadyInitMessage,
+		))
+	}
+	if op != controllerutil.OperationResultNone && apiObsGen {
 		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
@@ -676,8 +694,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		instance.Status.Conditions.Set(c)
 	}
 
-	// TODO: These will not work without rabbit yet
-	// deploy manila-scheduler
+	// Deploy ManilaScheduler
 	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -688,7 +705,24 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	if op != controllerutil.OperationResultNone {
+	schedObsGen, err := r.checkManilaSchedulerGeneration(instance)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			manilav1beta1.ManilaSchedulerReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			manilav1beta1.ManilaSchedulerReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, nil
+	}
+	if !schedObsGen {
+		instance.Status.Conditions.Set(condition.UnknownCondition(
+			manilav1beta1.ManilaSchedulerReadyCondition,
+			condition.InitReason,
+			manilav1beta1.ManilaSchedulerReadyInitMessage,
+		))
+	}
+	if op != controllerutil.OperationResultNone && schedObsGen {
 		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
@@ -701,8 +735,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		instance.Status.Conditions.Set(c)
 	}
 
-	// TODO: This requires some sort of backend and rabbit, and will not work without them
-	// deploy manila-share
+	// Deploy ManilaShare
 	var shareCondition *condition.Condition
 	for name, share := range instance.Spec.ManilaShares {
 		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share)
@@ -715,7 +748,24 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 				err.Error()))
 			return ctrl.Result{}, err
 		}
-		if op != controllerutil.OperationResultNone {
+		shareObsGen, err := r.checkManilaShareGeneration(instance)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				manilav1beta1.ManilaShareReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				manilav1beta1.ManilaShareReadyErrorMessage,
+				err.Error()))
+			return ctrlResult, nil
+		}
+		if !shareObsGen {
+			instance.Status.Conditions.Set(condition.UnknownCondition(
+				manilav1beta1.ManilaShareReadyCondition,
+				condition.InitReason,
+				manilav1beta1.ManilaShareReadyInitMessage,
+			))
+		}
+		if op != controllerutil.OperationResultNone && shareObsGen {
 			r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 		}
 
@@ -769,7 +819,6 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	// update the overall status condition if service is ready
-	instance.Status.ObservedGeneration = instance.Generation
 	if instance.IsReady() {
 		instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
 	}
@@ -1125,4 +1174,64 @@ func (r *ManilaReconciler) ensureDB(
 	instance.Status.DatabaseHostname = db.GetDatabaseHostname()
 	instance.Status.Conditions.MarkTrue(condition.DBReadyCondition, condition.DBReadyMessage)
 	return db, ctrlResult, nil
+}
+
+// checkManilaAPIGeneration -
+func (r *ManilaReconciler) checkManilaAPIGeneration(
+	instance *manilav1beta1.Manila,
+) (bool, error) {
+	api := &manilav1beta1.ManilaAPIList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+	}
+	if err := r.Client.List(context.Background(), api, listOpts...); err != nil {
+		r.Log.Error(err, "Unable to retrieve ManilaAPI %w")
+		return false, err
+	}
+	for _, item := range api.Items {
+		if item.Generation != item.Status.ObservedGeneration {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// checkManilaSchedulerGeneration -
+func (r *ManilaReconciler) checkManilaSchedulerGeneration(
+	instance *manilav1beta1.Manila,
+) (bool, error) {
+	sched := &manilav1beta1.ManilaSchedulerList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+	}
+	if err := r.Client.List(context.Background(), sched, listOpts...); err != nil {
+		r.Log.Error(err, "Unable to retrieve ManilaScheduler %w")
+		return false, err
+	}
+	for _, item := range sched.Items {
+		if item.Generation != item.Status.ObservedGeneration {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// checkManilaShareGeneration -
+func (r *ManilaReconciler) checkManilaShareGeneration(
+	instance *manilav1beta1.Manila,
+) (bool, error) {
+	share := &manilav1beta1.ManilaShareList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+	}
+	if err := r.Client.List(context.Background(), share, listOpts...); err != nil {
+		r.Log.Error(err, "Unable to retrieve ManilaShare %w")
+		return false, err
+	}
+	for _, item := range share.Items {
+		if item.Generation != item.Status.ObservedGeneration {
+			return false, nil
+		}
+	}
+	return true, nil
 }

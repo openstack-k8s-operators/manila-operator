@@ -915,6 +915,9 @@ spec:
                     type: string
                   type: array
                 type: object
+              observedGeneration:
+                format: int64
+                type: integer
               readyCount:
                 format: int32
                 type: integer
