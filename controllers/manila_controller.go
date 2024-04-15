@@ -672,6 +672,14 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			condition.InitReason,
 			manilav1beta1.ManilaAPIReadyInitMessage,
 		))
+	} else {
+		// Mirror ManilaAPI status' ReadyCount to this parent CR
+		instance.Status.ManilaAPIReadyCount = manilaAPI.Status.ReadyCount
+		// Mirror ManilaAPI's condition status
+		c := manilaAPI.Status.Conditions.Mirror(manilav1beta1.ManilaAPIReadyCondition)
+		if c != nil {
+			instance.Status.Conditions.Set(c)
+		}
 	}
 	if op != controllerutil.OperationResultNone && apiObsGen {
 		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
@@ -683,15 +691,6 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
 		return ctrl.Result{}, err
-	}
-
-	// Mirror ManilaAPI status' ReadyCount to this parent CR
-	instance.Status.ManilaAPIReadyCount = manilaAPI.Status.ReadyCount
-
-	// Mirror ManilaAPI's condition status
-	c := manilaAPI.Status.Conditions.Mirror(manilav1beta1.ManilaAPIReadyCondition)
-	if c != nil {
-		instance.Status.Conditions.Set(c)
 	}
 
 	// Deploy ManilaScheduler
@@ -721,18 +720,18 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			condition.InitReason,
 			manilav1beta1.ManilaSchedulerReadyInitMessage,
 		))
+	} else {
+		// Mirror ManilaScheduler status' ReadyCount to this parent CR
+		instance.Status.ManilaSchedulerReadyCount = manilaScheduler.Status.ReadyCount
+
+		// Mirror ManilaScheduler's condition status
+		c := manilaScheduler.Status.Conditions.Mirror(manilav1beta1.ManilaSchedulerReadyCondition)
+		if c != nil {
+			instance.Status.Conditions.Set(c)
+		}
 	}
 	if op != controllerutil.OperationResultNone && schedObsGen {
 		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
-	}
-
-	// Mirror ManilaScheduler status' ReadyCount to this parent CR
-	instance.Status.ManilaSchedulerReadyCount = manilaScheduler.Status.ReadyCount
-
-	// Mirror ManilaScheduler's condition status
-	c = manilaScheduler.Status.Conditions.Mirror(manilav1beta1.ManilaSchedulerReadyCondition)
-	if c != nil {
-		instance.Status.Conditions.Set(c)
 	}
 
 	// Deploy ManilaShare
@@ -764,23 +763,21 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 				condition.InitReason,
 				manilav1beta1.ManilaShareReadyInitMessage,
 			))
+		} else {
+			// Mirror ManilaShare status' ReadyCount to this parent CR
+			if instance.Status.ManilaSharesReadyCounts == nil {
+				instance.Status.ManilaSharesReadyCounts = map[string]int32{}
+			}
+			instance.Status.ManilaSharesReadyCounts[name] = manilaShare.Status.ReadyCount
 		}
 		if op != controllerutil.OperationResultNone && shareObsGen {
 			r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 		}
 
-		// Mirror ManilaShare status' ReadyCount to this parent CR
-		// TODO: Somehow this status map can be nil here despite being initialized
-		//       in the Reconcile function above
-		if instance.Status.ManilaSharesReadyCounts == nil {
-			instance.Status.ManilaSharesReadyCounts = map[string]int32{}
-		}
-		instance.Status.ManilaSharesReadyCounts[name] = manilaShare.Status.ReadyCount
-
 		// If this manilaShare is not IsReady, mirror the condition to get the latest step it is in.
 		// Could also check the overall ReadyCondition of the manilaShare.
 		if !manilaShare.IsReady() {
-			c = manilaShare.Status.Conditions.Mirror(manilav1beta1.ManilaShareReadyCondition)
+			c := manilaShare.Status.Conditions.Mirror(manilav1beta1.ManilaShareReadyCondition)
 			// Get the condition with higher priority for shareCondition.
 			shareCondition = condition.GetHigherPrioCondition(c, shareCondition).DeepCopy()
 		}
