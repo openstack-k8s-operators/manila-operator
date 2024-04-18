@@ -55,7 +55,6 @@ func StatefulSet(
 		InitialDelaySeconds: 10,
 	}
 
-	args := []string{"-c", ServiceCommand}
 	var probeCommand []string
 	livenessProbe.HTTPGet = &corev1.HTTPGetAction{
 		Port: intstr.FromInt(8080),
@@ -105,9 +104,15 @@ func StatefulSet(
 						{
 							Name: ComponentName,
 							Command: []string{
-								"/bin/bash",
+								"/usr/bin/dumb-init",
 							},
-							Args:  args,
+							Args: []string{
+								"--single-child",
+								"--",
+								"/bin/bash",
+								"-c",
+								string(ServiceCommand),
+							},
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser: &rootUser,

@@ -50,7 +50,6 @@ func StatefulSet(
 		InitialDelaySeconds: 10,
 	}
 
-	args := []string{"-c", ServiceCommand}
 	//
 	// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 	//
@@ -145,9 +144,15 @@ func StatefulSet(
 						{
 							Name: ComponentName,
 							Command: []string{
-								"/bin/bash",
+								"/usr/bin/dumb-init",
 							},
-							Args:  args,
+							Args: []string{
+								"--single-child",
+								"--",
+								"/bin/bash",
+								"-c",
+								string(ServiceCommand),
+							},
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser: &runAsUser,

@@ -261,8 +261,13 @@ spec:
         - name: logs
           mountPath: /var/log/manila
       - args:
-          - -c
-          - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        - --single-child
+        - --
+        - /bin/bash
+        - -c
+        - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        command:
+        - /usr/bin/dumb-init
         volumeMounts:
         - mountPath: /etc/machine-id
           name: etc-machine-id
@@ -357,8 +362,13 @@ spec:
       serviceAccountName: manila-manila
       containers:
       - args:
+        - --single-child
+        - --
+        - /bin/bash
         - -c
         - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        command:
+        - /usr/bin/dumb-init
         volumeMounts:
         - mountPath: /etc/machine-id
           name: etc-machine-id
@@ -475,8 +485,13 @@ spec:
       serviceAccountName: manila-manila
       containers:
       - args:
+        - --single-child
+        - --
+        - /bin/bash
         - -c
         - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        command:
+        - /usr/bin/dumb-init
         volumeMounts:
         - mountPath: /etc/machine-id
           name: etc-machine-id
