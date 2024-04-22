@@ -547,6 +547,13 @@ var _ = Describe("Manila controller", func() {
 
 			ManilaAPIExists(manilaTest.ManilaAPI)
 
+			th.ExpectCondition(
+				manilaTest.ManilaAPI,
+				ConditionGetterFunc(ManilaAPIConditionGetter),
+				condition.TLSInputReadyCondition,
+				corev1.ConditionTrue,
+			)
+
 			d := th.GetStatefulSet(manilaTest.ManilaAPI)
 			// Check the resulting deployment fieldsq
 			Expect(int(*d.Spec.Replicas)).To(Equal(1))
@@ -579,6 +586,20 @@ var _ = Describe("Manila controller", func() {
 
 			ManilaAPIExists(manilaTest.Instance)
 			ManilaSchedulerExists(manilaTest.Instance)
+
+			th.ExpectCondition(
+				manilaTest.ManilaAPI,
+				ConditionGetterFunc(ManilaAPIConditionGetter),
+				condition.TLSInputReadyCondition,
+				corev1.ConditionTrue,
+			)
+
+			th.ExpectCondition(
+				manilaTest.ManilaScheduler,
+				ConditionGetterFunc(ManilaSchedulerConditionGetter),
+				condition.TLSInputReadyCondition,
+				corev1.ConditionTrue,
+			)
 
 			// Grab the current config hash
 			apiOriginalHash := GetEnvVarValue(
