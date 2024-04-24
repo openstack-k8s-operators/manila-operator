@@ -567,7 +567,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configVars)
+	_, hashChanged, err := r.createHashOfInputHashes(instance, configVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -621,15 +621,15 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.ManilaAPI.NetworkAttachments)
 	if err != nil {
-		error := fmt.Errorf("failed create network annotation from %s: %w",
+		err := fmt.Errorf("failed create network annotation from %s: %w",
 			instance.Spec.ManilaAPI.NetworkAttachments, err)
 		instance.Status.Conditions.MarkFalse(
 			condition.NetworkAttachmentsReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
 			condition.NetworkAttachmentsReadyErrorMessage,
-			error.Error())
-		return ctrl.Result{}, error
+			err.Error())
+		return ctrl.Result{}, err
 	}
 	instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 
@@ -939,7 +939,6 @@ func (r *ManilaReconciler) generateServiceConfig(
 //
 // returns the hash, whether the hash changed (as a bool) and any error
 func (r *ManilaReconciler) createHashOfInputHashes(
-	ctx context.Context,
 	instance *manilav1beta1.Manila,
 	envVars map[string]env.Setter,
 ) (string, bool, error) {

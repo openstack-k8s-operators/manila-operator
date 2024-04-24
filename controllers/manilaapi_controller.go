@@ -330,7 +330,7 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ManilaAPIReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
-	l := log.FromContext(context.Background()).WithName("Controllers").WithName("ManilaAPI")
+	l := log.FromContext(ctx).WithName("Controllers").WithName("ManilaAPI")
 
 	for _, field := range manilaAPIWatchFields {
 		crList := &manilav1beta1.ManilaAPIList{}
@@ -338,7 +338,7 @@ func (r *ManilaAPIReconciler) findObjectsForSrc(ctx context.Context, src client.
 			FieldSelector: fields.OneTermEqualSelector(field, src.GetName()),
 			Namespace:     src.GetNamespace(),
 		}
-		err := r.List(context.TODO(), crList, listOps)
+		err := r.List(ctx, crList, listOps)
 		if err != nil {
 			return []reconcile.Request{}
 		}
@@ -750,7 +750,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configVars)
+	inputHash, hashChanged, err := r.createHashOfInputHashes(instance, configVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -801,14 +801,14 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 
 	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
 	if err != nil {
-		error := fmt.Errorf("failed create network annotation from %s: %w", instance.Spec.NetworkAttachments, err)
+		err := fmt.Errorf("failed create network annotation from %s: %w", instance.Spec.NetworkAttachments, err)
 		instance.Status.Conditions.MarkFalse(
 			condition.NetworkAttachmentsReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
 			condition.NetworkAttachmentsReadyErrorMessage,
-			error)
-		return ctrl.Result{}, error
+			err)
+		return ctrl.Result{}, err
 	}
 
 	// Handle service init
@@ -1035,7 +1035,6 @@ func (r *ManilaAPIReconciler) generateServiceConfig(
 //
 // returns the hash, whether the hash changed (as a bool) and any error
 func (r *ManilaAPIReconciler) createHashOfInputHashes(
-	ctx context.Context,
 	instance *manilav1beta1.ManilaAPI,
 	envVars map[string]env.Setter,
 ) (string, bool, error) {

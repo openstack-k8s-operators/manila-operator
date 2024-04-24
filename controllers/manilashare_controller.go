@@ -173,7 +173,7 @@ func (r *ManilaShareReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Handle service delete
 	if !instance.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, instance, helper)
+		return r.reconcileDelete(instance, helper)
 	}
 
 	// Handle non-deleted clusters
@@ -274,7 +274,7 @@ func (r *ManilaShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ManilaShareReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
-	l := log.FromContext(context.Background()).WithName("Controllers").WithName("ManilaShare")
+	l := log.FromContext(ctx).WithName("Controllers").WithName("ManilaShare")
 
 	for _, field := range commonWatchFields {
 		crList := &manilav1beta1.ManilaShareList{}
@@ -282,7 +282,7 @@ func (r *ManilaShareReconciler) findObjectsForSrc(ctx context.Context, src clien
 			FieldSelector: fields.OneTermEqualSelector(field, src.GetName()),
 			Namespace:     src.GetNamespace(),
 		}
-		err := r.List(context.TODO(), crList, listOps)
+		err := r.List(ctx, crList, listOps)
 		if err != nil {
 			return []reconcile.Request{}
 		}
@@ -304,25 +304,13 @@ func (r *ManilaShareReconciler) findObjectsForSrc(ctx context.Context, src clien
 	return requests
 }
 
-func (r *ManilaShareReconciler) reconcileDelete(ctx context.Context, instance *manilav1beta1.ManilaShare, helper *helper.Helper) (ctrl.Result, error) {
+func (r *ManilaShareReconciler) reconcileDelete(instance *manilav1beta1.ManilaShare, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
 
 	// Service is deleted so remove the finalizer.
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
 
-	return ctrl.Result{}, nil
-}
-
-func (r *ManilaShareReconciler) reconcileInit(
-	ctx context.Context,
-	instance *manilav1beta1.ManilaShare,
-	helper *helper.Helper,
-	serviceLabels map[string]string,
-) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
-
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' init successfully", instance.Name))
 	return ctrl.Result{}, nil
 }
 
@@ -431,7 +419,7 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configVars)
+	inputHash, hashChanged, err := r.createHashOfInputHashes(instance, configVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -482,22 +470,14 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 
 	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
 	if err != nil {
-		error := fmt.Errorf("failed create network annotation from %s: %w", instance.Spec.NetworkAttachments, err)
+		err := fmt.Errorf("failed create network annotation from %s: %w", instance.Spec.NetworkAttachments, err)
 		instance.Status.Conditions.MarkFalse(
 			condition.NetworkAttachmentsReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
 			condition.NetworkAttachmentsReadyErrorMessage,
-			error)
-		return ctrl.Result{}, error
-	}
-
-	// Handle service init
-	ctrlResult, err = r.reconcileInit(ctx, instance, helper, serviceLabels)
-	if err != nil {
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
+			err)
+		return ctrl.Result{}, err
 	}
 
 	//
@@ -706,7 +686,6 @@ func (r *ManilaShareReconciler) generateServiceConfig(
 //
 // returns the hash, whether the hash changed (as a bool) and any error
 func (r *ManilaShareReconciler) createHashOfInputHashes(
-	ctx context.Context,
 	instance *manilav1beta1.ManilaShare,
 	envVars map[string]env.Setter,
 ) (string, bool, error) {
