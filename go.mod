@@ -79,7 +79,7 @@ require (
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/imdario/mergo v0.3.16 //indirect
+	github.com/imdario/mergo v1.0.0 //indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
 	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.3.1-0.20240425065931-fcb08823a660 //indirect
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
