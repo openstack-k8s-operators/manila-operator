@@ -23,8 +23,14 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -127,16 +133,94 @@ var _ webhook.Validator = &Manila{}
 func (r *Manila) ValidateCreate() (admission.Warnings, error) {
 	manilalog.Info("validate create", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object creation.
+	var allErrs field.ErrorList
+	basePath := field.NewPath("spec")
+	if err := r.Spec.ValidateCreate(basePath); err != nil {
+		allErrs = append(allErrs, err...)
+	}
+
+	if len(allErrs) != 0 {
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: "manila.openstack.org", Kind: "Manila"},
+			r.Name, allErrs)
+	}
+
 	return nil, nil
+}
+
+// ValidateCreate - Exported function wrapping non-exported validate functions,
+// this function can be called externally to validate an manila spec.
+func (spec *ManilaSpec) ValidateCreate(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// validate the service override key is valid
+	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("manilaAPI").Child("override").Child("service"),
+		spec.ManilaAPI.Override.Service)...)
+
+	return allErrs
+}
+
+// ValidateCreate -
+func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// validate the service override key is valid
+	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("manilaAPI").Child("override").Child("service"),
+		spec.ManilaAPI.Override.Service)...)
+
+	return allErrs
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Manila) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	manilalog.Info("validate update", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object update.
+	oldManila, ok := old.(*Manila)
+	if !ok || oldManila == nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("unable to convert existing object"))
+	}
+
+	var allErrs field.ErrorList
+	basePath := field.NewPath("spec")
+
+	if err := r.Spec.ValidateUpdate(oldManila.Spec, basePath); err != nil {
+		allErrs = append(allErrs, err...)
+	}
+
+	if len(allErrs) != 0 {
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: "manila.openstack.org", Kind: "Manila"},
+			r.Name, allErrs)
+	}
+
 	return nil, nil
+}
+
+// ValidateUpdate - Exported function wrapping non-exported validate functions,
+// this function can be called externally to validate an manila spec.
+func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// validate the service override key is valid
+	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("manilaAPI").Child("override").Child("service"),
+		spec.ManilaAPI.Override.Service)...)
+
+	return allErrs
+}
+
+// ValidateUpdate -
+func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// validate the service override key is valid
+	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("manilaAPI").Child("override").Child("service"),
+		spec.ManilaAPI.Override.Service)...)
+
+	return allErrs
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
