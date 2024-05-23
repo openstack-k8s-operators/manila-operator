@@ -17,13 +17,16 @@ package functional
 
 import (
 	"fmt"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	//revive:disable-next-line:dot-imports
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
 	mariadb_test "github.com/openstack-k8s-operators/mariadb-operator/api/test/helpers"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
@@ -728,4 +731,44 @@ var _ = Describe("Manila controller", func() {
 
 	})
 
+})
+
+var _ = Describe("Manila Webhook", func() {
+
+	BeforeEach(func() {
+		err := os.Setenv("OPERATOR_TEMPLATES", "../../templates")
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("rejects with wrong ManilaAPI service override endpoint type", func() {
+		spec := GetDefaultManilaSpec()
+		apiSpec := GetDefaultManilaAPISpec()
+		apiSpec["override"] = map[string]interface{}{
+			"service": map[string]interface{}{
+				"internal": map[string]interface{}{},
+				"wrooong":  map[string]interface{}{},
+			},
+		}
+		spec["manilaAPI"] = apiSpec
+
+		raw := map[string]interface{}{
+			"apiVersion": "manila.openstack.org/v1beta1",
+			"kind":       "Manila",
+			"metadata": map[string]interface{}{
+				"name":      manilaTest.Instance.Name,
+				"namespace": manilaTest.Instance.Namespace,
+			},
+			"spec": spec,
+		}
+
+		unstructuredObj := &unstructured.Unstructured{Object: raw}
+		_, err := controllerutil.CreateOrPatch(
+			th.Ctx, th.K8sClient, unstructuredObj, func() error { return nil })
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(
+			ContainSubstring(
+				"invalid: spec.manilaAPI.override.service[wrooong]: " +
+					"Invalid value: \"wrooong\": invalid endpoint type: wrooong"),
+		)
+	})
 })
