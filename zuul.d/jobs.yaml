@@ -12,3 +12,11 @@
         MANILA_IMG: "{{ content_provider_registry_ip }}:5001/podified-antelope-centos9/manila-operator-index:{{ cifmw_repo_setup_full_hash }}"
       cifmw_kuttl_tests_operator_list:
         - manila
+
+- job:
+    name: manila-operator-tempest
+    parent: podified-multinode-hci-deployment-crc-1comp-backends
+    vars:
+      cifmw_test_operator_concurrency: 4
+      cifmw_test_operator_tempest_include_list: |
+        ^manila_tempest_tests.tests.api
