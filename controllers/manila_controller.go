@@ -893,6 +893,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 			instance.Status.DatabaseHostname,
 			manila.DatabaseCRName),
 		"MemcachedServersWithInet": memcached.GetMemcachedServerListWithInetString(),
+		"TimeOut":                  instance.Spec.APITimeout,
 	}
 
 	// create httpd  vhost template parameters
