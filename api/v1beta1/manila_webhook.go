@@ -230,3 +230,29 @@ func (r *Manila) ValidateDelete() (admission.Warnings, error) {
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil, nil
 }
+
+// SetDefaultRouteAnnotations sets HAProxy timeout values of the route
+func (spec *ManilaSpecCore) SetDefaultRouteAnnotations(annotations map[string]string) {
+	const haProxyAnno = "haproxy.router.openshift.io/timeout"
+	// Use a custom annotation to flag when the operator has set the default HAProxy timeout
+	// With the annotation func determines when to overwrite existing HAProxy timeout with the APITimeout
+	const manilaAnno = "api.manila.openstack.org/timeout"
+
+	valManila, okManila := annotations[manilaAnno]
+	valHAProxy, okHAProxy := annotations[haProxyAnno]
+
+	// Human operator set the HAProxy timeout manually
+	if (!okManila && okHAProxy) {
+		return
+	}
+
+	// Human operator modified the HAProxy timeout manually without removing the Manila flag
+	if (okManila && okHAProxy && valManila != valHAProxy) {
+		delete(annotations, manilaAnno)
+		return
+	}
+
+	timeout := fmt.Sprintf("%ds", spec.APITimeout)
+	annotations[manilaAnno] = timeout
+	annotations[haProxyAnno] = timeout
+}
