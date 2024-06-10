@@ -33,6 +33,8 @@ const (
 	DBPurgeDefaultAge = 30
 	//DBPurgeDefaultSchedule is in crontab format, and the default runs the job once every day
 	DBPurgeDefaultSchedule = "1 0 * * *"
+	// APIDefaultTimeout indicates the default APITimeout for HAProxy and Apache, defaults to 60 seconds
+	APIDefaultTimeout = 60
 )
 
 // ManilaTemplate defines common input parameters used by all Manila services
