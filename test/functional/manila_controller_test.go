@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	//revive:disable-next-line:dot-imports
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
 	mariadb_test "github.com/openstack-k8s-operators/mariadb-operator/api/test/helpers"
@@ -107,7 +108,7 @@ var _ = Describe("Manila controller", func() {
 			// it to run
 			Eventually(func() []string {
 				return GetManila(manilaTest.Instance).Finalizers
-			}, timeout, interval).Should(ContainElement("Manila"))
+			}, timeout, interval).Should(ContainElement("openstack.org/manila"))
 		})
 		It("creates service account, role and rolebindig", func() {
 
@@ -323,12 +324,12 @@ var _ = Describe("Manila controller", func() {
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 
 			mDB := mariadb.GetMariaDBDatabase(manilaTest.ManilaDatabaseName)
-			Expect(mDB.Finalizers).To(ContainElement("Manila"))
+			Expect(mDB.Finalizers).To(ContainElement("openstack.org/manila"))
 
 			th.DeleteInstance(GetManila(manilaTest.Instance))
 
 			mDB = mariadb.GetMariaDBDatabase(manilaTest.ManilaDatabaseName)
-			Expect(mDB.Finalizers).NotTo(ContainElement("Manila"))
+			Expect(mDB.Finalizers).NotTo(ContainElement("openstack.org/manila"))
 		})
 	})
 	When("Manila CR instance is built with NAD", func() {
@@ -657,7 +658,7 @@ var _ = Describe("Manila controller", func() {
 				"Manila",
 				manilaTest.Instance.Namespace,
 				manilaTest.Instance.Name,
-				"Manila",
+				"openstack.org/manila",
 				mariadb, timeout, interval,
 			)
 		},

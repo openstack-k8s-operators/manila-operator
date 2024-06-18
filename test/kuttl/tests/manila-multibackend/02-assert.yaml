@@ -136,7 +136,7 @@ apiVersion: manila.openstack.org/v1beta1
 kind: ManilaAPI
 metadata:
    finalizers:
-      - ManilaAPI
+      - openstack.org/manilaapi
    name: manila-api
 spec:
    databaseAccount: manila
