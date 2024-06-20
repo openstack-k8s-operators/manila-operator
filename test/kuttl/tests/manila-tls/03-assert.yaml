@@ -253,10 +253,9 @@ spec:
       - args:
         - --single-child
         - --
-        - /usr/bin/tail
-        - -n+1
-        - -F
-        - /var/log/manila/manila-api.log
+        - /bin/sh
+        - -c
+        - /usr/bin/tail -n+1 -F /var/log/manila/manila-api.log 2>/dev/null
         volumeMounts:
         - name: logs
           mountPath: /var/log/manila

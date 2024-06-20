@@ -128,10 +128,9 @@ func StatefulSet(
 							Args: []string{
 								"--single-child",
 								"--",
-								"/usr/bin/tail",
-								"-n+1",
-								"-F",
-								LogFile,
+								"/bin/sh",
+								"-c",
+								"/usr/bin/tail -n+1 -F " + LogFile + " 2>/dev/null",
 							},
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
