@@ -401,6 +401,10 @@ var _ = Describe("Manila controller", func() {
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
 			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			th.SimulateLoadBalancerServiceIP(types.NamespacedName{
+				Namespace: namespace,
+				Name:      manilaTest.Instance.Name + "-internal",
+			})
 			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
 		})
 		It("Check the resulting endpoints of the generated sub-CRs", func() {
