@@ -25,6 +25,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -163,6 +164,7 @@ rules:
   resources:
   - manilaapis/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - manila.openstack.org
@@ -189,6 +191,7 @@ rules:
   resources:
   - manilas/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - manila.openstack.org
@@ -215,6 +218,7 @@ rules:
   resources:
   - manilaschedulers/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - manila.openstack.org
@@ -241,6 +245,7 @@ rules:
   resources:
   - manilashares/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - manila.openstack.org
@@ -267,6 +272,7 @@ rules:
   resources:
   - mariadbaccounts/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - mariadb.openstack.org
@@ -285,6 +291,7 @@ rules:
   resources:
   - mariadbdatabases/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - memcached.openstack.org
@@ -314,6 +321,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -324,6 +332,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
