@@ -83,7 +83,7 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
 	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.4.1-0.20240709142659-5a0b4d5c6176 // indirect
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
-	k8s.io/utils v0.0.0-20240502163921-fe8a2dddb1d0
+	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
 
 replace github.com/openstack-k8s-operators/manila-operator/api => ./api
