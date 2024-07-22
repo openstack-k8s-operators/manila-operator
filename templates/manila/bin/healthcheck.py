@@ -35,6 +35,7 @@
 
 from http import server
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -45,12 +46,14 @@ from oslo_config import cfg
 from manila.common import config as manila_config
 
 
-HOSTNAME = ''
 SERVER_PORT = 8080
 CONF = cfg.CONF
 BINARIES = ('share', 'scheduler')
 STATE_UP = ":-)"
 STATUS_ENABLED = "enabled"
+
+class HTTPServerV6(server.HTTPServer):
+    address_family = socket.AF_INET6
 
 
 class ServiceNotFoundException(Exception):
@@ -215,7 +218,12 @@ if __name__ == "__main__":
 
     HeartbeatServer.initialize_class(binary, cfg_dir)
 
-    webServer = server.HTTPServer((HOSTNAME, SERVER_PORT), HeartbeatServer)
+    hostname = socket.gethostname()
+    ipv6_address = socket.getaddrinfo(hostname, None, socket.AF_INET6)
+    if ipv6_address:
+        webServer = HTTPServerV6(("::", SERVER_PORT), HeartbeatServer)
+    else:
+        webServer = server.HTTPServer(("0.0.0.0", SERVER_PORT), HeartbeatServer)
     stop = get_stopper(webServer)
 
     # Need to run the server on a different thread because its shutdown method
@@ -224,7 +232,7 @@ if __name__ == "__main__":
     thread = threading.Thread(target=webServer.serve_forever)
     thread.daemon = True
     thread.start()
-    print(f"Manila Healthcheck Server started http://{HOSTNAME}:{SERVER_PORT}")
+    print(f"Manila Healthcheck Server started http://{hostname}:{SERVER_PORT}")
     signal.signal(signal.SIGTERM, stop)
 
     try:
