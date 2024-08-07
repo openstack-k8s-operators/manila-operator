@@ -781,13 +781,14 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 		_, err := nad.GetNADWithName(ctx, helper, netAtt, instance.Namespace)
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
+				r.Log.Info(fmt.Sprintf("network-attachment-definition %s not found", netAtt))
 				instance.Status.Conditions.Set(condition.FalseCondition(
 					condition.NetworkAttachmentsReadyCondition,
 					condition.RequestedReason,
 					condition.SeverityInfo,
 					condition.NetworkAttachmentsReadyWaitingMessage,
 					netAtt))
-				return manila.ResultRequeue, fmt.Errorf("network-attachment-definition %s not found", netAtt)
+				return manila.ResultRequeue, nil
 			}
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NetworkAttachmentsReadyCondition,
@@ -934,12 +935,13 @@ func (r *ManilaAPIReconciler) getSecret(
 	secret, hash, err := secret.GetSecret(ctx, h, secretName, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
+			r.Log.Info(fmt.Sprintf("Secret %s not found", secretName))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.InputReadyCondition,
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.InputReadyWaitingMessage))
-			return manila.ResultRequeue, fmt.Errorf("Secret %s not found", secretName)
+			return manila.ResultRequeue, nil
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
