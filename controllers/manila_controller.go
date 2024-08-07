@@ -474,12 +474,13 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	memcached, err := memcachedv1.GetMemcachedByName(ctx, helper, instance.Spec.MemcachedInstance, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
+			r.Log.Info(fmt.Sprintf("memcached %s not found", instance.Spec.MemcachedInstance))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.MemcachedReadyCondition,
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.MemcachedReadyWaitingMessage))
-			return manila.ResultRequeue, fmt.Errorf("memcached %s not found", instance.Spec.MemcachedInstance)
+			return manila.ResultRequeue, nil
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.MemcachedReadyCondition,
@@ -491,12 +492,13 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	}
 
 	if !memcached.IsReady() {
+		r.Log.Info(fmt.Sprintf("memcached %s is not ready", memcached.Name))
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.MemcachedReadyCondition,
 			condition.RequestedReason,
 			condition.SeverityInfo,
 			condition.MemcachedReadyWaitingMessage))
-		return manila.ResultRequeue, fmt.Errorf("memcached %s is not ready", memcached.Name)
+		return manila.ResultRequeue, nil
 	}
 	// Mark the Memcached Service as Ready if we get to this point with no errors
 	instance.Status.Conditions.MarkTrue(
@@ -509,12 +511,13 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	ospSecret, hash, err := secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
+			r.Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.InputReadyCondition,
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.InputReadyWaitingMessage))
-			return manila.ResultRequeue, fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
+			return manila.ResultRequeue, nil
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
@@ -601,13 +604,14 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		_, err := nad.GetNADWithName(ctx, helper, netAtt, instance.Namespace)
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
+				r.Log.Info(fmt.Sprintf("network-attachment-definition %s not found", netAtt))
 				instance.Status.Conditions.Set(condition.FalseCondition(
 					condition.NetworkAttachmentsReadyCondition,
 					condition.RequestedReason,
 					condition.SeverityInfo,
 					condition.NetworkAttachmentsReadyWaitingMessage,
 					netAtt))
-				return manila.ResultRequeue, fmt.Errorf("network-attachment-definition %s not found", netAtt)
+				return manila.ResultRequeue, nil
 			}
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NetworkAttachmentsReadyCondition,
