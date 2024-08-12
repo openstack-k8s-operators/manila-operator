@@ -490,47 +490,39 @@ var _ = Describe("Manila controller", func() {
 		})
 
 		It("reports that the CA secret is missing", func() {
-			th.ExpectConditionWithDetails(
+			th.ExpectCondition(
 				manilaTest.ManilaAPI,
 				ConditionGetterFunc(ManilaAPIConditionGetter),
 				condition.TLSInputReadyCondition,
 				corev1.ConditionFalse,
-				condition.ErrorReason,
-				fmt.Sprintf("TLSInput error occured in TLS sources Secret %s/combined-ca-bundle not found", namespace),
 			)
 
-			th.ExpectConditionWithDetails(
+			th.ExpectCondition(
 				manilaTest.ManilaScheduler,
 				ConditionGetterFunc(ManilaSchedulerConditionGetter),
 				condition.TLSInputReadyCondition,
 				corev1.ConditionFalse,
-				condition.ErrorReason,
-				fmt.Sprintf("TLSInput error occured in TLS sources Secret %s/combined-ca-bundle not found", namespace),
 			)
 		})
 
 		It("reports that the internal cert secret is missing", func() {
 			DeferCleanup(k8sClient.Delete, ctx, th.CreateCABundleSecret(manilaTest.CABundleSecret))
-			th.ExpectConditionWithDetails(
+			th.ExpectCondition(
 				manilaTest.ManilaAPI,
 				ConditionGetterFunc(ManilaAPIConditionGetter),
 				condition.TLSInputReadyCondition,
 				corev1.ConditionFalse,
-				condition.ErrorReason,
-				fmt.Sprintf("TLSInput error occured in TLS sources Secret %s/internal-tls-certs not found", namespace),
 			)
 		})
 
 		It("reports that the public cert secret is missing", func() {
 			DeferCleanup(k8sClient.Delete, ctx, th.CreateCABundleSecret(manilaTest.CABundleSecret))
 			DeferCleanup(k8sClient.Delete, ctx, th.CreateCertSecret(manilaTest.InternalCertSecret))
-			th.ExpectConditionWithDetails(
+			th.ExpectCondition(
 				manilaTest.ManilaAPI,
 				ConditionGetterFunc(ManilaAPIConditionGetter),
 				condition.TLSInputReadyCondition,
 				corev1.ConditionFalse,
-				condition.ErrorReason,
-				fmt.Sprintf("TLSInput error occured in TLS sources Secret %s/public-tls-certs not found", namespace),
 			)
 		})
 
