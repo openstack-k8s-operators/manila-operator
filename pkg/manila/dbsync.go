@@ -8,11 +8,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	//DBSyncCommand -
-	DBSyncCommand = "/usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start"
-)
-
 // DbSyncJob func
 func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations map[string]string) *batchv1.Job {
 	var config0644AccessMode int32 = 0644
@@ -75,7 +70,6 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 		dbSyncMounts = append(dbSyncMounts, instance.Spec.ManilaAPI.TLS.CreateVolumeMounts(nil)...)
 	}
 
-	runAsUser := int64(0)
 	envVars := map[string]env.Setter{}
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["KOLLA_BOOTSTRAP"] = env.SetValue("TRUE")
@@ -100,13 +94,11 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 							Command: []string{
 								"/bin/bash",
 							},
-							Args:  args,
-							Image: instance.Spec.ManilaAPI.ContainerImage,
-							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &runAsUser,
-							},
-							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts: dbSyncMounts,
+							Args:            args,
+							Image:           instance.Spec.ManilaAPI.ContainerImage,
+							SecurityContext: manilaDefaultSecurityContext(),
+							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:    dbSyncMounts,
 						},
 					},
 					Volumes: dbSyncVolume,

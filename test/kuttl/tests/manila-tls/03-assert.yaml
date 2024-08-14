@@ -264,7 +264,7 @@ spec:
         - --
         - /bin/bash
         - -c
-        - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        - /usr/local/bin/kolla_start
         command:
         - /usr/bin/dumb-init
         volumeMounts:
@@ -365,7 +365,7 @@ spec:
         - --
         - /bin/bash
         - -c
-        - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        - /usr/local/bin/kolla_start
         command:
         - /usr/bin/dumb-init
         volumeMounts:
@@ -488,7 +488,7 @@ spec:
         - --
         - /bin/bash
         - -c
-        - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        - /usr/local/bin/kolla_start
         command:
         - /usr/bin/dumb-init
         volumeMounts:

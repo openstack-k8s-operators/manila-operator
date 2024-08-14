@@ -112,7 +112,7 @@ func CronJob(
 									},
 									Args:            args,
 									VolumeMounts:    cronJobVolumeMounts,
-									SecurityContext: GetManilaSecurityContext(),
+									SecurityContext: manilaDefaultSecurityContext(),
 								},
 							},
 							Volumes:            cronJobVolume,

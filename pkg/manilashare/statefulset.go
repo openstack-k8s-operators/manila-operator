@@ -25,7 +25,7 @@ import (
 
 const (
 	// ServiceCommand -
-	ServiceCommand = "/usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start"
+	ServiceCommand = "/usr/local/bin/kolla_start"
 )
 
 // StatefulSet func
@@ -36,11 +36,9 @@ func StatefulSet(
 	annotations map[string]string,
 ) *appsv1.StatefulSet {
 	trueVar := true
-	rootUser := int64(0)
-	// Manila's uid and gid magic numbers come from the 'manila-user' in
-	// https://github.com/openstack/kolla/blob/master/kolla/common/users.py
-	manilaUser := int64(42429)
-	manilaGroup := int64(42429)
+
+	manilaUser := manila.ManilaUserID
+	manilaGroup := manila.ManilaGroupID
 
 	// TODO until we determine how to properly query for these
 	livenessProbe := &corev1.Probe{
@@ -129,7 +127,7 @@ func StatefulSet(
 							},
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser:  &rootUser,
+								RunAsUser:  &manilaUser,
 								Privileged: &trueVar,
 							},
 							Env:           env.MergeEnvs([]corev1.EnvVar{}, envVars),

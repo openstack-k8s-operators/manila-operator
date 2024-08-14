@@ -27,7 +27,7 @@ import (
 
 const (
 	// ServiceCommand -
-	ServiceCommand = "/usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start"
+	ServiceCommand = "/usr/local/bin/kolla_start"
 )
 
 // StatefulSet func
@@ -37,7 +37,7 @@ func StatefulSet(
 	labels map[string]string,
 	annotations map[string]string,
 ) (*appsv1.StatefulSet, error) {
-	runAsUser := int64(0)
+	manilaUser := manila.ManilaUserID
 
 	livenessProbe := &corev1.Probe{
 		TimeoutSeconds:      10,
@@ -134,7 +134,7 @@ func StatefulSet(
 							},
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &runAsUser,
+								RunAsUser: &manilaUser,
 							},
 							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts: []corev1.VolumeMount{GetLogVolumeMount()},
@@ -154,7 +154,7 @@ func StatefulSet(
 							},
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &runAsUser,
+								RunAsUser: &manilaUser,
 							},
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:   volumeMounts,
