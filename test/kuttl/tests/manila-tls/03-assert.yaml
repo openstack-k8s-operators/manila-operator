@@ -23,10 +23,8 @@ spec:
       - share0
       volumes:
       - name: ceph
-        projected:
-          sources:
-          - secret:
-              name: ceph-conf-files
+        secret:
+          secretName: ceph-conf-files
     name: v1
     region: r1
   manilaAPI:
@@ -450,10 +448,8 @@ spec:
           secret:
             secretName: manila-config-data
         - name: ceph
-          projected:
-            sources:
-            - secret:
-                name: ceph-conf-files
+          secret:
+            secretName: ceph-conf-files
         - name: var-lib-manila
           hostPath:
             path: /var/lib/manila
