@@ -19,13 +19,13 @@ func GetOwningManilaName(instance client.Object) string {
 	return ""
 }
 
-// GetManilaSecurityContext - Returns the right set of SecurityContext that
+// manilaDefaultSecurityContext - Returns the right set of SecurityContext that
 // does not violate the k8s requirements
-func GetManilaSecurityContext() *corev1.SecurityContext {
+func manilaDefaultSecurityContext() *corev1.SecurityContext {
 	falseVal := false
 	trueVal := true
-	runAsUser := int64(42429)
-	runAsGroup := int64(42429)
+	runAsUser := ManilaUserID
+	runAsGroup := ManilaGroupID
 	return &corev1.SecurityContext{
 		RunAsUser:                &runAsUser,
 		RunAsGroup:               &runAsGroup,

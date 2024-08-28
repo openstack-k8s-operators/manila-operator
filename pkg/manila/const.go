@@ -36,6 +36,14 @@ const (
 	// is to be generated, e.g. "manila_e5a4", "manila_78bc", etc
 	DatabaseUsernamePrefix = "manila"
 
+	// Manila's uid and gid magic numbers come from the 'manila-user' in
+	// https://github.com/openstack/kolla/blob/master/kolla/common/users.py
+
+	// ManilaUserID -
+	ManilaUserID int64 = 42429
+	// ManilaGroupID -
+	ManilaGroupID int64 = 42429
+
 	// ManilaPublicPort -
 	ManilaPublicPort int32 = 8786
 	// ManilaInternalPort -
@@ -71,6 +79,8 @@ const (
 	ShortDuration = time.Duration(5) * time.Second
 	// NormalDuration -
 	NormalDuration = time.Duration(10) * time.Second
+	//DBSyncCommand -
+	DBSyncCommand = "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d db sync"
 )
 
 // DbsyncPropagation keeps track of the DBSync Service Propagation Type

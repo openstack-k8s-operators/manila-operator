@@ -1,3 +1,0 @@
-{
-  "command": "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d db sync"
-}
