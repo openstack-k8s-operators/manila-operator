@@ -638,31 +638,49 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
-	ctrlResult, err := r.getSecret(ctx, helper, instance, instance.Spec.TransportURLSecret, &configVars)
-	if err != nil {
+
+	ctrlResult, err := getServiceSecret(
+		ctx,
+		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
+		[]string{
+			instance.Spec.PasswordSelectors.Service,
+		},
+		helper.GetClient(),
+		&instance.Status.Conditions,
+		manila.NormalDuration,
+		&configVars,
+	)
+	if (err != nil || ctrlResult != ctrl.Result{}) {
 		return ctrlResult, err
 	}
 
 	//
+	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
+	//
+
+	ctrlResult, err = getConfigSecret(ctx, helper, &instance.Status.Conditions, instance.Spec.TransportURLSecret, instance.Namespace, &configVars)
+	if (err != nil || ctrlResult != ctrl.Result{}) {
+		return ctrlResult, err
+	}
+	//
 	// check for required service secrets
 	//
 	for _, secretName := range instance.Spec.CustomServiceConfigSecrets {
-		ctrlResult, err = r.getSecret(ctx, helper, instance, secretName, &configVars)
-		if err != nil {
+		ctrlResult, err = getConfigSecret(ctx, helper, &instance.Status.Conditions, secretName, instance.Namespace, &configVars)
+		if (err != nil || ctrlResult != ctrl.Result{}) {
 			return ctrlResult, err
 		}
 	}
 
 	parentManilaName := manila.GetOwningManilaName(instance)
-
 	parentSecrets := []string{
 		fmt.Sprintf("%s-scripts", parentManilaName),     // ScriptsSecret
 		fmt.Sprintf("%s-config-data", parentManilaName), // ConfigSecret
 	}
 
 	for _, parentSecret := range parentSecrets {
-		ctrlResult, err = r.getSecret(ctx, helper, instance, parentSecret, &configVars)
-		if err != nil {
+		ctrlResult, err = getConfigSecret(ctx, helper, &instance.Status.Conditions, parentSecret, instance.Namespace, &configVars)
+		if (err != nil || ctrlResult != ctrl.Result{}) {
 			return ctrlResult, err
 		}
 	}
@@ -921,41 +939,6 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	if instance.IsReady() {
 		instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
 	}
-	return ctrl.Result{}, nil
-}
-
-// getSecret - get the specified secret, and add its hash to envVars
-func (r *ManilaAPIReconciler) getSecret(
-	ctx context.Context,
-	h *helper.Helper,
-	instance *manilav1beta1.ManilaAPI,
-	secretName string,
-	envVars *map[string]env.Setter,
-) (ctrl.Result, error) {
-	secret, hash, err := secret.GetSecret(ctx, h, secretName, instance.Namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			r.Log.Info(fmt.Sprintf("Secret %s not found", secretName))
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return manila.ResultRequeue, nil
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-
-	// Add a prefix to the var name to avoid accidental collision with other non-secret
-	// vars. The secret names themselves will be unique.
-	(*envVars)["secret-"+secret.Name] = env.SetValue(hash)
-
 	return ctrl.Result{}, nil
 }
 
