@@ -323,7 +323,7 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
-	ctrlResult, err := getServiceSecret(
+	ctrlResult, err := verifyServiceSecret(
 		ctx,
 		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
 		[]string{
@@ -344,32 +344,26 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	// check for required TransportURL secret holding transport URL string
 	//
 
-	ctrlResult, err = getConfigSecret(ctx, helper, &instance.Status.Conditions, instance.Spec.TransportURLSecret, instance.Namespace, &configVars)
+	parentManilaName := manila.GetOwningManilaName(instance)
+	secretNames := []string{
+		instance.Spec.TransportURLSecret,                // TransportURLSecret
+		fmt.Sprintf("%s-scripts", parentManilaName),     // ScriptsSecret
+		fmt.Sprintf("%s-config-data", parentManilaName), // ConfigSecret
+	}
+
+	// Append CustomServiceConfigSecrets that should be checked
+	secretNames = append(secretNames, instance.Spec.CustomServiceConfigSecrets...)
+
+	ctrlResult, err = verifyConfigSecrets(
+		ctx,
+		helper,
+		&instance.Status.Conditions,
+		secretNames,
+		instance.Namespace,
+		&configVars,
+	)
 	if (err != nil || ctrlResult != ctrl.Result{}) {
 		return ctrlResult, err
-	}
-
-	//
-	// check for required service secrets
-	//
-	for _, secretName := range instance.Spec.CustomServiceConfigSecrets {
-		ctrlResult, err = getConfigSecret(ctx, helper, &instance.Status.Conditions, secretName, instance.Namespace, &configVars)
-		if (err != nil || ctrlResult != ctrl.Result{}) {
-			return ctrlResult, err
-		}
-	}
-
-	parentManilaName := manila.GetOwningManilaName(instance)
-	parentSecrets := []string{
-		fmt.Sprintf("%s-scripts", parentManilaName),     // ScriptsSecret
-		fmt.Sprintf("%s-config-data", parentManilaName), // Secret used for ServiceConfig
-	}
-
-	for _, parentSecret := range parentSecrets {
-		ctrlResult, err = getConfigSecret(ctx, helper, &instance.Status.Conditions, parentSecret, instance.Namespace, &configVars)
-		if (err != nil || ctrlResult != ctrl.Result{}) {
-			return ctrlResult, err
-		}
 	}
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 

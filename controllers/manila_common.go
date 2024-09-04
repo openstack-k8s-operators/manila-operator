@@ -38,10 +38,10 @@ type conditionUpdater interface {
 	MarkTrue(t condition.Type, messageFormat string, messageArgs ...interface{})
 }
 
-// getServiceSecret - ensures that the Secret object exists and the expected
+// verifyServiceSecret - ensures that the Secret object exists and the expected
 // fields are in the Secret. It also sets a hash of the values of the expected
 // fields passed as input.
-func getServiceSecret(
+func verifyServiceSecret(
 	ctx context.Context,
 	secretName types.NamespacedName,
 	expectedFields []string,
@@ -73,38 +73,42 @@ func getServiceSecret(
 	return ctrl.Result{}, nil
 }
 
-// getConfigSecret - get the specified secret, and add its hash to envVars
-func getConfigSecret(
+// verifyConfigSecrets - It iterates over the secretNames passed as input and
+// sets the hash of values in the envVars map.
+func verifyConfigSecrets(
 	ctx context.Context,
 	h *helper.Helper,
 	conditionUpdater conditionUpdater,
-	secretName string,
+	secretNames []string,
 	namespace string,
 	envVars *map[string]env.Setter,
 ) (ctrl.Result, error) {
-	secret, hash, err := secret.GetSecret(ctx, h, secretName, namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			log.FromContext(ctx).Info(fmt.Sprintf("Secret %s not found", secretName))
+	var hash string
+	var err error
+	for _, secretName := range secretNames {
+		_, hash, err = secret.GetSecret(ctx, h, secretName, namespace)
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				log.FromContext(ctx).Info(fmt.Sprintf("Secret %s not found", secretName))
+				conditionUpdater.Set(condition.FalseCondition(
+					condition.InputReadyCondition,
+					condition.RequestedReason,
+					condition.SeverityInfo,
+					condition.InputReadyWaitingMessage))
+				return manila.ResultRequeue, nil
+			}
 			conditionUpdater.Set(condition.FalseCondition(
 				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return manila.ResultRequeue, nil
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.InputReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
 		}
-		conditionUpdater.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
+		// Add a prefix to the var name to avoid accidental collision with other non-secret
+		// vars. The secret names themselves will be unique.
+		(*envVars)["secret-"+secretName] = env.SetValue(hash)
 	}
-
-	// Add a prefix to the var name to avoid accidental collision with other non-secret
-	// vars. The secret names themselves will be unique.
-	(*envVars)["secret-"+secret.Name] = env.SetValue(hash)
 
 	return ctrl.Result{}, nil
 }

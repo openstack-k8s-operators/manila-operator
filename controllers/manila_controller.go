@@ -510,7 +510,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
 
-	result, err := getServiceSecret(
+	result, err := verifyServiceSecret(
 		ctx,
 		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
 		[]string{
