@@ -323,39 +323,48 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
-	ctrlResult, err := r.getSecret(ctx, helper, instance, instance.Spec.Secret, &configVars)
+
+	ctrlResult, err := verifyServiceSecret(
+		ctx,
+		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
+		[]string{
+			instance.Spec.PasswordSelectors.Service,
+		},
+		helper.GetClient(),
+		&instance.Status.Conditions,
+		manila.NormalDuration,
+		&configVars,
+	)
 	if err != nil {
 		return ctrlResult, err
-	}
-	//
-	// check for required TransportURL secret holding transport URL string
-	//
-	ctrlResult, err = r.getSecret(ctx, helper, instance, instance.Spec.TransportURLSecret, &configVars)
-	if err != nil {
-		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		return ctrlResult, nil
 	}
 
 	//
 	// check for required service secrets
 	//
-	for _, secretName := range instance.Spec.CustomServiceConfigSecrets {
-		ctrlResult, err = r.getSecret(ctx, helper, instance, secretName, &configVars)
-		if err != nil {
-			return ctrlResult, err
-		}
-	}
 
 	parentManilaName := manila.GetOwningManilaName(instance)
-	parentSecrets := []string{
-		fmt.Sprintf("%s-scripts", parentManilaName),     // ScriptsConfigMap
-		fmt.Sprintf("%s-config-data", parentManilaName), // ConfigMap
+	secretNames := []string{
+		instance.Spec.TransportURLSecret,                // TransportURLSecret
+		fmt.Sprintf("%s-scripts", parentManilaName),     // ScriptsSecret
+		fmt.Sprintf("%s-config-data", parentManilaName), // ConfigSecret
 	}
 
-	for _, parentSecret := range parentSecrets {
-		ctrlResult, err = r.getSecret(ctx, helper, instance, parentSecret, &configVars)
-		if err != nil {
-			return ctrlResult, err
-		}
+	// Append CustomServiceConfigSecrets that should be checked
+	secretNames = append(secretNames, instance.Spec.CustomServiceConfigSecrets...)
+
+	ctrlResult, err = verifyConfigSecrets(
+		ctx,
+		helper,
+		&instance.Status.Conditions,
+		secretNames,
+		instance.Namespace,
+		&configVars,
+	)
+	if (err != nil || ctrlResult != ctrl.Result{}) {
+		return ctrlResult, err
 	}
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
@@ -576,41 +585,6 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	if instance.IsReady() {
 		instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
 	}
-	return ctrl.Result{}, nil
-}
-
-// getSecret - get the specified secret, and add its hash to envVars
-func (r *ManilaSchedulerReconciler) getSecret(
-	ctx context.Context,
-	h *helper.Helper,
-	instance *manilav1beta1.ManilaScheduler,
-	secretName string,
-	envVars *map[string]env.Setter,
-) (ctrl.Result, error) {
-	secret, hash, err := secret.GetSecret(ctx, h, secretName, instance.Namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			r.Log.Info(fmt.Sprintf("Secret %s not found", secretName))
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return manila.ResultRequeue, nil
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-
-	// Add a prefix to the var name to avoid accidental collision with other non-secret
-	// vars. The secret names themselves will be unique.
-	(*envVars)["secret-"+secret.Name] = env.SetValue(hash)
-
 	return ctrl.Result{}, nil
 }
 
