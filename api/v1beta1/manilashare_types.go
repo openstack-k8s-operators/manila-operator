@@ -25,6 +25,11 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	// ShareNameLabel - Label used to identify the manila-share name / backend
+	ShareNameLabel = "share-name"
+)
+
 // ManilaShareTemplate defines the input parameter for the ManilaShare service
 type ManilaShareTemplate struct {
 
@@ -132,4 +137,10 @@ func init() {
 // IsReady - returns true if service is ready to serve requests
 func (instance ManilaShare) IsReady() bool {
 	return instance.Status.ReadyCount == *instance.Spec.Replicas
+}
+
+// ShareName - returns the name used to identify the ManilaShare
+func (instance ManilaShare) ShareName() string {
+	// The information is stored as a label
+	return instance.Labels[ShareNameLabel]
 }

@@ -406,8 +406,9 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	instance.Status.Conditions.MarkTrue(condition.TLSInputReadyCondition, condition.InputReadyMessage)
 
 	serviceLabels := map[string]string{
-		common.AppSelector:       manila.ServiceName,
-		common.ComponentSelector: manilashare.ComponentName,
+		common.AppSelector:           manila.ServiceName,
+		common.ComponentSelector:     manilashare.ComponentName,
+		manilav1beta1.ShareNameLabel: instance.ShareName(),
 	}
 	//
 	// create service Secrets for manila-share service

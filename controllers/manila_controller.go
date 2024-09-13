@@ -738,7 +738,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// Deploy ManilaShare
 	var shareCondition *condition.Condition
 	for name, share := range instance.Spec.ManilaShares {
-		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share)
+		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share, serviceLabels)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				manilav1beta1.ManilaShareReadyCondition,
@@ -1031,11 +1031,21 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila, name string, share manilav1beta1.ManilaShareTemplate) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
+	ctx context.Context,
+	instance *manilav1beta1.Manila,
+	name string,
+	share manilav1beta1.ManilaShareTemplate,
+	serviceLabels map[string]string,
+) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
+
+	// Add the ShareName to the ManilaShare instance as a label
+	serviceLabels[manilav1beta1.ShareNameLabel] = name
 	deployment := &manilav1beta1.ManilaShare{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-share-%s", instance.Name, name),
 			Namespace: instance.Namespace,
+			Labels:    serviceLabels,
 		},
 	}
 
