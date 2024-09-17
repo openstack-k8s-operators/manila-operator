@@ -714,7 +714,7 @@ var _ = Describe("Manila controller", func() {
 
 	mariadbSuite.RunBasicSuite()
 
-	mariadbSuite.RunURLAssertSuite(func(accountName types.NamespacedName, username string, password string) {
+	mariadbSuite.RunURLAssertSuite(func(_ types.NamespacedName, username string, password string) {
 		Eventually(func(g Gomega) {
 			secretDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
 

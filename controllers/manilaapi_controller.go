@@ -211,7 +211,7 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Watch for changes to any CustomServiceConfigSecrets. Global secrets
 	// (e.g. TransportURLSecret) are handled by the top Manila controller.
-	secretFn := func(ctx context.Context, o client.Object) []reconcile.Request {
+	secretFn := func(_ context.Context, o client.Object) []reconcile.Request {
 		var namespace string = o.GetNamespace()
 		var secretName string = o.GetName()
 		result := []reconcile.Request{}
