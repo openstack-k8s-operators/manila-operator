@@ -815,6 +815,11 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	instance.Status.Conditions.MarkTrue(condition.CronJobReadyCondition, condition.CronJobReadyMessage)
 	// create CronJob - end
 
+	err = r.shareCleanup(ctx, instance)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	// update the overall status condition if service is ready
 	if instance.IsReady() {
@@ -1242,4 +1247,38 @@ func (r *ManilaReconciler) checkManilaShareGeneration(
 		}
 	}
 	return true, nil
+}
+
+// shareCleanup - Delete manila share instances that no longer appears in the spec.
+func (r *ManilaReconciler) shareCleanup(
+	ctx context.Context,
+	instance *manilav1beta1.Manila,
+) error {
+	// Generate a list of share CRs
+	shares := &manilav1beta1.ManilaShareList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+	}
+	if err := r.Client.List(ctx, shares, listOpts...); err != nil {
+		r.Log.Error(err, "Unable to retrieve Manila Share CRs %v")
+		return nil
+	}
+	for _, share := range shares.Items {
+		// Skip shares CRs that we don't own
+		if manila.GetOwningManilaName(&share) != instance.Name {
+			continue
+		}
+
+		// Delete the manilaShare if it's no longer in the spec
+		_, exists := instance.Spec.ManilaShares[share.ShareName()]
+		if !exists && share.DeletionTimestamp.IsZero() {
+			err := r.Client.Delete(ctx, &share)
+			if err != nil && !k8s_errors.IsNotFound(err) {
+				err = fmt.Errorf("Error cleaning up %s: %w", share.Name, err)
+				return err
+			}
+			delete(instance.Status.ManilaSharesReadyCounts, share.ShareName())
+		}
+	}
+	return nil
 }

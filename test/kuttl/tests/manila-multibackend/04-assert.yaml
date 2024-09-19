@@ -1,3 +1,4 @@
+# Check for:
 #
 # - 1 manilaAPI
 # - 2 manilaScheduler
@@ -15,42 +16,29 @@ spec:
    databaseInstance: openstack
    databaseAccount: manila
    manilaAPI:
-       customServiceConfig: |
-          [DEFAULT]
-          enabled_share_protocols=nfs,cephfs,cifs
-       replicas: 1
-       resources: {}
+      customServiceConfig: |
+         [DEFAULT]
+         enabled_share_protocols=nfs,cephfs,cifs
+      replicas: 1
+      resources: {}
    manilaScheduler:
       customServiceConfig: '# add your customization here'
       replicas: 1
       resources: {}
    manilaShares:
-     share0:
-       customServiceConfig: |
-          [DEFAULT]
-          enabled_share_backends = cephfs
-          [cephfs]
-          driver_handles_share_servers=False
-          share_backend_name=cephfs
-          share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
-          cephfs_conf_path=/etc/ceph/ceph.conf
-          cephfs_auth_id=openstack
-          cephfs_cluster_name=ceph
-          cephfs_protocol_helper_type=CEPHFS
-       replicas: 1
-     share1:
-       customServiceConfig: |
-           [DEFAULT]
-           enabled_share_backends=cephfsnfs
-           [cephfsnfs]
-           driver_handles_share_servers=False
-           share_backend_name=cephfs
-           share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
-           cephfs_auth_id=openstack
-           cephfs_cluster_name=ceph
-           cephfs_nfs_cluster_id=cephfs
-           cephfs_protocol_helper_type=NFS
-       replicas: 0
+      share1:
+        replicas: 1
+        customServiceConfig: |
+            [DEFAULT]
+            enabled_share_backends=cephfsnfs
+            [cephfsnfs]
+            driver_handles_share_servers=False
+            share_backend_name=cephfs
+            share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+            cephfs_auth_id=openstack
+            cephfs_cluster_name=ceph
+            cephfs_nfs_cluster_id=cephfs
+            cephfs_protocol_helper_type=NFS
    passwordSelectors:
       service: ManilaPassword
    preserveJobs: false
@@ -126,8 +114,7 @@ status:
    manilaAPIReadyCount: 1
    manilaSchedulerReadyCount: 1
    manilaSharesReadyCounts:
-      share0: 1
-      share1: 0
+      share1: 1
    transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 ---
 apiVersion: batch/v1
@@ -172,7 +159,7 @@ spec:
 apiVersion: manila.openstack.org/v1beta1
 kind: ManilaShare
 metadata:
-  name: manila-share-share0
+  name: manila-share-share1
 spec:
   databaseAccount: manila
   passwordSelectors:
@@ -230,7 +217,7 @@ commands:
               SERVICE_IMAGE=$(oc get -n $NAMESPACE manilaapi manila-api -o go-template="$template")
               ;;
             SHARE)
-              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilashares manila-share-share0 -o go-template="$template")
+              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilashares manila-share-share1 -o go-template="$template")
               ;;
             SCHEDULER)
               SERVICE_IMAGE=$(oc get -n $NAMESPACE manilascheduler manila-scheduler -o go-template="$template")
