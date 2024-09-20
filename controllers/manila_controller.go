@@ -366,7 +366,13 @@ func (r *ManilaReconciler) reconcileInit(
 	// run manila db sync
 	//
 	dbSyncHash := instance.Status.Hash[manilav1beta1.DbSyncHash]
-	jobDef := manila.DbSyncJob(instance, serviceLabels, serviceAnnotations)
+	jobDef := manila.Job(
+		instance,
+		serviceLabels,
+		serviceAnnotations,
+		manila.DBSyncJobName,
+		manila.DBSyncCommand,
+	)
 	dbSyncjob := job.NewJob(
 		jobDef,
 		manilav1beta1.DbSyncHash,
@@ -815,11 +821,38 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	instance.Status.Conditions.MarkTrue(condition.CronJobReadyCondition, condition.CronJobReadyMessage)
 	// create CronJob - end
 
-	err = r.shareCleanup(ctx, instance)
+	cleanJob, err := r.shareCleanup(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
+	if cleanJob {
+		jobDef := manila.Job(
+			instance,
+			serviceLabels,
+			serviceAnnotations,
+			manila.SvcCleanupJobName,
+			manila.SvcCleanupCommand,
+		)
+		svcCleanupHash := instance.Status.Hash[manilav1beta1.SvcCleanupHash]
+		shareCleanupJob := job.NewJob(
+			jobDef,
+			manilav1beta1.SvcCleanupHash,
+			instance.Spec.PreserveJobs,
+			manila.ShortDuration,
+			svcCleanupHash,
+		)
+		ctrlResult, err := shareCleanupJob.DoJob(
+			ctx,
+			helper,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if (ctrlResult != ctrl.Result{}) {
+			return ctrlResult, nil
+		}
+	}
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	// update the overall status condition if service is ready
 	if instance.IsReady() {
@@ -1253,15 +1286,16 @@ func (r *ManilaReconciler) checkManilaShareGeneration(
 func (r *ManilaReconciler) shareCleanup(
 	ctx context.Context,
 	instance *manilav1beta1.Manila,
-) error {
+) (bool, error) {
 	// Generate a list of share CRs
 	shares := &manilav1beta1.ManilaShareList{}
+	cleanJob := false
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(ctx, shares, listOpts...); err != nil {
 		r.Log.Error(err, "Unable to retrieve Manila Share CRs %v")
-		return nil
+		return cleanJob, nil
 	}
 	for _, share := range shares.Items {
 		// Skip shares CRs that we don't own
@@ -1275,10 +1309,11 @@ func (r *ManilaReconciler) shareCleanup(
 			err := r.Client.Delete(ctx, &share)
 			if err != nil && !k8s_errors.IsNotFound(err) {
 				err = fmt.Errorf("Error cleaning up %s: %w", share.Name, err)
-				return err
+				return cleanJob, err
 			}
 			delete(instance.Status.ManilaSharesReadyCounts, share.ShareName())
+			cleanJob = true
 		}
 	}
-	return nil
+	return cleanJob, nil
 }

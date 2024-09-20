@@ -79,8 +79,14 @@ const (
 	ShortDuration = time.Duration(5) * time.Second
 	// NormalDuration -
 	NormalDuration = time.Duration(10) * time.Second
-	//DBSyncCommand -
+	// DBSyncJobName -
+	DBSyncJobName = "db-sync"
+	// DBSyncCommand -
 	DBSyncCommand = "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d db sync"
+	// SvcCleanupJobName -
+	SvcCleanupJobName = "service-cleanup"
+	// SvcCleanupCommand -
+	SvcCleanupCommand = "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d service cleanup"
 )
 
 // DbsyncPropagation keeps track of the DBSync Service Propagation Type
