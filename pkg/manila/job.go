@@ -1,6 +1,7 @@
 package manila
 
 import (
+	"fmt"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -8,18 +9,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// DbSyncJob func
-func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations map[string]string) *batchv1.Job {
+// ManilaJob func
+func Job(
+	instance *manilav1.Manila,
+	labels map[string]string,
+	annotations map[string]string,
+	jobName string,
+	jobCommand string,
+) *batchv1.Job {
 	var config0644AccessMode int32 = 0644
-
-	// Unlike the individual manila services, the DbSyncJob doesn't need a
-	// secret that contains all of the config snippets required by every
-	// service, The two snippet files that it does need (DefaultsConfigFileName
-	// and CustomConfigFileName) can be extracted from the top-level manila
-	// config-data secret.
-	dbSyncVolume := []corev1.Volume{
+	// Unlike the individual manila services, DbSyncJob or a Job executing a
+	// manila-manage command doesn't need a secret that contains all of the
+	// config snippets required by every service, The two snippet files that it
+	// does need (DefaultsConfigFileName and CustomConfigFileName) can be
+	// extracted from the top-level manila config-data secret.
+	manilaJobVolume := []corev1.Volume{
 		{
-			Name: "db-sync-config-data",
+			Name: "job-config-data",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					DefaultMode: &config0644AccessMode,
@@ -48,9 +54,9 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 		},
 	}
 
-	dbSyncMounts := []corev1.VolumeMount{
+	manilaJobMounts := []corev1.VolumeMount{
 		{
-			Name:      "db-sync-config-data",
+			Name:      "job-config-data",
 			MountPath: "/etc/manila/manila.conf.d",
 			ReadOnly:  true,
 		},
@@ -62,12 +68,12 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 		},
 	}
 
-	args := []string{"-c", DBSyncCommand}
+	args := []string{"-c", jobCommand}
 
 	// add CA cert if defined
 	if instance.Spec.ManilaAPI.TLS.CaBundleSecretName != "" {
-		dbSyncVolume = append(dbSyncVolume, instance.Spec.ManilaAPI.TLS.CreateVolume())
-		dbSyncMounts = append(dbSyncMounts, instance.Spec.ManilaAPI.TLS.CreateVolumeMounts(nil)...)
+		manilaJobVolume = append(manilaJobVolume, instance.Spec.ManilaAPI.TLS.CreateVolume())
+		manilaJobMounts = append(manilaJobMounts, instance.Spec.ManilaAPI.TLS.CreateVolumeMounts(nil)...)
 	}
 
 	envVars := map[string]env.Setter{}
@@ -76,7 +82,8 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-db-sync",
+			//Name:      instance.Name + "-db-sync",
+			Name:      fmt.Sprintf("%s-%s", instance.Name, jobName),
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
@@ -90,7 +97,7 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 					ServiceAccountName: instance.RbacResourceName(),
 					Containers: []corev1.Container{
 						{
-							Name: instance.Name + "-db-sync",
+							Name: fmt.Sprintf("%s-%s", instance.Name, jobName),
 							Command: []string{
 								"/bin/bash",
 							},
@@ -98,10 +105,10 @@ func DbSyncJob(instance *manilav1.Manila, labels map[string]string, annotations 
 							Image:           instance.Spec.ManilaAPI.ContainerImage,
 							SecurityContext: manilaDefaultSecurityContext(),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts:    dbSyncMounts,
+							VolumeMounts:    manilaJobMounts,
 						},
 					},
-					Volumes: dbSyncVolume,
+					Volumes: manilaJobVolume,
 				},
 			},
 		},
