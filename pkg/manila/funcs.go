@@ -3,6 +3,7 @@ package manila
 import (
 	common "github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,4 +55,13 @@ func GetPodAffinity(componentName string) *corev1.Affinity {
 		},
 		corev1.LabelHostname,
 	)
+}
+
+// sharesHash -
+func SharesListHash(shareNames []string) (string, error) {
+	hash, err := util.ObjectHash(shareNames)
+	if err != nil {
+		return hash, err
+	}
+	return hash, err
 }

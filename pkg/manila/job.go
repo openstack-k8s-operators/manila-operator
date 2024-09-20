@@ -14,6 +14,7 @@ func Job(
 	instance *manilav1.Manila,
 	labels map[string]string,
 	annotations map[string]string,
+	ttl *int32,
 	jobName string,
 	jobCommand string,
 ) *batchv1.Job {
@@ -82,7 +83,6 @@ func Job(
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			//Name:      instance.Name + "-db-sync",
 			Name:      fmt.Sprintf("%s-%s", instance.Name, jobName),
 			Namespace: instance.Namespace,
 			Labels:    labels,
@@ -113,6 +113,9 @@ func Job(
 			},
 		},
 	}
-
+	if ttl != nil {
+		// Setting TTL to delete the job after it has completed
+		job.Spec.TTLSecondsAfterFinished = ttl
+	}
 	return job
 }
