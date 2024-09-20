@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	"github.com/go-logr/logr"
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
@@ -370,6 +371,7 @@ func (r *ManilaReconciler) reconcileInit(
 		instance,
 		serviceLabels,
 		serviceAnnotations,
+		nil,
 		manila.DBSyncJobName,
 		manila.DBSyncCommand,
 	)
@@ -784,7 +786,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	instance.Status.Conditions.MarkTrue(condition.CronJobReadyCondition, condition.CronJobReadyMessage)
 	// create CronJob - end
 
-	cleanJob, err := r.shareCleanup(ctx, instance)
+	cleanJob, hash, err := r.shareCleanup(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -794,26 +796,23 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			instance,
 			serviceLabels,
 			serviceAnnotations,
-			manila.SvcCleanupJobName,
+			ptr.To(manila.TTL),
+			fmt.Sprintf("%s-%s", manila.SvcCleanupJobName, hash[:manila.TruncateHash]),
 			manila.SvcCleanupCommand,
 		)
-		svcCleanupHash := instance.Status.Hash[manilav1beta1.SvcCleanupHash]
 		shareCleanupJob := job.NewJob(
 			jobDef,
 			manilav1beta1.SvcCleanupHash,
-			instance.Spec.PreserveJobs,
+			false,
 			manila.ShortDuration,
-			svcCleanupHash,
+			"",
 		)
 		ctrlResult, err := shareCleanupJob.DoJob(
 			ctx,
 			helper,
 		)
 		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if (ctrlResult != ctrl.Result{}) {
-			return ctrlResult, nil
+			return ctrlResult, err
 		}
 	}
 	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
@@ -1249,34 +1248,40 @@ func (r *ManilaReconciler) checkManilaShareGeneration(
 func (r *ManilaReconciler) shareCleanup(
 	ctx context.Context,
 	instance *manilav1beta1.Manila,
-) (bool, error) {
+) (bool, string, error) {
+	cleanJob := false
+	var deletedShares = []string{}
 	// Generate a list of share CRs
 	shares := &manilav1beta1.ManilaShareList{}
-	cleanJob := false
+
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(ctx, shares, listOpts...); err != nil {
 		r.Log.Error(err, "Unable to retrieve Manila Share CRs %v")
-		return cleanJob, nil
+		return cleanJob, "", nil
 	}
 	for _, share := range shares.Items {
 		// Skip shares CRs that we don't own
 		if manila.GetOwningManilaName(&share) != instance.Name {
 			continue
 		}
-
 		// Delete the manilaShare if it's no longer in the spec
 		_, exists := instance.Spec.ManilaShares[share.ShareName()]
 		if !exists && share.DeletionTimestamp.IsZero() {
 			err := r.Client.Delete(ctx, &share)
 			if err != nil && !k8s_errors.IsNotFound(err) {
 				err = fmt.Errorf("Error cleaning up %s: %w", share.Name, err)
-				return cleanJob, err
+				return cleanJob, "", err
 			}
 			delete(instance.Status.ManilaSharesReadyCounts, share.ShareName())
+			deletedShares = append(deletedShares, share.ShareName())
 			cleanJob = true
 		}
 	}
-	return cleanJob, nil
+	hash, err := manila.SharesListHash(deletedShares)
+	if err != nil {
+		return false, hash, err
+	}
+	return cleanJob, hash, nil
 }

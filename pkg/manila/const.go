@@ -87,6 +87,10 @@ const (
 	SvcCleanupJobName = "service-cleanup"
 	// SvcCleanupCommand -
 	SvcCleanupCommand = "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d service cleanup"
+	// TruncateHash -
+	TruncateHash int = 8
+	// TTL -
+	TTL int32 = 5 * 60 // 5 minutes
 )
 
 // DbsyncPropagation keeps track of the DBSync Service Propagation Type
