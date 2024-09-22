@@ -55,10 +55,10 @@ var _ = Describe("Manila controller", func() {
 		})
 		It("initializes the status fields", func() {
 			Eventually(func(g Gomega) {
-				glance := GetManila(manilaName)
-				g.Expect(glance.Status.Conditions).To(HaveLen(14))
+				manila := GetManila(manilaName)
+				g.Expect(manila.Status.Conditions).To(HaveLen(14))
 
-				g.Expect(glance.Status.DatabaseHostname).To(Equal(""))
+				g.Expect(manila.Status.DatabaseHostname).To(Equal(""))
 			}, timeout*2, interval).Should(Succeed())
 		})
 		It("is not Ready", func() {
@@ -296,6 +296,26 @@ var _ = Describe("Manila controller", func() {
 		It("Assert Services are created", func() {
 			th.AssertServiceExists(manilaTest.ManilaServicePublic)
 			th.AssertServiceExists(manilaTest.ManilaServiceInternal)
+		})
+		It("configures DB Purge job", func() {
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				cron := GetCronJob(manilaTest.DBPurgeCronJob)
+				g.Expect(cron.Spec.Schedule).To(Equal(manila.Spec.DBPurge.Schedule))
+			}, timeout, interval).Should(Succeed())
+		})
+		It("update DB Purge job", func() {
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				manila.Spec.DBPurge.Schedule = "*/30 * * * *"
+				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				cron := GetCronJob(manilaTest.DBPurgeCronJob)
+				g.Expect(cron.Spec.Schedule).To(Equal(manila.Spec.DBPurge.Schedule))
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 	When("Manila CR instance is deleted", func() {
