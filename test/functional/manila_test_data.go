@@ -69,6 +69,7 @@ type ManilaTestData struct {
 	CABundleSecret              types.NamespacedName
 	InternalCertSecret          types.NamespacedName
 	PublicCertSecret            types.NamespacedName
+	DBPurgeCronJob              types.NamespacedName
 }
 
 // GetManilaTestData is a function that initialize the ManilaTestData
@@ -190,6 +191,10 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		PublicCertSecret: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      PublicCertSecretName,
+		},
+		DBPurgeCronJob: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      fmt.Sprintf("%s-db-purge", manilaName.Name),
 		},
 	}
 }
