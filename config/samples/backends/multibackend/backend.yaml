@@ -14,10 +14,8 @@ spec:
           debug = true
           enabled_share_protocols=nfs,cephfs,cifs
         replicas: 1
-        containerImage: quay.io/tripleozedcentos9/openstack-manila-api:current-tripleo
       manilaScheduler:
         replicas: 1
-        containerImage: quay.io/tripleozedcentos9/openstack-manila-scheduler:current-tripleo
       manilaShares:
         share1:
           networkAttachments:
@@ -33,7 +31,6 @@ spec:
               cephfs_cluster_name=ceph
               cephfs_nfs_cluster_id=cephfs
               cephfs_protocol_helper_type=NFS
-          containerImage: quay.io/tripleozedcentos9/openstack-manila-share:current-tripleo
           replicas: 1
         share2:
           networkAttachments:
@@ -52,7 +49,6 @@ spec:
               cephfs_ganesha_server_is_remote=False
               cephfs_volume_mode=0755
               cephfs_protocol_helper_type=CEPHFS
-          containerImage: quay.io/tripleozedcentos9/openstack-manila-share:current-tripleo
           replicas: 1
         share3:
           networkAttachments:
@@ -69,7 +65,6 @@ spec:
             netapp_transport_type=http
           customServiceConfigSecrets:
             - osp-secret-manila-netapp
-          containerImage: quay.io/tripleozedcentos9/openstack-manila-share:current-tripleo
           replicas: 1
   extraMounts:
     - name: v1
