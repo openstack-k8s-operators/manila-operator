@@ -26,6 +26,7 @@ import (
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,6 +37,56 @@ import (
 type conditionUpdater interface {
 	Set(c *condition.Condition)
 	MarkTrue(t condition.Type, messageFormat string, messageArgs ...interface{})
+}
+
+// ensureNAD - common function called in the Manila controllers that GetNAD based
+// on the string[] passed as input and produces the required Annotation for each
+// Manila component
+func ensureNAD(
+	ctx context.Context,
+	conditionUpdater conditionUpdater,
+	nAttach []string,
+	helper *helper.Helper,
+) (map[string]string, ctrl.Result, error) {
+
+	var serviceAnnotations map[string]string
+	var err error
+	// Iterate over the []networkattachment, get the corresponding NAD and create
+	// the required annotation
+	for _, netAtt := range nAttach {
+		_, err = nad.GetNADWithName(ctx, helper, netAtt, helper.GetBeforeObject().GetNamespace())
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				log.FromContext(ctx).Info(fmt.Sprintf("network-attachment-definition %s not found", netAtt))
+				conditionUpdater.Set(condition.FalseCondition(
+					condition.NetworkAttachmentsReadyCondition,
+					condition.RequestedReason,
+					condition.SeverityInfo,
+					condition.NetworkAttachmentsReadyWaitingMessage,
+					netAtt))
+				return serviceAnnotations, manila.ResultRequeue, nil
+			}
+			conditionUpdater.Set(condition.FalseCondition(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				err.Error()))
+			return serviceAnnotations, manila.ResultRequeue, nil
+		}
+	}
+	// Create NetworkAnnotations
+	serviceAnnotations, err = nad.CreateNetworksAnnotation(helper.GetBeforeObject().GetNamespace(), nAttach)
+	if err != nil {
+		err := fmt.Errorf("failed create network annotation from %s: %w", nAttach, err)
+		conditionUpdater.Set(condition.FalseCondition(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			err.Error()))
+	}
+	return serviceAnnotations, ctrl.Result{}, err
 }
 
 // verifyServiceSecret - ensures that the Secret object exists and the expected

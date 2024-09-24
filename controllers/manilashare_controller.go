@@ -334,10 +334,8 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 		manila.NormalDuration,
 		&configVars,
 	)
-	if err != nil {
+	if (err != nil || ctrlResult != ctrl.Result{}) {
 		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
 	}
 
 	//
@@ -450,44 +448,11 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	}
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
-	//
-	// TODO check when/if Init, Update, or Upgrade should/could be skipped
-	//
-
-	// networks to attach to
-	for _, netAtt := range instance.Spec.NetworkAttachments {
-		_, err := nad.GetNADWithName(ctx, helper, netAtt, instance.Namespace)
-		if err != nil {
-			if k8s_errors.IsNotFound(err) {
-				r.Log.Info(fmt.Sprintf("network-attachment-definition %s not found", netAtt))
-				instance.Status.Conditions.Set(condition.FalseCondition(
-					condition.NetworkAttachmentsReadyCondition,
-					condition.RequestedReason,
-					condition.SeverityInfo,
-					condition.NetworkAttachmentsReadyWaitingMessage,
-					netAtt))
-				return manila.ResultRequeue, nil
-			}
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.NetworkAttachmentsReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.NetworkAttachmentsReadyErrorMessage,
-				err.Error()))
-			return ctrl.Result{}, err
-		}
-	}
-
-	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
+	var serviceAnnotations map[string]string
+	// Ensure NAD annotations are generated
+	serviceAnnotations, ctrlResult, err = ensureNAD(ctx, &instance.Status.Conditions, instance.Spec.NetworkAttachments, helper)
 	if err != nil {
-		err := fmt.Errorf("failed create network annotation from %s: %w", instance.Spec.NetworkAttachments, err)
-		instance.Status.Conditions.MarkFalse(
-			condition.NetworkAttachmentsReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.NetworkAttachmentsReadyErrorMessage,
-			err)
-		return ctrl.Result{}, err
+		return ctrlResult, err
 	}
 
 	//
