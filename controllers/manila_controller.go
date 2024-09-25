@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/go-logr/logr"
@@ -246,7 +247,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// reconciliation for a Manila CR that does not need it.
 	//
 	// TODO: We also need a watch func to monitor for changes to the secret referenced by Manila.Spec.Secret
-	transportURLSecretFn := func(ctx context.Context, o client.Object) []reconcile.Request {
+	transportURLSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
 		result := []reconcile.Request{}
 
 		// get all Manila CRs
@@ -280,7 +281,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return nil
 	}
 
-	memcachedFn := func(ctx context.Context, o client.Object) []reconcile.Request {
+	memcachedFn := func(_ context.Context, o client.Object) []reconcile.Request {
 		result := []reconcile.Request{}
 
 		// get all Manila CRs
