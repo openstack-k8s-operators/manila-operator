@@ -34,7 +34,6 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
-	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	common_rbac "github.com/openstack-k8s-operators/lib-common/modules/common/rbac"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
@@ -511,7 +510,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
 
-	result, err := verifyServiceSecret(
+	ctrlResult, err := verifyServiceSecret(
 		ctx,
 		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
 		[]string{
@@ -522,10 +521,8 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		manila.NormalDuration,
 		&configVars,
 	)
-	if err != nil {
-		return result, err
-	} else if (result != ctrl.Result{}) {
-		return result, nil
+	if (err != nil || ctrlResult != ctrl.Result{}) {
+		return ctrlResult, nil
 	}
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 	// run check OpenStack secret - end
@@ -592,51 +589,16 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
-	//
-	// TODO check when/if Init, Update, or Upgrade should/could be skipped
-	//
-
-	// Check networks that the DBSync job will use in reconcileInit. The ones from the API service are always enough,
-	// it doesn't need the storage specific ones that manila-share may have.
-	for _, netAtt := range instance.Spec.ManilaAPI.NetworkAttachments {
-		_, err := nad.GetNADWithName(ctx, helper, netAtt, instance.Namespace)
-		if err != nil {
-			if k8s_errors.IsNotFound(err) {
-				r.Log.Info(fmt.Sprintf("network-attachment-definition %s not found", netAtt))
-				instance.Status.Conditions.Set(condition.FalseCondition(
-					condition.NetworkAttachmentsReadyCondition,
-					condition.RequestedReason,
-					condition.SeverityInfo,
-					condition.NetworkAttachmentsReadyWaitingMessage,
-					netAtt))
-				return manila.ResultRequeue, nil
-			}
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.NetworkAttachmentsReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.NetworkAttachmentsReadyErrorMessage,
-				err.Error()))
-			return ctrl.Result{}, err
-		}
-	}
-
-	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.ManilaAPI.NetworkAttachments)
+	var serviceAnnotations map[string]string
+	// Ensure NAD annotations are generated
+	serviceAnnotations, ctrlResult, err = ensureNAD(ctx, &instance.Status.Conditions, instance.Spec.ManilaAPI.NetworkAttachments, helper)
 	if err != nil {
-		err := fmt.Errorf("failed create network annotation from %s: %w",
-			instance.Spec.ManilaAPI.NetworkAttachments, err)
-		instance.Status.Conditions.MarkFalse(
-			condition.NetworkAttachmentsReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.NetworkAttachmentsReadyErrorMessage,
-			err.Error())
-		return ctrl.Result{}, err
+		return ctrlResult, err
 	}
 	instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 
 	// Handle service init
-	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels, serviceAnnotations)
+	ctrlResult, err = r.reconcileInit(ctx, instance, helper, serviceLabels, serviceAnnotations)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {

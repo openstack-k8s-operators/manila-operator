@@ -248,12 +248,12 @@ func (spec *ManilaSpecCore) SetDefaultRouteAnnotations(annotations map[string]st
 	valHAProxy, okHAProxy := annotations[haProxyAnno]
 
 	// Human operator set the HAProxy timeout manually
-	if (!okManila && okHAProxy) {
+	if !okManila && okHAProxy {
 		return
 	}
 
 	// Human operator modified the HAProxy timeout manually without removing the Manila flag
-	if (okManila && okHAProxy && valManila != valHAProxy) {
+	if okManila && okHAProxy && valManila != valHAProxy {
 		delete(annotations, manilaAnno)
 		return
 	}
