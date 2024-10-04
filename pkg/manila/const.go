@@ -43,12 +43,13 @@ const (
 	ManilaUserID int64 = 42429
 	// ManilaGroupID -
 	ManilaGroupID int64 = 42429
-
 	// ManilaPublicPort -
 	ManilaPublicPort int32 = 8786
 	// ManilaInternalPort -
 	ManilaInternalPort int32 = 8786
-
+	// ManilaServiceCleanupDelay - Time in seconds that the ServiceCleanupJob
+	// needs to wait before executing the manila-manage command
+	ManilaServiceCleanupDelay int32 = 120
 	// ManilaExtraVolTypeUndefined can be used to label an extraMount which
 	// is not associated with a specific backend
 	ManilaExtraVolTypeUndefined storage.ExtraVolType = "Undefined"

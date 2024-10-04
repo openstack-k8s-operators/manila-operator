@@ -17,6 +17,7 @@ func Job(
 	ttl *int32,
 	jobName string,
 	jobCommand string,
+	delay int32,
 ) *batchv1.Job {
 	var config0644AccessMode int32 = 0644
 	// Unlike the individual manila services, DbSyncJob or a Job executing a
@@ -69,7 +70,8 @@ func Job(
 		},
 	}
 
-	args := []string{"-c", jobCommand}
+	delayCommand := fmt.Sprintf("sleep %d", delay)
+	args := []string{"-c", fmt.Sprintf("%s && %s", delayCommand, jobCommand)}
 
 	// add CA cert if defined
 	if instance.Spec.ManilaAPI.TLS.CaBundleSecretName != "" {

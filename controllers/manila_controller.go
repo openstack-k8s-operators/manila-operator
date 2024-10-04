@@ -374,6 +374,7 @@ func (r *ManilaReconciler) reconcileInit(
 		nil,
 		manila.DBSyncJobName,
 		manila.DBSyncCommand,
+		0, // no need to delay dbSync
 	)
 	dbSyncjob := job.NewJob(
 		jobDef,
@@ -799,6 +800,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			ptr.To(manila.TTL),
 			fmt.Sprintf("%s-%s", manila.SvcCleanupJobName, hash[:manila.TruncateHash]),
 			manila.SvcCleanupCommand,
+			manila.ManilaServiceCleanupDelay,
 		)
 		shareCleanupJob := job.NewJob(
 			jobDef,
