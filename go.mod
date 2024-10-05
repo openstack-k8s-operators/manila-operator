@@ -12,7 +12,7 @@ require (
 	github.com/openstack-k8s-operators/lib-common/modules/storage v0.4.1-0.20240926101719-8fc1c3da53f7
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.4.1-0.20240926101719-8fc1c3da53f7
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.4.1-0.20240927143624-61d230f582d6
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.4.1-0.20241003090345-178862fb12c3
 	k8s.io/api v0.29.9
 	k8s.io/apimachinery v0.29.9
 	k8s.io/client-go v0.29.9
