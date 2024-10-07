@@ -25,7 +25,8 @@ import (
 const (
 	// DbSyncHash hash
 	DbSyncHash = "dbsync"
-
+	// SvcCleanupHash hash
+	SvcCleanupHash = "servicecleanup"
 	// DeploymentHash hash used to detect changes
 	DeploymentHash = "deployment"
 )

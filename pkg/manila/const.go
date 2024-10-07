@@ -43,12 +43,13 @@ const (
 	ManilaUserID int64 = 42429
 	// ManilaGroupID -
 	ManilaGroupID int64 = 42429
-
 	// ManilaPublicPort -
 	ManilaPublicPort int32 = 8786
 	// ManilaInternalPort -
 	ManilaInternalPort int32 = 8786
-
+	// ManilaServiceCleanupDelay - Time in seconds that the ServiceCleanupJob
+	// needs to wait before executing the manila-manage command
+	ManilaServiceCleanupDelay int32 = 120
 	// ManilaExtraVolTypeUndefined can be used to label an extraMount which
 	// is not associated with a specific backend
 	ManilaExtraVolTypeUndefined storage.ExtraVolType = "Undefined"
@@ -79,8 +80,18 @@ const (
 	ShortDuration = time.Duration(5) * time.Second
 	// NormalDuration -
 	NormalDuration = time.Duration(10) * time.Second
-	//DBSyncCommand -
+	// DBSyncJobName -
+	DBSyncJobName = "db-sync"
+	// DBSyncCommand -
 	DBSyncCommand = "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d db sync"
+	// SvcCleanupJobName -
+	SvcCleanupJobName = "service-cleanup"
+	// SvcCleanupCommand -
+	SvcCleanupCommand = "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d service cleanup"
+	// TruncateHash -
+	TruncateHash int = 8
+	// TTL -
+	TTL int32 = 5 * 60 // 5 minutes
 )
 
 // DbsyncPropagation keeps track of the DBSync Service Propagation Type
