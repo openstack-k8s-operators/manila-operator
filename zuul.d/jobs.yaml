@@ -3,6 +3,8 @@
     name: manila-operator-kuttl
     parent: cifmw-base-multinode-kuttl
     attempts: 1
+    required-projects:
+      - github.com/openstack-k8s-operators/manila-operator
     vars:
       cifmw_kuttl_tests_env_vars:
         CEPH_HOSTNETWORK: true
