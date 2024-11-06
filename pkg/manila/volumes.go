@@ -48,12 +48,6 @@ func GetVolumes(name string, extraVol []manilav1.ManilaExtraVolMounts, svc []sto
 				},
 			},
 		},
-		/*{
-			Name: "config-data-merged",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""},
-			},
-		},*/
 	}
 
 	for _, exv := range extraVol {
