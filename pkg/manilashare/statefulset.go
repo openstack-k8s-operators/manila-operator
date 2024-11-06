@@ -81,11 +81,13 @@ func StatefulSet(
 	volumes := GetVolumes(
 		manila.GetOwningManilaName(instance),
 		instance.Name,
-		instance.Spec.ExtraMounts)
+		instance.Spec.ExtraMounts,
+		instance.ShareName(),
+	)
 
 	volumeMounts := GetVolumeMounts(
-		instance.Name,
 		instance.Spec.ExtraMounts,
+		instance.ShareName(),
 	)
 
 	// Add the CA bundle
