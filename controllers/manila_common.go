@@ -19,11 +19,13 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"k8s.io/apimachinery/pkg/types"
-	"time"
 
+	networkv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
@@ -53,8 +55,9 @@ func ensureNAD(
 	var err error
 	// Iterate over the []networkattachment, get the corresponding NAD and create
 	// the required annotation
+	nadList := []networkv1.NetworkAttachmentDefinition{}
 	for _, netAtt := range nAttach {
-		_, err = nad.GetNADWithName(ctx, helper, netAtt, helper.GetBeforeObject().GetNamespace())
+		nad, err := nad.GetNADWithName(ctx, helper, netAtt, helper.GetBeforeObject().GetNamespace())
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
 				log.FromContext(ctx).Info(fmt.Sprintf("network-attachment-definition %s not found", netAtt))
@@ -74,9 +77,13 @@ func ensureNAD(
 				err.Error()))
 			return serviceAnnotations, manila.ResultRequeue, nil
 		}
+
+		if nad != nil {
+			nadList = append(nadList, *nad)
+		}
 	}
 	// Create NetworkAnnotations
-	serviceAnnotations, err = nad.CreateNetworksAnnotation(helper.GetBeforeObject().GetNamespace(), nAttach)
+	serviceAnnotations, err = nad.EnsureNetworksAnnotation(nadList)
 	if err != nil {
 		err := fmt.Errorf("failed create network annotation from %s: %w", nAttach, err)
 		conditionUpdater.Set(condition.FalseCondition(
