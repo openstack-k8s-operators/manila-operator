@@ -665,6 +665,198 @@ var _ = Describe("Manila controller", func() {
 		})
 	})
 
+	When("A Manila is created with nodeSelector", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["nodeSelector"] = map[string]interface{}{
+				"foo": "bar",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaName).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaShares[0])
+		})
+
+		It("sets nodeSelector in resource specs", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("updates nodeSelector in resource specs when changed", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaName)
+				newNodeSelector := map[string]string{
+					"foo2": "bar2",
+				}
+				manila.Spec.NodeSelector = &newNodeSelector
+				g.Expect(k8sClient.Update(ctx, manila)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo2": "bar2"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo2": "bar2"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo2": "bar2"}))
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo2": "bar2"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo2": "bar2"}))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("removes nodeSelector from resource specs when cleared", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaName)
+				emptyNodeSelector := map[string]string{}
+				manila.Spec.NodeSelector = &emptyNodeSelector
+				g.Expect(k8sClient.Update(ctx, manila)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(BeNil())
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("removes nodeSelector from resource specs when nilled", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaName)
+				manila.Spec.NodeSelector = nil
+				g.Expect(k8sClient.Update(ctx, manila)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(BeNil())
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("allows nodeSelector service override", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaName)
+				apiNodeSelector := map[string]string{
+					"foo": "api",
+				}
+				manila.Spec.ManilaAPI.NodeSelector = &apiNodeSelector
+				schedulerNodeSelector := map[string]string{
+					"foo": "scheduler",
+				}
+				manila.Spec.ManilaScheduler.NodeSelector = &schedulerNodeSelector
+				shareNodeSelector := map[string]string{
+					"foo": "share",
+				}
+				share := manila.Spec.ManilaShares["share0"]
+				share.NodeSelector = &shareNodeSelector
+				manila.Spec.ManilaShares["share0"] = share
+				g.Expect(k8sClient.Update(ctx, manila)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "api"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "scheduler"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "share"}))
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("allows nodeSelector service override to empty", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaName)
+				apiNodeSelector := map[string]string{}
+				manila.Spec.ManilaAPI.NodeSelector = &apiNodeSelector
+				schedulerNodeSelector := map[string]string{}
+				manila.Spec.ManilaScheduler.NodeSelector = &schedulerNodeSelector
+				shareNodeSelector := map[string]string{}
+				share := manila.Spec.ManilaShares["share0"]
+				share.NodeSelector = &shareNodeSelector
+				manila.Spec.ManilaShares["share0"] = share
+				g.Expect(k8sClient.Update(ctx, manila)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.NodeSelector).To(BeNil())
+				g.Expect(th.GetJob(manilaTest.ManilaDBSync).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+				g.Expect(GetCronJob(manilaTest.DBPurgeCronJob).Spec.JobTemplate.Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 	// Run MariaDBAccount suite tests.  these are pre-packaged ginkgo tests
 	// that exercise standard account create / update patterns that should be
 	// common to all controllers that ensure MariaDBAccount CRs.

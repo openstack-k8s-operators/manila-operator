@@ -73,7 +73,9 @@ func GetDefaultManilaSpec() map[string]interface{} {
 		"secret":           SecretName,
 		"manilaAPI":        GetDefaultManilaAPISpec(),
 		"manilaScheduler":  GetDefaultManilaSchedulerSpec(),
-		"manilaShare":      GetDefaultManilaShareSpec(),
+		"manilaShares": map[string]interface{}{
+			"share0": GetDefaultManilaShareSpec(),
+		},
 	}
 }
 
