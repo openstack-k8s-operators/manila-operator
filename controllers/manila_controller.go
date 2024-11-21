@@ -977,12 +977,13 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 		ServiceAccount:     instance.RbacResourceName(),
 	}
 
+	if apiSpec.NodeSelector == nil {
+		apiSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = apiSpec
 
-		if len(deployment.Spec.NodeSelector) == 0 {
-			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
-		}
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
@@ -1014,12 +1015,12 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context
 		TLS:                     instance.Spec.ManilaAPI.TLS.Ca,
 	}
 
+	if schedulerSpec.NodeSelector == nil {
+		schedulerSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = schedulerSpec
-
-		if len(deployment.Spec.NodeSelector) == 0 {
-			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
-		}
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
@@ -1061,12 +1062,12 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 		TLS:                 instance.Spec.ManilaAPI.TLS.Ca,
 	}
 
+	if shareSpec.NodeSelector == nil {
+		shareSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = shareSpec
-
-		if len(deployment.Spec.NodeSelector) == 0 {
-			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
-		}
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)

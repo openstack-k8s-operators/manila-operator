@@ -2,6 +2,7 @@ package manila
 
 import (
 	"fmt"
+
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -118,6 +119,9 @@ func Job(
 	if ttl != nil {
 		// Setting TTL to delete the job after it has completed
 		job.Spec.TTLSecondsAfterFinished = ttl
+	}
+	if instance.Spec.NodeSelector != nil {
+		job.Spec.Template.Spec.NodeSelector = *instance.Spec.NodeSelector
 	}
 	return job
 }
