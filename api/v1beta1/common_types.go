@@ -67,7 +67,7 @@ type ManilaServiceTemplate struct {
 	// +kubebuilder:validation:Optional
 	// NodeSelector to target subset of worker nodes running this service. Setting here overrides
 	// any global NodeSelector settings within the Manila CR.
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	NodeSelector *map[string]string `json:"nodeSelector,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="# add your customization here"
