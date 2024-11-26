@@ -3,13 +3,14 @@
     name: manila-operator-kuttl
     parent: cifmw-base-multinode-kuttl
     attempts: 1
+    required-projects:
+      - github.com/openstack-k8s-operators/manila-operator
     vars:
       cifmw_kuttl_tests_env_vars:
         CEPH_HOSTNETWORK: true
         CEPH_TIMEOUT: 90
         CEPH_DATASIZE: "2Gi"
         PV_NUM: 20
-        MANILA_IMG: "{{ content_provider_registry_ip }}:5001/podified-antelope-centos9/manila-operator-index:{{ cifmw_repo_setup_full_hash }}"
       cifmw_kuttl_tests_operator_list:
         - manila
 
