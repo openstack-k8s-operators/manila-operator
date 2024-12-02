@@ -6,13 +6,13 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/onsi/gomega v1.34.1
-	github.com/openstack-k8s-operators/infra-operator/apis v0.5.1-0.20241122093230-6821e16a4f22
-	github.com/openstack-k8s-operators/keystone-operator/api v0.5.1-0.20241122081244-322aab6fa1e8
+	github.com/openstack-k8s-operators/infra-operator/apis v0.5.1-0.20241128131522-70981ed1ed1a
+	github.com/openstack-k8s-operators/keystone-operator/api v0.5.1-0.20241128130137-80d688a88c19
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.5.1-0.20241114091812-6dc9fd0961dc
 	github.com/openstack-k8s-operators/lib-common/modules/storage v0.5.1-0.20241114091812-6dc9fd0961dc
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.5.1-0.20241114091812-6dc9fd0961dc
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.5.1-0.20241121162930-c6bef3ccad2a
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.5.1-0.20241128102736-6b2a89799960
 	k8s.io/api v0.29.10
 	k8s.io/apimachinery v0.29.10
 	k8s.io/client-go v0.29.10
