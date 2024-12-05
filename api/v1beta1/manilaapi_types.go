@@ -30,6 +30,19 @@ type ManilaAPITemplate struct {
 	// +kubebuilder:validation:Required
 	// ContainerImage - Manila API Container Image URL
 	ContainerImage string `json:"containerImage"`
+
+	// +kubebuilder:validation:Optional
+	// HttpdCustomization - customize the httpd service
+	HttpdCustomization HttpdCustomization `json:"httpdCustomization,omitempty"`
+}
+
+// HttpdCustomization -
+type HttpdCustomization struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=4
+	// +kubebuilder:validation:Minimum=1
+	// ProcessNumber - Number of processes running in ManilaAPI
+	ProcessNumber *int32 `json:"processNumber"`
 }
 
 // ManilaAPITemplateCore -

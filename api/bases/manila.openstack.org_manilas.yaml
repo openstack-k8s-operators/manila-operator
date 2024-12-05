@@ -558,6 +558,14 @@ spec:
                     items:
                       type: string
                     type: array
+                  httpdCustomization:
+                    properties:
+                      processNumber:
+                        default: 4
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    type: object
                   networkAttachments:
                     items:
                       type: string
