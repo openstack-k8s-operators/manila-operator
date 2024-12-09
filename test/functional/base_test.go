@@ -336,3 +336,37 @@ func GetCronJob(name types.NamespacedName) *batchv1.CronJob {
 	}, timeout, interval).Should(Succeed())
 	return cron
 }
+
+// GetExtraMounts - Utility function that simulates extraMounts pointing
+// to a Ceph secret
+func GetExtraMounts() []map[string]interface{} {
+	return []map[string]interface{}{
+		{
+			"name":   manilaTest.Instance.Name,
+			"region": "az0",
+			"extraVol": []map[string]interface{}{
+				{
+					"extraVolType": ManilaCephExtraMountsSecretName,
+					"propagation": []string{
+						"ManilaShare",
+					},
+					"volumes": []map[string]interface{}{
+						{
+							"name": ManilaCephExtraMountsSecretName,
+							"secret": map[string]interface{}{
+								"secretName": ManilaCephExtraMountsSecretName,
+							},
+						},
+					},
+					"mounts": []map[string]interface{}{
+						{
+							"name":      ManilaCephExtraMountsSecretName,
+							"mountPath": ManilaCephExtraMountsPath,
+							"readOnly":  true,
+						},
+					},
+				},
+			},
+		},
+	}
+}

@@ -33,6 +33,10 @@ const (
 	InternalCertSecretName = "internal-tls-certs"
 	//CABundleSecretName -
 	CABundleSecretName = "combined-ca-bundle"
+	// ManilaCephExtraMountsPath -
+	ManilaCephExtraMountsPath = "/etc/ceph"
+	// ManilaCephExtraMountsSecretName -
+	ManilaCephExtraMountsSecretName = "ceph"
 )
 
 // ManilaTestData is the data structure used to provide input data to envTest
