@@ -856,6 +856,80 @@ var _ = Describe("Manila controller", func() {
 			}, timeout, interval).Should(Succeed())
 		})
 	})
+	When("Manila CR instance is built with ExtraMounts", func() {
+		BeforeEach(func() {
+			rawSpec := map[string]interface{}{
+				"secret":              SecretName,
+				"databaseInstance":    "openstack",
+				"rabbitMqClusterName": "rabbitmq",
+				"extraMounts":         GetExtraMounts(),
+				"manilaAPI": map[string]interface{}{
+					"containerImage": manilav1.ManilaAPIContainerImage,
+				},
+				"manilaScheduler": map[string]interface{}{
+					"containerImage": manilav1.ManilaSchedulerContainerImage,
+				},
+				"manilaShares": map[string]interface{}{
+					"share0": map[string]interface{}{
+						"containerImage": manilav1.ManilaShareContainerImage,
+					},
+				},
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)
+			keystoneAPI.Status.APIEndpoints["internal"] = "http://keystone-internal-openstack.testing"
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+		})
+		It("Check the extraMounts of the resulting StatefulSets", func() {
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaShares[0])
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+			// Retrieve the generated resources
+			share := manilaTest.ManilaShares[0]
+			th.SimulateStatefulSetReplicaReady(share)
+			ss := th.GetStatefulSet(share)
+			// Check the resulting deployment fields
+			Expect(int(*ss.Spec.Replicas)).To(Equal(1))
+			Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(7))
+			Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
+			// Get the manila-share container
+			container := ss.Spec.Template.Spec.Containers[1]
+			// Fail if manila-share doesn't have the right number of
+			// VolumeMounts entries
+			Expect(container.VolumeMounts).To(HaveLen(9))
+			// Inspect VolumeMounts and make sure we have the Ceph MountPath
+			// provided through extraMounts
+			for _, vm := range container.VolumeMounts {
+				if vm.Name == "ceph" {
+					Expect(vm.MountPath).To(
+						ContainSubstring(ManilaCephExtraMountsPath))
+				}
+			}
+		})
+	})
 
 	// Run MariaDBAccount suite tests.  these are pre-packaged ginkgo tests
 	// that exercise standard account create / update patterns that should be
