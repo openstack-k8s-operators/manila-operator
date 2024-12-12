@@ -5,6 +5,15 @@
     attempts: 1
     required-projects:
       - github.com/openstack-k8s-operators/manila-operator
+    irrelevant-files: &ir_files
+      - .*/*.md
+      - ^\..*$
+      - ^LICENSE$
+      - ^OWNERS$
+      - ^OWNERS_ALIASES$
+      - ^PROJECT$
+      - ^README.md$
+      - tests?\/functional
     vars:
       cifmw_kuttl_tests_env_vars:
         CEPH_HOSTNETWORK: true
