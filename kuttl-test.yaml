@@ -16,8 +16,9 @@
 
 apiVersion: kuttl.dev/v1beta1
 kind: TestSuite
-reportFormat: XML
-reportName: kuttl-test-manila
+reportFormat: xml
+reportName: kuttl-report-manila
+reportGranularity: test
 namespace: manila-kuttl-tests
 timeout: 180
 parallel: 1
