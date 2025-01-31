@@ -665,6 +665,135 @@ var _ = Describe("Manila controller", func() {
 		})
 	})
 
+	When("Manila is created with topologyRef", func() {
+		BeforeEach(func() {
+			// Build the topology Spec
+			topologySpec := GetSampleTopologySpec()
+			// Create Test Topologies
+			for _, t := range manilaTest.ManilaTopologies {
+				CreateTopology(t, topologySpec)
+			}
+			spec := GetDefaultManilaSpec()
+			spec["topologyRef"] = map[string]interface{}{
+				"name": manilaTest.ManilaTopologies[0].Name,
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaName).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaShares[0])
+		})
+
+		It("sets topology in CR status", func() {
+			Eventually(func(g Gomega) {
+				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
+				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[0].Name))
+				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[0].Name))
+				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
+				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[0].Name))
+			}, timeout, interval).Should(Succeed())
+		})
+		It("sets Topology in resource specs", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.Affinity).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.Affinity).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.Affinity).To(BeNil())
+			}, timeout, interval).Should(Succeed())
+		})
+		It("updates topology when the reference changes", func() {
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				manila.Spec.TopologyRef.Name = manilaTest.ManilaTopologies[1].Name
+				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
+				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
+				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[1].Name))
+			}, timeout, interval).Should(Succeed())
+		})
+		It("overrides topology when the reference changes", func() {
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				//Patch ManilaAPI Spec
+				newAPI := GetManilaAPISpec(manilaTest.ManilaAPI)
+				newAPI.TopologyRef.Name = manilaTest.ManilaTopologies[1].Name
+				manila.Spec.ManilaAPI = newAPI
+				//Patch ManilaScheduler Spec
+				newSch := GetManilaSchedulerSpec(manilaTest.ManilaScheduler)
+				newSch.TopologyRef.Name = manilaTest.ManilaTopologies[2].Name
+				manila.Spec.ManilaScheduler = newSch
+				//Patch ManilaShare (share0) Spec
+				newSh := GetManilaShareSpec(manilaTest.ManilaShares[0])
+				newSh.TopologyRef.Name = manilaTest.ManilaTopologies[3].Name
+				manila.Spec.ManilaShares["share0"] = newSh
+				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
+				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[2].Name))
+				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
+				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[3].Name))
+			}, timeout, interval).Should(Succeed())
+		})
+		It("removes topologyRef from the spec", func() {
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				// Remove the TopologyRef from the existing Manila .Spec
+				manila.Spec.TopologyRef = nil
+				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
+				g.Expect(manilaAPI.Status.LastAppliedTopology).Should(BeEmpty())
+				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).Should(BeEmpty())
+				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
+				g.Expect(manilaShare.Status.LastAppliedTopology).Should(BeEmpty())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.TopologySpreadConstraints).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.Affinity).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.TopologySpreadConstraints).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.Affinity).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.TopologySpreadConstraints).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.Affinity).ToNot(BeNil())
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 	When("A Manila is created with nodeSelector", func() {
 		BeforeEach(func() {
 			spec := GetDefaultManilaSpec()
@@ -1052,6 +1181,33 @@ var _ = Describe("Manila Webhook", func() {
 			ContainSubstring(
 				"invalid: spec.manilaAPI.override.service[wrooong]: " +
 					"Invalid value: \"wrooong\": invalid endpoint type: wrooong"),
+		)
+	})
+
+	It("rejects a wrong TopologyRef on a different namespace", func() {
+		spec := GetDefaultManilaSpec()
+		// Reference a top-level topology
+		spec["topologyRef"] = map[string]interface{}{
+			"name":      manilaTest.ManilaTopologies[0].Name,
+			"namespace": "foo",
+		}
+		raw := map[string]interface{}{
+			"apiVersion": "manila.openstack.org/v1beta1",
+			"kind":       "Manila",
+			"metadata": map[string]interface{}{
+				"name":      manilaTest.Instance.Name,
+				"namespace": manilaTest.Instance.Namespace,
+			},
+			"spec": spec,
+		}
+
+		unstructuredObj := &unstructured.Unstructured{Object: raw}
+		_, err := controllerutil.CreateOrPatch(
+			th.Ctx, th.K8sClient, unstructuredObj, func() error { return nil })
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(
+			ContainSubstring(
+				"Invalid value: \"namespace\": Customizing namespace field is not supported"),
 		)
 	})
 })

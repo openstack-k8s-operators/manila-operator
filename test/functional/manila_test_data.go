@@ -74,6 +74,7 @@ type ManilaTestData struct {
 	InternalCertSecret          types.NamespacedName
 	PublicCertSecret            types.NamespacedName
 	DBPurgeCronJob              types.NamespacedName
+	ManilaTopologies            []types.NamespacedName
 }
 
 // GetManilaTestData is a function that initialize the ManilaTestData
@@ -199,6 +200,27 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		DBPurgeCronJob: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%s-db-purge", manilaName.Name),
+		},
+		// A set of topologies to Test how the reference is propagated to the
+		// resulting StatefulSets and if a potential override produces the
+		// expected values
+		ManilaTopologies: []types.NamespacedName{
+			{
+				Namespace: manilaName.Namespace,
+				Name:      fmt.Sprintf("%s-global-topology", manilaName.Name),
+			},
+			{
+				Namespace: manilaName.Namespace,
+				Name:      fmt.Sprintf("%s-api-topology", manilaName.Name),
+			},
+			{
+				Namespace: manilaName.Namespace,
+				Name:      fmt.Sprintf("%s-scheduler-topology", manilaName.Name),
+			},
+			{
+				Namespace: manilaName.Namespace,
+				Name:      fmt.Sprintf("%s-share-topology", manilaName.Name),
+			},
 		},
 	}
 }

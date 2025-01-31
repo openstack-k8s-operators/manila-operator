@@ -219,18 +219,21 @@ const (
 	caBundleSecretNameField = ".spec.tls.caBundleSecretName"
 	tlsAPIInternalField     = ".spec.tls.api.internal.secretName"
 	tlsAPIPublicField       = ".spec.tls.api.public.secretName"
+	topologyField           = ".spec.topologyRef.Name"
 )
 
 var (
 	commonWatchFields = []string{
 		passwordSecretField,
 		caBundleSecretNameField,
+		topologyField,
 	}
 	manilaAPIWatchFields = []string{
 		passwordSecretField,
 		caBundleSecretNameField,
 		tlsAPIInternalField,
 		tlsAPIPublicField,
+		topologyField,
 	}
 )
 
@@ -981,6 +984,12 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 		apiSpec.NodeSelector = instance.Spec.NodeSelector
 	}
 
+	// If topology is not present in the underlying ManilaAPI Spec,
+	// inherit from the top-level CR
+	if apiSpec.TopologyRef == nil {
+		apiSpec.TopologyRef = instance.Spec.TopologyRef
+	}
+
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = apiSpec
 
@@ -1017,6 +1026,12 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context
 
 	if schedulerSpec.NodeSelector == nil {
 		schedulerSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
+	// If topology is not present in the underlying Scheduler Spec
+	// inherit from the top-level CR
+	if schedulerSpec.TopologyRef == nil {
+		schedulerSpec.TopologyRef = instance.Spec.TopologyRef
 	}
 
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
@@ -1064,6 +1079,12 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 
 	if shareSpec.NodeSelector == nil {
 		shareSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
+	// If topology is not present in the underlying Share Spec
+	// inherit from the top-level CR
+	if shareSpec.TopologyRef == nil {
+		shareSpec.TopologyRef = instance.Spec.TopologyRef
 	}
 
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {

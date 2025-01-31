@@ -13,6 +13,7 @@ limitations under the License.
 package manilascheduler
 
 import (
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	manila "github.com/openstack-k8s-operators/manila-operator/pkg/manila"
@@ -34,6 +35,7 @@ func StatefulSet(
 	configHash string,
 	labels map[string]string,
 	annotations map[string]string,
+	topology *topologyv1.Topology,
 ) *appsv1.StatefulSet {
 	manilaUser := manila.ManilaUserID
 	manilaGroup := manila.ManilaGroupID
@@ -131,8 +133,7 @@ func StatefulSet(
 							VolumeMounts: volumeMounts,
 						},
 					},
-					Affinity: manila.GetPodAffinity(ComponentName),
-					Volumes:  volumes,
+					Volumes: volumes,
 				},
 			},
 		},
@@ -140,6 +141,24 @@ func StatefulSet(
 
 	if instance.Spec.NodeSelector != nil {
 		statefulset.Spec.Template.Spec.NodeSelector = *instance.Spec.NodeSelector
+	}
+
+	if topology != nil {
+		// Get the Topology .Spec
+		ts := topology.Spec
+		// Process TopologySpreadConstraints if defined in the referenced Topology
+		if ts.TopologySpreadConstraints != nil {
+			statefulset.Spec.Template.Spec.TopologySpreadConstraints = *topology.Spec.TopologySpreadConstraints
+		}
+		// Process Affinity if defined in the referenced Topology
+		if ts.Affinity != nil {
+			statefulset.Spec.Template.Spec.Affinity = ts.Affinity
+		}
+	} else {
+		// If possible two pods of the same service should not
+		// run on the same worker node. If this is not possible
+		// the get still created on the same worker node.
+		statefulset.Spec.Template.Spec.Affinity = manila.GetPodAffinity(ComponentName)
 	}
 
 	return statefulset
