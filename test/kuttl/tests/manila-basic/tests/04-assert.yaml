@@ -11,20 +11,6 @@ kind: Manila
 metadata:
    name: manila
 spec:
-   customServiceConfig: |
-      [DEFAULT]
-      debug = true
-   databaseInstance: openstack
-   databaseAccount: manila
-   manilaAPI:
-      customServiceConfig: |
-         [DEFAULT]
-         enabled_share_protocols = cephfs
-      replicas: 3
-      resources: {}
-   manilaScheduler:
-      replicas: 1
-      resources: {}
    manilaShares:
       share0:
          replicas: 1
@@ -40,12 +26,6 @@ spec:
             cephfs_auth_id=openstack
             cephfs_cluster_name=ceph
             cephfs_protocol_helper_type=CEPHFS
-   passwordSelectors:
-      service: ManilaPassword
-   preserveJobs: false
-   rabbitMqClusterName: rabbitmq
-   secret: osp-secret
-   serviceUser: manila
 status:
    conditions:
       - message: Setup complete
@@ -112,54 +92,12 @@ status:
         reason: Ready
         status: "True"
         type: ServiceConfigReady
-   databaseHostname: openstack.manila-kuttl-tests.svc
-   manilaAPIReadyCount: 3
-   manilaSchedulerReadyCount: 1
+   manilaAPIReadyCount: 1
+   manilaSchedulerReadyCount: 3
    manilaSharesReadyCounts:
       share0: 1
-   transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 ---
-apiVersion: manila.openstack.org/v1beta1
-kind: ManilaAPI
+apiVersion: batch/v1
+kind: CronJob
 metadata:
-   finalizers:
-      - openstack.org/manilaapi
-   name: manila-api
-spec:
-   databaseHostname: openstack.manila-kuttl-tests.svc
-   databaseAccount: manila
-   passwordSelectors:
-      service: ManilaPassword
-   replicas: 3
-   resources: {}
-   secret: osp-secret
-   serviceAccount: manila-manila
-   serviceUser: manila
-status:
-   readyCount: 3
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-   labels:
-      component: manila-api
-      service: manila
-   name: manila-api
-   ownerReferences:
-      - apiVersion: manila.openstack.org/v1beta1
-        kind: ManilaAPI
-        name: manila-api
-spec:
-   replicas: 3
-   template:
-      metadata:
-         labels:
-            component: manila-api
-            service: manila
-      spec:
-         serviceAccount: manila-manila
-         serviceAccountName: manila-manila
-status:
-   availableReplicas: 3
-   readyReplicas: 3
-   replicas: 3
+  name: manila-db-purge
