@@ -596,6 +596,7 @@ func (r *ManilaSchedulerReconciler) generateServiceConfig(
 	}
 	customData[manila.DefaultsConfigFileName] = string(manilaSecret.Data[manila.DefaultsConfigFileName])
 	customData[manila.CustomConfigFileName] = string(manilaSecret.Data[manila.CustomConfigFileName])
+	customData[common.TemplateParameters] = string(manilaSecret.Data[common.TemplateParameters])
 
 	customSecrets := ""
 	for _, secretName := range instance.Spec.CustomServiceConfigSecrets {

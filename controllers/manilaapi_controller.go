@@ -309,6 +309,18 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	// index httpdOverrideSecretField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &manilav1beta1.ManilaAPI{}, httpdCustomServiceConfigSecretField, func(rawObj client.Object) []string {
+		// Extract the secret name from the spec, if one is provided
+		cr := rawObj.(*manilav1beta1.ManilaAPI)
+		if cr.Spec.HttpdCustomization.CustomConfigSecret == nil {
+			return nil
+		}
+		return []string{*cr.Spec.HttpdCustomization.CustomConfigSecret}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&manilav1beta1.ManilaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
@@ -947,6 +959,12 @@ func (r *ManilaAPIReconciler) generateServiceConfig(
 	}
 	customData[manila.DefaultsConfigFileName] = string(manilaSecret.Data[manila.DefaultsConfigFileName])
 	customData[manila.CustomConfigFileName] = string(manilaSecret.Data[manila.CustomConfigFileName])
+	//customData[common.TemplateParameters] = string(manilaSecret.Data[common.TemplateParameters])
+	//for _, key := range maps.Keys(manilaSecret.Data) {
+	//	if strings.HasPrefix(key, "httpd_custom_") {
+	//		customData[key] = string(manilaSecret.Data[key])
+	//	}
+	//}
 
 	customSecrets := ""
 	for _, secretName := range instance.Spec.CustomServiceConfigSecrets {
