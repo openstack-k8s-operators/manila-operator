@@ -27,6 +27,7 @@ import (
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -141,6 +142,9 @@ func (r *Manila) ValidateCreate() (admission.Warnings, error) {
 
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
+
+	allErrs = r.Spec.ValidateManilaTopology(basePath, r.Namespace)
+
 	if err := r.Spec.ValidateCreate(basePath); err != nil {
 		allErrs = append(allErrs, err...)
 	}
@@ -190,6 +194,8 @@ func (r *Manila) ValidateUpdate(old runtime.Object) (admission.Warnings, error) 
 
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
+
+	allErrs = r.Spec.ValidateManilaTopology(basePath, r.Namespace)
 
 	if err := r.Spec.ValidateUpdate(oldManila.Spec, basePath); err != nil {
 		allErrs = append(allErrs, err...)
@@ -261,4 +267,46 @@ func (spec *ManilaSpecCore) SetDefaultRouteAnnotations(annotations map[string]st
 	timeout := fmt.Sprintf("%ds", spec.APITimeout)
 	annotations[manilaAnno] = timeout
 	annotations[haProxyAnno] = timeout
+}
+
+// ValidateManilaTopology - Returns an ErrorList if the Topology is referenced
+// on a different namespace
+func (spec *ManilaSpec) ValidateManilaTopology(basePath *field.Path, namespace string) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// When a TopologyRef CR is referenced, fail if a different Namespace is
+	// referenced because is not supported
+	if spec.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to ManilaAPI, fail
+	// if a different Namespace is referenced because not supported
+	if spec.ManilaAPI.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.ManilaAPI.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to ManilaScheduler,
+	// fail if a different Namespace is referenced because not supported
+	if spec.ManilaScheduler.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.ManilaScheduler.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to an instance of
+	// ManilaShares, fail if a different Namespace is referenced because not
+	// supported
+	for _, ms := range spec.ManilaShares {
+		if ms.TopologyRef != nil {
+			if err := topologyv1.ValidateTopologyNamespace(ms.TopologyRef.Namespace, *basePath, namespace); err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+	}
+	return allErrs
 }
