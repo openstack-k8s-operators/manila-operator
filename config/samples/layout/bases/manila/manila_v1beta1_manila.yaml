@@ -11,6 +11,7 @@ spec:
   databaseInstance: openstack
   secret: osp-secret
   databaseUser: manila
+  preserveJobs: true
   rabbitMqClusterName: rabbitmq
   manilaAPI: {}
   manilaScheduler: {}
