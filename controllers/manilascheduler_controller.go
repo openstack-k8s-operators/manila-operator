@@ -339,11 +339,7 @@ func (r *ManilaSchedulerReconciler) reconcileDelete(ctx context.Context, instanc
 	if ctrlResult, err := topologyv1.EnsureDeletedTopologyRef(
 		ctx,
 		helper,
-		&topologyv1.TopoRef{
-			Name:      instance.Status.LastAppliedTopology,
-			Namespace: instance.Namespace,
-		},
-		//fmt.Sprintf("%s%s", helper.GetFinalizer(), instance.Name),
+		instance.Status.LastAppliedTopology,
 		instance.Name,
 	); err != nil {
 		return ctrlResult, err
@@ -498,17 +494,16 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	//
 	// Handle Topology
 	//
-	lastTopologyRef := topologyv1.TopoRef{
-		Name:      instance.Status.LastAppliedTopology,
-		Namespace: instance.Namespace,
-	}
-	topology, err := ensureManilaTopology(
+	topology, err := topologyv1.EnsureServiceTopology(
 		ctx,
 		helper,
 		instance.Spec.TopologyRef,
-		&lastTopologyRef,
+		GetLastAppliedTopologyRef(instance, instance.Namespace),
 		instance.Name,
-		manilascheduler.ComponentName,
+		labels.GetSingleLabelSelector(
+			common.ComponentSelector,
+			manilascheduler.ComponentName,
+		),
 	)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -525,12 +520,12 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 	// and mark the condition as true
 	if instance.Spec.TopologyRef != nil {
 		// update the Status with the last retrieved Topology name
-		instance.Status.LastAppliedTopology = instance.Spec.TopologyRef.Name
+		instance.Status.LastAppliedTopology = instance.Spec.TopologyRef
 		// update the TopologyRef associated condition
 		instance.Status.Conditions.MarkTrue(condition.TopologyReadyCondition, condition.TopologyReadyMessage)
 	} else {
 		// remove LastAppliedTopology from the .Status
-		instance.Status.LastAppliedTopology = ""
+		instance.Status.LastAppliedTopology = nil
 	}
 
 	// Deploy a statefulset
