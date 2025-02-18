@@ -706,11 +706,14 @@ var _ = Describe("Manila controller", func() {
 		It("sets topology in CR status", func() {
 			Eventually(func(g Gomega) {
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
-				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[0].Name))
+				g.Expect(manilaAPI.Status.LastAppliedTopology).ToNot(BeNil())
+				g.Expect(manilaAPI.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[0].Name))
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
-				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[0].Name))
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).ToNot(BeNil())
+				g.Expect(manilaScheduler.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[0].Name))
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
-				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[0].Name))
+				g.Expect(manilaShare.Status.LastAppliedTopology).ToNot(BeNil())
+				g.Expect(manilaShare.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[0].Name))
 			}, timeout, interval).Should(Succeed())
 		})
 		It("sets Topology in resource specs", func() {
@@ -732,11 +735,11 @@ var _ = Describe("Manila controller", func() {
 
 			Eventually(func(g Gomega) {
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
-				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				g.Expect(manilaAPI.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
-				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				g.Expect(manilaScheduler.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
-				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				g.Expect(manilaShare.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
 			}, timeout, interval).Should(Succeed())
 		})
 		It("overrides topology when the reference changes", func() {
@@ -759,11 +762,11 @@ var _ = Describe("Manila controller", func() {
 
 			Eventually(func(g Gomega) {
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
-				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				g.Expect(manilaAPI.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
-				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[2].Name))
+				g.Expect(manilaScheduler.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[2].Name))
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
-				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(manilaTest.ManilaTopologies[3].Name))
+				g.Expect(manilaShare.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[3].Name))
 			}, timeout, interval).Should(Succeed())
 		})
 		It("removes topologyRef from the spec", func() {
@@ -776,11 +779,11 @@ var _ = Describe("Manila controller", func() {
 
 			Eventually(func(g Gomega) {
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
-				g.Expect(manilaAPI.Status.LastAppliedTopology).Should(BeEmpty())
+				g.Expect(manilaAPI.Status.LastAppliedTopology).Should(BeNil())
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
-				g.Expect(manilaScheduler.Status.LastAppliedTopology).Should(BeEmpty())
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).Should(BeNil())
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
-				g.Expect(manilaShare.Status.LastAppliedTopology).Should(BeEmpty())
+				g.Expect(manilaShare.Status.LastAppliedTopology).Should(BeNil())
 			}, timeout, interval).Should(Succeed())
 
 			Eventually(func(g Gomega) {
