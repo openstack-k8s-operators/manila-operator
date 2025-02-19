@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,7 +29,6 @@ import (
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,65 +42,21 @@ type conditionUpdater interface {
 	MarkTrue(t condition.Type, messageFormat string, messageArgs ...interface{})
 }
 
-// ensureManilaTopology - when a Topology CR is referenced, remove the
-// finalizer from a previous referenced Topology (if any), and retrieve the
-// newly referenced topology object
-func ensureManilaTopology(
-	ctx context.Context,
-	helper *helper.Helper,
-	tpRef *topologyv1.TopoRef,
-	lastAppliedTopology *topologyv1.TopoRef,
-	finalizer string,
-	selector string,
-) (*topologyv1.Topology, error) {
+type topologyGetter interface {
+	GetLastAppliedTopology() *topologyv1.TopoRef
+}
 
-	var podTopology *topologyv1.Topology
-	var err error
-
-	// Remove (if present) the finalizer from a previously referenced topology
-	//
-	// 1. a topology reference is removed (tpRef == nil) from the Manila Component
-	//    subCR and the finalizer should be deleted from the last applied topology
-	//    (lastAppliedTopology != "")
-	// 2. a topology reference is updated in the Manila Component CR (tpRef != nil)
-	//    and the finalizer should be removed from the previously
-	//    referenced topology (tpRef.Name != lastAppliedTopology.Name)
-	if (tpRef == nil && lastAppliedTopology.Name != "") ||
-		(tpRef != nil && tpRef.Name != lastAppliedTopology.Name) {
-		_, err = topologyv1.EnsureDeletedTopologyRef(
-			ctx,
-			helper,
-			lastAppliedTopology,
-			finalizer,
-		)
-		if err != nil {
-			return nil, err
-		}
+// GetLastTopologyRef - Returns a TopoRef object that can be passed to the
+// Handle topology logic
+func GetLastAppliedTopologyRef(t topologyGetter, ns string) *topologyv1.TopoRef {
+	lastAppliedTopologyName := ""
+	if l := t.GetLastAppliedTopology(); l != nil {
+		lastAppliedTopologyName = l.Name
 	}
-	// TopologyRef is passed as input, get the Topology object
-	if tpRef != nil {
-		// no Namespace is provided, default to instance.Namespace
-		if tpRef.Namespace == "" {
-			tpRef.Namespace = helper.GetBeforeObject().GetNamespace()
-		}
-		// Build a defaultLabelSelector (component=manila-[api|scheduler|share])
-		defaultLabelSelector := labels.GetSingleLabelSelector(
-			common.ComponentSelector,
-			selector,
-		)
-		// Retrieve the referenced Topology
-		podTopology, _, err = topologyv1.EnsureTopologyRef(
-			ctx,
-			helper,
-			tpRef,
-			finalizer,
-			&defaultLabelSelector,
-		)
-		if err != nil {
-			return nil, err
-		}
+	return &topologyv1.TopoRef{
+		Name:      lastAppliedTopologyName,
+		Namespace: ns,
 	}
-	return podTopology, nil
 }
 
 // ensureNAD - common function called in the Manila controllers that GetNAD based
