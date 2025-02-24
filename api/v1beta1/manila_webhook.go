@@ -143,9 +143,7 @@ func (r *Manila) ValidateCreate() (admission.Warnings, error) {
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
 
-	allErrs = r.Spec.ValidateManilaTopology(basePath, r.Namespace)
-
-	if err := r.Spec.ValidateCreate(basePath); err != nil {
+	if err := r.Spec.ValidateCreate(basePath, r.Namespace); err != nil {
 		allErrs = append(allErrs, err...)
 	}
 
@@ -160,7 +158,7 @@ func (r *Manila) ValidateCreate() (admission.Warnings, error) {
 
 // ValidateCreate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an manila spec.
-func (spec *ManilaSpec) ValidateCreate(basePath *field.Path) field.ErrorList {
+func (spec *ManilaSpec) ValidateCreate(basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// validate the service override key is valid
@@ -168,11 +166,12 @@ func (spec *ManilaSpec) ValidateCreate(basePath *field.Path) field.ErrorList {
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
 
+	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
 	return allErrs
 }
 
 // ValidateCreate -
-func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path) field.ErrorList {
+func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// validate the service override key is valid
@@ -180,6 +179,7 @@ func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path) field.ErrorList
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
 
+	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
 	return allErrs
 }
 
@@ -195,9 +195,7 @@ func (r *Manila) ValidateUpdate(old runtime.Object) (admission.Warnings, error) 
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
 
-	allErrs = r.Spec.ValidateManilaTopology(basePath, r.Namespace)
-
-	if err := r.Spec.ValidateUpdate(oldManila.Spec, basePath); err != nil {
+	if err := r.Spec.ValidateUpdate(oldManila.Spec, basePath, r.Namespace); err != nil {
 		allErrs = append(allErrs, err...)
 	}
 
@@ -212,7 +210,7 @@ func (r *Manila) ValidateUpdate(old runtime.Object) (admission.Warnings, error) 
 
 // ValidateUpdate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an manila spec.
-func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path) field.ErrorList {
+func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// validate the service override key is valid
@@ -220,11 +218,12 @@ func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path) fie
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
 
+	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
 	return allErrs
 }
 
 // ValidateUpdate -
-func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.Path) field.ErrorList {
+func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// validate the service override key is valid
@@ -232,6 +231,7 @@ func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.P
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
 
+	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
 	return allErrs
 }
 
@@ -269,6 +269,47 @@ func (spec *ManilaSpecCore) SetDefaultRouteAnnotations(annotations map[string]st
 	annotations[haProxyAnno] = timeout
 }
 
+// ValidateManilaTopology - Returns an ErrorList if the Topology is referenced
+// on a different namespace
+func (spec *ManilaSpecCore) ValidateManilaTopology(basePath *field.Path, namespace string) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// When a TopologyRef CR is referenced, fail if a different Namespace is
+	// referenced because is not supported
+	if spec.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to ManilaAPI, fail
+	// if a different Namespace is referenced because not supported
+	if spec.ManilaAPI.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.ManilaAPI.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to ManilaScheduler,
+	// fail if a different Namespace is referenced because not supported
+	if spec.ManilaScheduler.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.ManilaScheduler.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to an instance of
+	// ManilaShares, fail if a different Namespace is referenced because not
+	// supported
+	for _, ms := range spec.ManilaShares {
+		if ms.TopologyRef != nil {
+			if err := topologyv1.ValidateTopologyNamespace(ms.TopologyRef.Namespace, *basePath, namespace); err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+	}
+	return allErrs
+}
 // ValidateManilaTopology - Returns an ErrorList if the Topology is referenced
 // on a different namespace
 func (spec *ManilaSpec) ValidateManilaTopology(basePath *field.Path, namespace string) field.ErrorList {
