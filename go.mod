@@ -6,16 +6,16 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/onsi/gomega v1.34.1
-	github.com/openstack-k8s-operators/infra-operator/apis v0.5.1-0.20250218115938-ae95bdfefded
-	github.com/openstack-k8s-operators/keystone-operator/api v0.5.1-0.20250107165241-16c3ed8e549f
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.5.1-0.20250205143454-43504d7ad19a
-	github.com/openstack-k8s-operators/lib-common/modules/storage v0.5.1-0.20241216113837-d172b3ac0f4e
-	github.com/openstack-k8s-operators/lib-common/modules/test v0.5.1-0.20241216113837-d172b3ac0f4e
+	github.com/openstack-k8s-operators/infra-operator/apis v0.5.1-0.20250225210325-92c2416febbe
+	github.com/openstack-k8s-operators/keystone-operator/api v0.5.1-0.20250226092400-645dd6edb3b9
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.5.1-0.20250225220922-3ead38b7284f
+	github.com/openstack-k8s-operators/lib-common/modules/storage v0.5.1-0.20250225220922-3ead38b7284f
+	github.com/openstack-k8s-operators/lib-common/modules/test v0.5.1-0.20250225220922-3ead38b7284f
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.5.1-0.20250108071621-aa59f25c5b1a
-	k8s.io/api v0.29.13
-	k8s.io/apimachinery v0.29.13
-	k8s.io/client-go v0.29.13
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.5.1-0.20250225210327-7746ba50108f
+	k8s.io/api v0.29.14
+	k8s.io/apimachinery v0.29.14
+	k8s.io/client-go v0.29.14
 	sigs.k8s.io/controller-runtime v0.17.6
 )
 
@@ -68,8 +68,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.29.13 // indirect
-	k8s.io/component-base v0.29.13 // indirect
+	k8s.io/apiextensions-apiserver v0.29.14 // indirect
+	k8s.io/component-base v0.29.14 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240322212309-b815d8309940 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
@@ -81,7 +81,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/imdario/mergo v0.3.16 //indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.5
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.5.1-0.20241216113837-d172b3ac0f4e // indirect
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.5.1-0.20250225220922-3ead38b7284f // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
