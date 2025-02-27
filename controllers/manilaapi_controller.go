@@ -844,10 +844,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 		instance,      // topologyHandler
 		instance.Name, // finalizer
 		&instance.Status.Conditions,
-		labels.GetSingleLabelSelector(
-			common.ComponentSelector,
-			manilaapi.ComponentName,
-		),
+		labels.GetLabelSelector(serviceLabels),
 	)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(

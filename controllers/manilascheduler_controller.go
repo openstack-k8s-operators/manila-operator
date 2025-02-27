@@ -501,10 +501,7 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 		instance,      // topologyHandler
 		instance.Name, // finalizer
 		&instance.Status.Conditions,
-		labels.GetSingleLabelSelector(
-			common.ComponentSelector,
-			manilascheduler.ComponentName,
-		),
+		labels.GetLabelSelector(serviceLabels),
 	)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
