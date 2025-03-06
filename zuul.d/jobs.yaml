@@ -27,6 +27,7 @@
     name: manila-operator-tempest
     parent: podified-multinode-hci-deployment-crc-1comp-backends
     vars:
+      cifmw_test_operator_index: quay.io/openstack-k8s-operators/test-operator-index:18.0-fr2-latest
       cifmw_test_operator_concurrency: 4
       cifmw_test_operator_tempest_include_list: |
         ^manila_tempest_tests.tests.api
