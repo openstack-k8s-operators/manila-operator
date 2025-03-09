@@ -735,10 +735,13 @@ var _ = Describe("Manila controller", func() {
 
 			Eventually(func(g Gomega) {
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
+				g.Expect(manilaAPI.Status.LastAppliedTopology).ToNot(BeNil())
 				g.Expect(manilaAPI.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).ToNot(BeNil())
 				g.Expect(manilaScheduler.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
+				g.Expect(manilaShare.Status.LastAppliedTopology).ToNot(BeNil())
 				g.Expect(manilaShare.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
 			}, timeout, interval).Should(Succeed())
 		})
@@ -762,10 +765,13 @@ var _ = Describe("Manila controller", func() {
 
 			Eventually(func(g Gomega) {
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
+				g.Expect(manilaAPI.Status.LastAppliedTopology).ToNot(BeNil())
 				g.Expect(manilaAPI.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).ToNot(BeNil())
 				g.Expect(manilaScheduler.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[2].Name))
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
+				g.Expect(manilaShare.Status.LastAppliedTopology).ToNot(BeNil())
 				g.Expect(manilaShare.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[3].Name))
 			}, timeout, interval).Should(Succeed())
 		})
