@@ -1193,30 +1193,71 @@ var _ = Describe("Manila Webhook", func() {
 		)
 	})
 
-	It("rejects a wrong TopologyRef on a different namespace", func() {
-		spec := GetDefaultManilaSpec()
-		// Reference a top-level topology
-		spec["topologyRef"] = map[string]interface{}{
-			"name":      manilaTest.ManilaTopologies[0].Name,
-			"namespace": "foo",
-		}
-		raw := map[string]interface{}{
-			"apiVersion": "manila.openstack.org/v1beta1",
-			"kind":       "Manila",
-			"metadata": map[string]interface{}{
-				"name":      manilaTest.Instance.Name,
-				"namespace": manilaTest.Instance.Namespace,
-			},
-			"spec": spec,
-		}
+	DescribeTable("rejects wrong topology for",
+		func(serviceNameFunc func() (string, string)) {
 
-		unstructuredObj := &unstructured.Unstructured{Object: raw}
-		_, err := controllerutil.CreateOrPatch(
-			th.Ctx, th.K8sClient, unstructuredObj, func() error { return nil })
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(
-			ContainSubstring(
-				"Invalid value: \"namespace\": Customizing namespace field is not supported"),
-		)
-	})
+			component, errorPath := serviceNameFunc()
+			expectedErrorMessage := fmt.Sprintf("spec.%s.namespace: Invalid value: \"namespace\": Customizing namespace field is not supported", errorPath)
+
+			spec := GetDefaultManilaSpec()
+			// API and Scheduler
+			if component != "top-level" && component != "share0" {
+				spec[component] = map[string]interface{}{
+					"topologyRef": map[string]interface{}{
+						"name":      "bar",
+						"namespace": "foo",
+					},
+				}
+			}
+			// manilaShares share0
+			if component == "share0" {
+				shareList := map[string]interface{}{
+					"share0": map[string]interface{}{
+						"topologyRef": map[string]interface{}{
+							"name":      "foo",
+							"namespace": "bar",
+						},
+					},
+				}
+				spec["manilaShares"] = shareList
+				// top-level topologyRef
+			} else {
+				spec["topologyRef"] = map[string]interface{}{
+					"name":      "bar",
+					"namespace": "foo",
+				}
+			}
+			// Build the manila CR
+			raw := map[string]interface{}{
+				"apiVersion": "manila.openstack.org/v1beta1",
+				"kind":       "Manila",
+				"metadata": map[string]interface{}{
+					"name":      manilaTest.Instance.Name,
+					"namespace": manilaTest.Instance.Namespace,
+				},
+				"spec": spec,
+			}
+			unstructuredObj := &unstructured.Unstructured{Object: raw}
+			_, err := controllerutil.CreateOrPatch(
+				th.Ctx, th.K8sClient, unstructuredObj, func() error { return nil })
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(
+				ContainSubstring(expectedErrorMessage))
+		},
+		Entry("top-level topologyRef", func() (string, string) {
+			return "top-level", "topologyRef"
+		}),
+		Entry("manilaAPI topologyRef", func() (string, string) {
+			component := "manilaAPI"
+			return component, fmt.Sprintf("%s.topologyRef", component)
+		}),
+		Entry("manilaScheduler topologyRef", func() (string, string) {
+			component := "manilaScheduler"
+			return component, fmt.Sprintf("%s.topologyRef", component)
+		}),
+		Entry("manilaShare share0 topologyRef", func() (string, string) {
+			instance := "share0"
+			return instance, fmt.Sprintf("manilaShares[%s].topologyRef", instance)
+		}),
+	)
 })
