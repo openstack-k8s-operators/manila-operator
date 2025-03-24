@@ -276,40 +276,31 @@ func (spec *ManilaSpecCore) ValidateManilaTopology(basePath *field.Path, namespa
 
 	// When a TopologyRef CR is referenced, fail if a different Namespace is
 	// referenced because is not supported
-	if spec.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	allErrs = append(allErrs, topologyv1.ValidateTopologyRef(
+		spec.TopologyRef, *basePath.Child("topologyRef"), namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to ManilaAPI, fail
 	// if a different Namespace is referenced because not supported
-	if spec.ManilaAPI.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.ManilaAPI.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	apiPath := basePath.Child("manilaAPI")
+	allErrs = append(allErrs,
+		spec.ManilaAPI.ValidateTopology(apiPath, namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to ManilaScheduler,
 	// fail if a different Namespace is referenced because not supported
-	if spec.ManilaScheduler.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.ManilaScheduler.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	scPath := basePath.Child("manilaScheduler")
+	allErrs = append(allErrs,
+		spec.ManilaScheduler.ValidateTopology(scPath, namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to an instance of
 	// ManilaShares, fail if a different Namespace is referenced because not
 	// supported
-	for _, ms := range spec.ManilaShares {
-		if ms.TopologyRef != nil {
-			if err := topologyv1.ValidateTopologyNamespace(ms.TopologyRef.Namespace, *basePath, namespace); err != nil {
-				allErrs = append(allErrs, err)
-			}
-		}
+	for k, ms := range spec.ManilaShares {
+		path := basePath.Child("manilaShares").Key(k)
+		allErrs = append(allErrs, ms.ValidateTopology(path, namespace)...)
 	}
 	return allErrs
 }
+
 // ValidateManilaTopology - Returns an ErrorList if the Topology is referenced
 // on a different namespace
 func (spec *ManilaSpec) ValidateManilaTopology(basePath *field.Path, namespace string) field.ErrorList {
@@ -317,37 +308,27 @@ func (spec *ManilaSpec) ValidateManilaTopology(basePath *field.Path, namespace s
 
 	// When a TopologyRef CR is referenced, fail if a different Namespace is
 	// referenced because is not supported
-	if spec.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	allErrs = append(allErrs, topologyv1.ValidateTopologyRef(
+		spec.TopologyRef, *basePath.Child("topologyRef"), namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to ManilaAPI, fail
 	// if a different Namespace is referenced because not supported
-	if spec.ManilaAPI.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.ManilaAPI.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	apiPath := basePath.Child("manilaAPI")
+	allErrs = append(allErrs,
+		spec.ManilaAPI.ValidateTopology(apiPath, namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to ManilaScheduler,
 	// fail if a different Namespace is referenced because not supported
-	if spec.ManilaScheduler.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.ManilaScheduler.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	scPath := basePath.Child("manilaScheduler")
+	allErrs = append(allErrs,
+		spec.ManilaScheduler.ValidateTopology(scPath, namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to an instance of
 	// ManilaShares, fail if a different Namespace is referenced because not
 	// supported
-	for _, ms := range spec.ManilaShares {
-		if ms.TopologyRef != nil {
-			if err := topologyv1.ValidateTopologyNamespace(ms.TopologyRef.Namespace, *basePath, namespace); err != nil {
-				allErrs = append(allErrs, err)
-			}
-		}
+	for k, ms := range spec.ManilaShares {
+		path := basePath.Child("manilaShares").Key(k)
+		allErrs = append(allErrs, ms.ValidateTopology(path, namespace)...)
 	}
 	return allErrs
 }
