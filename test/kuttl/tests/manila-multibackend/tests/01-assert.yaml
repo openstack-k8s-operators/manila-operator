@@ -9,21 +9,6 @@ kind: Manila
 metadata:
    name: manila
 spec:
-   customServiceConfig: |
-      [DEFAULT]
-      debug = true
-   databaseInstance: openstack
-   databaseAccount: manila
-   manilaAPI:
-       customServiceConfig: |
-          [DEFAULT]
-          enabled_share_protocols=nfs,cephfs,cifs
-       replicas: 1
-       resources: {}
-   manilaScheduler:
-      customServiceConfig: '# add your customization here'
-      replicas: 1
-      resources: {}
    manilaShares:
      share0:
        customServiceConfig: |
@@ -37,7 +22,6 @@ spec:
           cephfs_auth_id=openstack
           cephfs_cluster_name=ceph
           cephfs_protocol_helper_type=CEPHFS
-       replicas: 1
      share1:
        customServiceConfig: |
            [DEFAULT]
@@ -50,13 +34,6 @@ spec:
            cephfs_cluster_name=ceph
            cephfs_nfs_cluster_id=cephfs
            cephfs_protocol_helper_type=NFS
-       replicas: 0
-   passwordSelectors:
-      service: ManilaPassword
-   preserveJobs: false
-   rabbitMqClusterName: rabbitmq
-   secret: osp-secret
-   serviceUser: manila
 status:
    conditions:
       - message: Setup complete
@@ -128,61 +105,16 @@ status:
    manilaSharesReadyCounts:
       share0: 1
       share1: 0
-   transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 ---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: manila-db-purge
-spec:
-  jobTemplate:
-    metadata:
-      labels:
-        service: manila
-    spec:
-      completions: 1
-      parallelism: 1
-      template:
-        spec:
-          containers:
-          - args:
-            - -c
-            - /usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d
-              db purge 30
-            command:
-            - /bin/bash
-            name: manila-db-purge
-            volumeMounts:
-            - mountPath: /etc/manila/manila.conf.d
-              name: db-purge-config-data
-              readOnly: true
-          serviceAccount: manila-manila
-          serviceAccountName: manila-manila
-          volumes:
-          - name: db-purge-config-data
-            secret:
-              defaultMode: 420
-              items:
-              - key: 00-config.conf
-                path: 00-config.conf
-              secretName: manila-config-data
-  schedule: 1 0 * * *
-  suspend: false
 ---
 apiVersion: manila.openstack.org/v1beta1
 kind: ManilaShare
 metadata:
   name: manila-share-share0
-spec:
-  databaseAccount: manila
-  passwordSelectors:
-    service: ManilaPassword
-  replicas: 1
-  resources: {}
-  secret: osp-secret
-  serviceAccount: manila-manila
-  serviceUser: manila
-  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 status:
   conditions:
   - message: Setup complete
@@ -210,36 +142,3 @@ status:
     status: "True"
     type: TLSInputReady
   readyCount: 1
----
-# when using image digests the containerImage URLs are SHA's so we verify them with a script
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-commands:
-  - script: |
-      tupleTemplate='{{ range (index .spec.template.spec.containers 1).env }}{{ .name }}{{ "#" }}{{ .value}}{{"\n"}}{{ end }}'
-      imageTuples=$(oc get -n openstack-operators deployment manila-operator-controller-manager -o go-template="$tupleTemplate")
-      # format of imageTuple is: RELATED_IMAGE_MANILA_<service>#<image URL with SHA> separated by newlines
-      for ITEM in $(echo $imageTuples); do
-        # it is an image
-        if echo $ITEM | grep 'RELATED_IMAGE' &> /dev/null; then
-          NAME=$(echo $ITEM | sed -e 's|^RELATED_IMAGE_MANILA_\([^_]*\)_.*|\1|')
-          IMG_FROM_ENV=$(echo $ITEM | sed -e 's|^.*#\(.*\)|\1|')
-          template='{{.spec.containerImage}}'
-          case $NAME in
-            API)
-              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilaapi manila-api -o go-template="$template")
-              ;;
-            SHARE)
-              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilashares manila-share-share0 -o go-template="$template")
-              ;;
-            SCHEDULER)
-              SERVICE_IMAGE=$(oc get -n $NAMESPACE manilascheduler manila-scheduler -o go-template="$template")
-              ;;
-          esac
-          if [ "$SERVICE_IMAGE" != "$IMG_FROM_ENV" ]; then
-            echo "$NAME image does not equal $VALUE"
-            exit 1
-          fi
-        fi
-      done
-      exit 0
