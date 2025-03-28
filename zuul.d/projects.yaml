@@ -7,8 +7,6 @@
         - manila-operator-kuttl:
             dependencies:
               - openstack-k8s-operators-content-provider
-            voting: false
         - manila-operator-tempest:
             dependencies:
               - openstack-k8s-operators-content-provider
-            voting: false
