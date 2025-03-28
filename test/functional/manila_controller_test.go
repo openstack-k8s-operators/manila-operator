@@ -32,6 +32,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
@@ -666,16 +667,26 @@ var _ = Describe("Manila controller", func() {
 	})
 
 	When("Manila is created with topologyRef", func() {
+		var topologyRef, topologyRefAlt *topologyv1.TopoRef
 		BeforeEach(func() {
-			// Build the topology Spec
-			topologySpec := GetSampleTopologySpec()
 			// Create Test Topologies
 			for _, t := range manilaTest.ManilaTopologies {
+				// Build the topology Spec
+				topologySpec, _ := GetSampleTopologySpec(t.Name)
 				CreateTopology(t, topologySpec)
 			}
 			spec := GetDefaultManilaSpec()
+
+			topologyRef = &topologyv1.TopoRef{
+				Name:      manilaTest.ManilaTopologies[0].Name,
+				Namespace: manilaTest.ManilaTopologies[0].Namespace,
+			}
+			topologyRefAlt = &topologyv1.TopoRef{
+				Name:      manilaTest.ManilaTopologies[1].Name,
+				Namespace: manilaTest.ManilaTopologies[1].Namespace,
+			}
 			spec["topologyRef"] = map[string]interface{}{
-				"name": manilaTest.ManilaTopologies[0].Name,
+				"name": topologyRef.Name,
 			}
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
@@ -704,45 +715,97 @@ var _ = Describe("Manila controller", func() {
 		})
 
 		It("sets topology in CR status", func() {
+			expectedTopology := &topologyv1.TopoRef{
+				Name:      topologyRef.Name,
+				Namespace: topologyRef.Namespace,
+			}
+			var finalizers []string
 			Eventually(func(g Gomega) {
+				tp := GetTopology(types.NamespacedName{
+					Name:      expectedTopology.Name,
+					Namespace: expectedTopology.Namespace,
+				})
+				g.Expect(tp.GetFinalizers()).To(HaveLen(3))
+				finalizers = tp.GetFinalizers()
+
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
 				g.Expect(manilaAPI.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaAPI.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[0].Name))
+				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilaapi-%s", manilaAPI.Name)))
+
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
 				g.Expect(manilaScheduler.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaScheduler.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[0].Name))
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilascheduler-%s", manilaScheduler.Name)))
+
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
 				g.Expect(manilaShare.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaShare.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[0].Name))
+				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilashare-%s", manilaShare.Name)))
 			}, timeout, interval).Should(Succeed())
 		})
 		It("sets Topology in resource specs", func() {
 			Eventually(func(g Gomega) {
-				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				_, expectedTopologySpecObj := GetSampleTopologySpec(topologyRef.Name)
 				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.Affinity).To(BeNil())
-				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.TopologySpreadConstraints).To(Equal(expectedTopologySpecObj))
 				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.Affinity).To(BeNil())
-				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.TopologySpreadConstraints).To(Equal(expectedTopologySpecObj))
 				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.Affinity).To(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.TopologySpreadConstraints).ToNot(BeNil())
+				g.Expect(th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.TopologySpreadConstraints).To(Equal(expectedTopologySpecObj))
 			}, timeout, interval).Should(Succeed())
 		})
 		It("updates topology when the reference changes", func() {
+			expectedTopology := &topologyv1.TopoRef{
+				Name:      topologyRefAlt.Name,
+				Namespace: topologyRefAlt.Namespace,
+			}
+			var finalizers []string
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
-				manila.Spec.TopologyRef.Name = manilaTest.ManilaTopologies[1].Name
+				manila.Spec.TopologyRef.Name = expectedTopology.Name
 				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
 			Eventually(func(g Gomega) {
+				tp := GetTopology(types.NamespacedName{
+					Name:      expectedTopology.Name,
+					Namespace: expectedTopology.Namespace,
+				})
+				finalizers = tp.GetFinalizers()
+				g.Expect(finalizers).To(HaveLen(3))
+
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
 				g.Expect(manilaAPI.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaAPI.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilaapi-%s", manilaAPI.Name)))
+
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
 				g.Expect(manilaScheduler.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaScheduler.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilascheduler-%s", manilaScheduler.Name)))
+
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
 				g.Expect(manilaShare.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaShare.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilashare-%s", manilaShare.Name)))
+
+				// Get the previous topology and verify there are no finalizers
+				// anymore
+				tp = GetTopology(types.NamespacedName{
+					Name:      topologyRef.Name,
+					Namespace: topologyRef.Namespace,
+				})
+				g.Expect(tp.GetFinalizers()).To(BeEmpty())
 			}, timeout, interval).Should(Succeed())
 		})
 		It("overrides topology when the reference changes", func() {
@@ -764,18 +827,62 @@ var _ = Describe("Manila controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			Eventually(func(g Gomega) {
+				expectedTopology := &topologyv1.TopoRef{
+					Name:      manilaTest.ManilaTopologies[1].Name,
+					Namespace: manilaTest.ManilaTopologies[1].Namespace,
+				}
+				tp := GetTopology(types.NamespacedName{
+					Name:      expectedTopology.Name,
+					Namespace: expectedTopology.Namespace,
+				})
+				finalizers := tp.GetFinalizers()
+				g.Expect(finalizers).To(HaveLen(1))
+
 				manilaAPI := GetManilaAPI(manilaTest.ManilaAPI)
 				g.Expect(manilaAPI.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaAPI.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[1].Name))
+				g.Expect(manilaAPI.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilaapi-%s", manilaAPI.Name)))
+
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				expectedTopology := &topologyv1.TopoRef{
+					Name:      manilaTest.ManilaTopologies[2].Name,
+					Namespace: manilaTest.ManilaTopologies[2].Namespace,
+				}
+				tp := GetTopology(types.NamespacedName{
+					Name:      expectedTopology.Name,
+					Namespace: expectedTopology.Namespace,
+				})
+				finalizers := tp.GetFinalizers()
+				g.Expect(finalizers).To(HaveLen(1))
 				manilaScheduler := GetManilaScheduler(manilaTest.ManilaScheduler)
 				g.Expect(manilaScheduler.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaScheduler.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[2].Name))
+				g.Expect(manilaScheduler.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilascheduler-%s", manilaScheduler.Name)))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				expectedTopology := &topologyv1.TopoRef{
+					Name:      manilaTest.ManilaTopologies[3].Name,
+					Namespace: manilaTest.ManilaTopologies[3].Namespace,
+				}
+				tp := GetTopology(types.NamespacedName{
+					Name:      expectedTopology.Name,
+					Namespace: expectedTopology.Namespace,
+				})
+				g.Expect(tp.GetFinalizers()).To(HaveLen(1))
+				finalizers := tp.GetFinalizers()
 				manilaShare := GetManilaShare(manilaTest.ManilaShares[0])
 				g.Expect(manilaShare.Status.LastAppliedTopology).ToNot(BeNil())
-				g.Expect(manilaShare.Status.LastAppliedTopology.Name).To(Equal(manilaTest.ManilaTopologies[3].Name))
+				g.Expect(manilaShare.Status.LastAppliedTopology).To(Equal(expectedTopology))
+				g.Expect(finalizers).To(ContainElement(
+					fmt.Sprintf("openstack.org/manilashare-%s", manilaShare.Name)))
 			}, timeout, interval).Should(Succeed())
 		})
-		It("removes topologyRef from the spec", func() {
+		It("removes topology from the spec", func() {
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
 				// Remove the TopologyRef from the existing Manila .Spec
@@ -799,6 +906,17 @@ var _ = Describe("Manila controller", func() {
 				g.Expect(th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.Affinity).ToNot(BeNil())
 				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.TopologySpreadConstraints).To(BeNil())
 				g.Expect(th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.Affinity).ToNot(BeNil())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				for _, topology := range manilaTest.ManilaTopologies {
+					// Get the current topology and verify there are no finalizers
+					tp := GetTopology(types.NamespacedName{
+						Name:      topology.Name,
+						Namespace: topology.Namespace,
+					})
+					g.Expect(tp.GetFinalizers()).To(BeEmpty())
+				}
 			}, timeout, interval).Should(Succeed())
 		})
 	})
