@@ -673,7 +673,7 @@ var _ = Describe("Manila controller", func() {
 			for _, t := range manilaTest.ManilaTopologies {
 				// Build the topology Spec
 				topologySpec, _ := GetSampleTopologySpec(t.Name)
-				CreateTopology(t, topologySpec)
+				infra.CreateTopology(t, topologySpec)
 			}
 			spec := GetDefaultManilaSpec()
 
@@ -721,7 +721,7 @@ var _ = Describe("Manila controller", func() {
 			}
 			var finalizers []string
 			Eventually(func(g Gomega) {
-				tp := GetTopology(types.NamespacedName{
+				tp := infra.GetTopology(types.NamespacedName{
 					Name:      expectedTopology.Name,
 					Namespace: expectedTopology.Namespace,
 				})
@@ -774,7 +774,7 @@ var _ = Describe("Manila controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			Eventually(func(g Gomega) {
-				tp := GetTopology(types.NamespacedName{
+				tp := infra.GetTopology(types.NamespacedName{
 					Name:      expectedTopology.Name,
 					Namespace: expectedTopology.Namespace,
 				})
@@ -801,7 +801,7 @@ var _ = Describe("Manila controller", func() {
 
 				// Get the previous topology and verify there are no finalizers
 				// anymore
-				tp = GetTopology(types.NamespacedName{
+				tp = infra.GetTopology(types.NamespacedName{
 					Name:      topologyRef.Name,
 					Namespace: topologyRef.Namespace,
 				})
@@ -831,7 +831,7 @@ var _ = Describe("Manila controller", func() {
 					Name:      manilaTest.ManilaTopologies[1].Name,
 					Namespace: manilaTest.ManilaTopologies[1].Namespace,
 				}
-				tp := GetTopology(types.NamespacedName{
+				tp := infra.GetTopology(types.NamespacedName{
 					Name:      expectedTopology.Name,
 					Namespace: expectedTopology.Namespace,
 				})
@@ -851,7 +851,7 @@ var _ = Describe("Manila controller", func() {
 					Name:      manilaTest.ManilaTopologies[2].Name,
 					Namespace: manilaTest.ManilaTopologies[2].Namespace,
 				}
-				tp := GetTopology(types.NamespacedName{
+				tp := infra.GetTopology(types.NamespacedName{
 					Name:      expectedTopology.Name,
 					Namespace: expectedTopology.Namespace,
 				})
@@ -869,7 +869,7 @@ var _ = Describe("Manila controller", func() {
 					Name:      manilaTest.ManilaTopologies[3].Name,
 					Namespace: manilaTest.ManilaTopologies[3].Namespace,
 				}
-				tp := GetTopology(types.NamespacedName{
+				tp := infra.GetTopology(types.NamespacedName{
 					Name:      expectedTopology.Name,
 					Namespace: expectedTopology.Namespace,
 				})
@@ -911,7 +911,7 @@ var _ = Describe("Manila controller", func() {
 			Eventually(func(g Gomega) {
 				for _, topology := range manilaTest.ManilaTopologies {
 					// Get the current topology and verify there are no finalizers
-					tp := GetTopology(types.NamespacedName{
+					tp := infra.GetTopology(types.NamespacedName{
 						Name:      topology.Name,
 						Namespace: topology.Namespace,
 					})
