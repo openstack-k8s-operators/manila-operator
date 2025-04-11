@@ -11,23 +11,8 @@ kind: Manila
 metadata:
    name: manila
 spec:
-   customServiceConfig: |
-      [DEFAULT]
-      debug = true
-   databaseInstance: openstack
-   databaseAccount: manila
-   manilaAPI:
-      customServiceConfig: |
-         [DEFAULT]
-         enabled_share_protocols=nfs,cephfs,cifs
-      replicas: 1
-      resources: {}
-   manilaScheduler:
-      replicas: 1
-      resources: {}
    manilaShares:
       share0:
-         replicas: 1
          resources: {}
          customServiceConfig: |
             [DEFAULT]
@@ -52,13 +37,6 @@ spec:
             cephfs_cluster_name=ceph
             cephfs_nfs_cluster_id=cephfs
             cephfs_protocol_helper_type=NFS
-        replicas: 1
-   passwordSelectors:
-      service: ManilaPassword
-   preserveJobs: false
-   rabbitMqClusterName: rabbitmq
-   secret: osp-secret
-   serviceUser: manila
 status:
    conditions:
       - message: Setup complete
@@ -130,47 +108,18 @@ status:
    manilaSharesReadyCounts:
       share0: 1
       share1: 1
-   transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 ---
 apiVersion: manila.openstack.org/v1beta1
 kind: ManilaAPI
 metadata:
-   finalizers:
-      - openstack.org/manilaapi
    name: manila-api
-spec:
-   databaseAccount: manila
-   passwordSelectors:
-      service: ManilaPassword
-   replicas: 1
-   resources: {}
-   secret: osp-secret
-   serviceAccount: manila-manila
-   serviceUser: manila
 status:
    readyCount: 1
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-   labels:
-      component: manila-api
-      service: manila
    name: manila-api
-   ownerReferences:
-      - apiVersion: manila.openstack.org/v1beta1
-        kind: ManilaAPI
-        name: manila-api
-spec:
-   replicas: 1
-   template:
-      metadata:
-         labels:
-            component: manila-api
-            service: manila
-      spec:
-         serviceAccount: manila-manila
-         serviceAccountName: manila-manila
 status:
    availableReplicas: 1
    readyReplicas: 1
@@ -180,16 +129,6 @@ apiVersion: manila.openstack.org/v1beta1
 kind: ManilaShare
 metadata:
   name: manila-share-share0
-spec:
-  databaseAccount: manila
-  passwordSelectors:
-    service: ManilaPassword
-  replicas: 1
-  resources: {}
-  secret: osp-secret
-  serviceAccount: manila-manila
-  serviceUser: manila
-  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 status:
   conditions:
   - message: Setup complete
@@ -222,16 +161,6 @@ apiVersion: manila.openstack.org/v1beta1
 kind: ManilaShare
 metadata:
   name: manila-share-share1
-spec:
-  databaseAccount: manila
-  passwordSelectors:
-    service: ManilaPassword
-  replicas: 1
-  resources: {}
-  secret: osp-secret
-  serviceAccount: manila-manila
-  serviceUser: manila
-  transportURLSecret: rabbitmq-transport-url-manila-manila-transport
 status:
   conditions:
   - message: Setup complete
