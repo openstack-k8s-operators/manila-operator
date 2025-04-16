@@ -590,11 +590,11 @@ var _ = Describe("Manila controller", func() {
 
 			// cert volumeMounts
 			container := d.Spec.Template.Spec.Containers[1]
-			th.AssertVolumeMountExists(manilaTest.InternalCertSecret.Name, "tls.key", container.VolumeMounts)
-			th.AssertVolumeMountExists(manilaTest.InternalCertSecret.Name, "tls.crt", container.VolumeMounts)
-			th.AssertVolumeMountExists(manilaTest.PublicCertSecret.Name, "tls.key", container.VolumeMounts)
-			th.AssertVolumeMountExists(manilaTest.PublicCertSecret.Name, "tls.crt", container.VolumeMounts)
-			th.AssertVolumeMountExists(manilaTest.CABundleSecret.Name, "tls-ca-bundle.pem", container.VolumeMounts)
+			th.AssertVolumeMountPathExists(manilaTest.InternalCertSecret.Name, "", "tls.key", container.VolumeMounts)
+			th.AssertVolumeMountPathExists(manilaTest.InternalCertSecret.Name, "", "tls.crt", container.VolumeMounts)
+			th.AssertVolumeMountPathExists(manilaTest.PublicCertSecret.Name, "", "tls.key", container.VolumeMounts)
+			th.AssertVolumeMountPathExists(manilaTest.PublicCertSecret.Name, "", "tls.crt", container.VolumeMounts)
+			th.AssertVolumeMountPathExists(manilaTest.CABundleSecret.Name, "", "tls-ca-bundle.pem", container.VolumeMounts)
 
 			Expect(container.ReadinessProbe.HTTPGet.Scheme).To(Equal(corev1.URISchemeHTTPS))
 			Expect(container.LivenessProbe.HTTPGet.Scheme).To(Equal(corev1.URISchemeHTTPS))
@@ -1178,12 +1178,8 @@ var _ = Describe("Manila controller", func() {
 			Expect(container.VolumeMounts).To(HaveLen(9))
 			// Inspect VolumeMounts and make sure we have the Ceph MountPath
 			// provided through extraMounts
-			for _, vm := range container.VolumeMounts {
-				if vm.Name == "ceph" {
-					Expect(vm.MountPath).To(
-						ContainSubstring(ManilaCephExtraMountsPath))
-				}
-			}
+			th.AssertVolumeMountPathExists(ManilaCephExtraMountsSecretName,
+				ManilaCephExtraMountsPath, "", container.VolumeMounts)
 		})
 	})
 
