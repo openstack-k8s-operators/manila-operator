@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package main implements the manila-operator controller manager.
 package main
 
 import (

@@ -124,7 +124,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	Log := r.GetLogger(ctx)
 
 	instance := &manilav1beta1.Manila{}
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
@@ -230,7 +230,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 // fields to index to reconcile when change
 const (
 	passwordSecretField     = ".spec.secret"
-	caBundleSecretNameField = ".spec.tls.caBundleSecretName"
+	caBundleSecretNameField = ".spec.tls.caBundleSecretName" // #nosec G101
 	tlsAPIInternalField     = ".spec.tls.api.internal.secretName"
 	tlsAPIPublicField       = ".spec.tls.api.public.secretName"
 	topologyField           = ".spec.topologyRef.Name"
@@ -273,7 +273,7 @@ func (r *ManilaReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		listOpts := []client.ListOption{
 			client.InNamespace(o.GetNamespace()),
 		}
-		if err := r.Client.List(context.Background(), manilas, listOpts...); err != nil {
+		if err := r.List(context.Background(), manilas, listOpts...); err != nil {
 			Log.Error(err, "Unable to retrieve Manila CRs %v")
 			return nil
 		}
@@ -307,7 +307,7 @@ func (r *ManilaReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		listOpts := []client.ListOption{
 			client.InNamespace(o.GetNamespace()),
 		}
-		if err := r.Client.List(context.Background(), manilas, listOpts...); err != nil {
+		if err := r.List(context.Background(), manilas, listOpts...); err != nil {
 			Log.Error(err, "Unable to retrieve Manila CRs %w")
 			return nil
 		}
@@ -362,7 +362,7 @@ func (r *ManilaReconciler) findObjectForSrc(ctx context.Context, src client.Obje
 	listOps := &client.ListOptions{
 		Namespace: src.GetNamespace(),
 	}
-	err := r.Client.List(ctx, crList, listOps)
+	err := r.List(ctx, crList, listOps)
 	if err != nil {
 		Log.Error(err, fmt.Sprintf("listing %s for namespace: %s", crList.GroupVersionKind().Kind, src.GetNamespace()))
 		return requests
@@ -954,7 +954,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 	labels := labels.GetLabels(instance, labels.GetGroupLabel(manila.ServiceName), serviceLabels)
 
 	var tlsCfg *tls.Service
-	if instance.Spec.ManilaAPI.TLS.Ca.CaBundleSecretName != "" {
+	if instance.Spec.ManilaAPI.TLS.CaBundleSecretName != "" {
 		tlsCfg = &tls.Service{}
 	}
 
@@ -1385,7 +1385,7 @@ func (r *ManilaReconciler) checkManilaAPIGeneration(
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
-	if err := r.Client.List(context.Background(), api, listOpts...); err != nil {
+	if err := r.List(context.Background(), api, listOpts...); err != nil {
 		Log.Error(err, "Unable to retrieve ManilaAPI %w")
 		return false, err
 	}
@@ -1407,7 +1407,7 @@ func (r *ManilaReconciler) checkManilaSchedulerGeneration(
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
-	if err := r.Client.List(context.Background(), sched, listOpts...); err != nil {
+	if err := r.List(context.Background(), sched, listOpts...); err != nil {
 		Log.Error(err, "Unable to retrieve ManilaScheduler %w")
 		return false, err
 	}
@@ -1429,7 +1429,7 @@ func (r *ManilaReconciler) checkManilaShareGeneration(
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
-	if err := r.Client.List(context.Background(), share, listOpts...); err != nil {
+	if err := r.List(context.Background(), share, listOpts...); err != nil {
 		Log.Error(err, "Unable to retrieve ManilaShare %w")
 		return false, err
 	}
@@ -1455,7 +1455,7 @@ func (r *ManilaReconciler) shareCleanup(
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
-	if err := r.Client.List(ctx, shares, listOpts...); err != nil {
+	if err := r.List(ctx, shares, listOpts...); err != nil {
 		Log.Error(err, "Unable to retrieve Manila Share CRs %v")
 		return cleanJob, "", nil
 	}
@@ -1467,9 +1467,9 @@ func (r *ManilaReconciler) shareCleanup(
 		// Delete the manilaShare if it's no longer in the spec
 		_, exists := instance.Spec.ManilaShares[share.ShareName()]
 		if !exists && share.DeletionTimestamp.IsZero() {
-			err := r.Client.Delete(ctx, &share)
+			err := r.Delete(ctx, &share)
 			if err != nil && !k8s_errors.IsNotFound(err) {
-				err = fmt.Errorf("Error cleaning up %s: %w", share.Name, err)
+				err = fmt.Errorf("error cleaning up %s: %w", share.Name, err)
 				return cleanJob, "", err
 			}
 			delete(instance.Status.ManilaSharesReadyCounts, share.ShareName())
