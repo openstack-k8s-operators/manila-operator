@@ -12,6 +12,8 @@ github.com/evanphx/json-patch v5.7.0+incompatible h1:vgGkfT/9f8zE6tvSCe74nfpAVDQ
 github.com/evanphx/json-patch v5.7.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.9.0 h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0/FOJfg=
 github.com/evanphx/json-patch/v5 v5.9.0/go.mod h1:VNkHZ/282BpEyt/tObQO8s5CMPmYYq14uClGH4abBuQ=
+github.com/fmount/lib-common/modules/common v0.0.0-20250418160113-1c589e5592a0 h1:SfrZ25ESOPTbVMHOOFDXoWaGE419F+l3+S7EoYhyNhU=
+github.com/fmount/lib-common/modules/common v0.0.0-20250418160113-1c589e5592a0/go.mod h1:A9Ohw5Q90YOGhcDF4ZHkMr5RArz3phoBu9+ibbYDKG4=
 github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nosvA=
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
 github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
@@ -75,8 +77,6 @@ github.com/onsi/gomega v1.34.1 h1:EUMJIKUjM8sKjYbtxQI9A4z2o+rruxnzNvpknOXie6k=
 github.com/onsi/gomega v1.34.1/go.mod h1:kU1QgUvBDLXBJq618Xvm2LUX6rSAfRaFRTcdOeDLwwY=
 github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20250414173555-d17cbc245462 h1:hWdJM9hB/GSFjXc7E7b9L+2H4ZfCOxygceMiYXR4kKc=
 github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20250414173555-d17cbc245462/go.mod h1:+l+sclC6YCRcLcvS3UEGKBf8xya8aExMrmHeA9tMg+k=
-github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20250408123225-0d9e9b82c41b h1:T+N6xOT2NP+hVp2K1xl/NV3uheVHu38CcBuW+8uOBYw=
-github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20250408123225-0d9e9b82c41b/go.mod h1:A9Ohw5Q90YOGhcDF4ZHkMr5RArz3phoBu9+ibbYDKG4=
 github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20250408123225-0d9e9b82c41b h1:eFKmZDCOLmdrTf3h1ELb/wroxfCHQhNZPdCvEe1RZMU=
 github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20250408123225-0d9e9b82c41b/go.mod h1:5+v92XC/PRATIiBrhNLEpJ+T4R9JpxBCgRP6QvbfwgE=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
