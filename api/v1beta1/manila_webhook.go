@@ -213,18 +213,25 @@ func (r *Manila) ValidateUpdate(old runtime.Object) (admission.Warnings, error) 
 func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
+	// validate the service base parameters
+	allErrs = append(allErrs, spec.ValidateBaseParams(basePath)...)
+
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
+
 	return allErrs
 }
 
 // ValidateUpdate -
 func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
+
+	// validate the service base parameters
+	allErrs = append(allErrs, spec.ValidateBaseParams(basePath)...)
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
@@ -239,7 +246,6 @@ func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.P
 func (r *Manila) ValidateDelete() (admission.Warnings, error) {
 	manilalog.Info("validate delete", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object deletion.
 	return nil, nil
 }
 
@@ -329,6 +335,48 @@ func (spec *ManilaSpec) ValidateManilaTopology(basePath *field.Path, namespace s
 	for k, ms := range spec.ManilaShares {
 		path := basePath.Child("manilaShares").Key(k)
 		allErrs = append(allErrs, ms.ValidateTopology(path, namespace)...)
+	}
+	return allErrs
+}
+
+// ValidateBaseParams -
+func (spec *ManilaSpec) ValidateBaseParams(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.RabbitMqClusterName == "" {
+		rabbitPath := basePath.Child("rabbitMqClusterName")
+		allErrs = append(allErrs,
+			field.Invalid(rabbitPath, "rabbitMqClusterName", "RabbitMqClusterName is empty"))
+	}
+	if spec.MemcachedInstance == "" {
+		mcPath := basePath.Child("memcachedInstance")
+		allErrs = append(allErrs,
+			field.Invalid(mcPath, "memcachedInstance", "MemcachedInstance is empty"))
+	}
+	if spec.DatabaseAccount == "" {
+		dbAcc := basePath.Child("databaseAccount")
+		allErrs = append(allErrs,
+			field.Invalid(dbAcc, "databaseAccount", "DatabaseAccount is empty"))
+	}
+	return allErrs
+}
+
+// ValidateBaseParams -
+func (spec *ManilaSpecCore) ValidateBaseParams(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.RabbitMqClusterName == "" {
+		rabbitPath := basePath.Child("rabbitMqClusterName")
+		allErrs = append(allErrs,
+			field.Invalid(rabbitPath, "rabbitMqClusterName", "RabbitMqClusterName is empty"))
+	}
+	if spec.MemcachedInstance == "" {
+		mcPath := basePath.Child("memcachedInstance")
+		allErrs = append(allErrs,
+			field.Invalid(mcPath, "memcachedInstance", "MemcachedInstance is empty"))
+	}
+	if spec.DatabaseAccount == "" {
+		dbAcc := basePath.Child("databaseAccount")
+		allErrs = append(allErrs,
+			field.Invalid(dbAcc, "databaseAccount", "DatabaseAccount is empty"))
 	}
 	return allErrs
 }
