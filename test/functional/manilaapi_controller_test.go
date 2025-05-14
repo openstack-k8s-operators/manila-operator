@@ -26,18 +26,13 @@ import (
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
-	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("ManilaAPI controller", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
 
 	BeforeEach(func() {
-		memcachedSpec = memcachedv1.MemcachedSpec{
-			MemcachedSpecCore: memcachedv1.MemcachedSpecCore{
-				Replicas: ptr.To[int32](3),
-			},
-		}
+		memcachedSpec = infra.GetDefaultMemcachedSpec()
 		apiSpec := GetDefaultManilaAPISpec()
 		apiSpec["customServiceConfig"] = "foo=bar"
 		DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
