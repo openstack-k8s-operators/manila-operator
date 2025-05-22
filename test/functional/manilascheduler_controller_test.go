@@ -26,18 +26,13 @@ import (
 
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	"k8s.io/utils/ptr"
 )
 
 var _ = Describe("ManilaScheduler controller", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
 
 	BeforeEach(func() {
-		memcachedSpec = memcachedv1.MemcachedSpec{
-			MemcachedSpecCore: memcachedv1.MemcachedSpecCore{
-				Replicas: ptr.To[int32](3),
-			},
-		}
+		memcachedSpec = infra.GetDefaultMemcachedSpec()
 		schedSpec := GetDefaultManilaSchedulerSpec()
 		schedSpec["customServiceConfig"] = "foo=bar"
 		DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))

@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
 
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
@@ -43,11 +42,7 @@ var _ = Describe("Manila controller", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
 
 	BeforeEach(func() {
-		memcachedSpec = memcachedv1.MemcachedSpec{
-			MemcachedSpecCore: memcachedv1.MemcachedSpecCore{
-				Replicas: ptr.To[int32](3),
-			},
-		}
+		memcachedSpec = infra.GetDefaultMemcachedSpec()
 	})
 
 	When("Manila CR instance is created", func() {
@@ -1201,11 +1196,7 @@ var _ = Describe("Manila controller", func() {
 		// needs to make it all the way to the end where the mariadb finalizers
 		// are removed from unused accounts since that's part of what we are testing
 		SetupCR: func(accountName types.NamespacedName) {
-			memcachedSpec = memcachedv1.MemcachedSpec{
-				MemcachedSpecCore: memcachedv1.MemcachedSpecCore{
-					Replicas: ptr.To[int32](3),
-				},
-			}
+			memcachedSpec = infra.GetDefaultMemcachedSpec()
 
 			spec := GetDefaultManilaSpec()
 			spec["databaseAccount"] = accountName.Name
