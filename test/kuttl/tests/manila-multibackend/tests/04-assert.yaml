@@ -1,0 +1,132 @@
+# Check for:
+#
+# - 1 manilaAPI
+# - 2 manilaScheduler
+# - 3 manilaShares
+# - 4 extraMounts
+
+apiVersion: manila.openstack.org/v1beta1
+kind: Manila
+metadata:
+   name: manila
+spec:
+   manilaShares:
+      share1:
+        customServiceConfig: |
+            [DEFAULT]
+            enabled_share_backends=cephfsnfs
+            [cephfsnfs]
+            driver_handles_share_servers=False
+            share_backend_name=cephfs
+            share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+            cephfs_auth_id=openstack
+            cephfs_cluster_name=ceph
+            cephfs_nfs_cluster_id=cephfs
+            cephfs_protocol_helper_type=NFS
+status:
+   conditions:
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: Ready
+      - message: CronJob completed
+        reason: Ready
+        status: "True"
+        type: CronJobReady
+      - message: DB create completed
+        reason: Ready
+        status: "True"
+        type: DBReady
+      - message: DBsync completed
+        reason: Ready
+        status: "True"
+        type: DBSyncReady
+      - message: Input data complete
+        reason: Ready
+        status: "True"
+        type: InputReady
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: ManilaAPIReady
+      - message: Setup complete
+        reason: Ready
+        status: "True"
+        type: ManilaSchedulerReady
+      - message: Deployment completed
+        reason: Ready
+        status: "True"
+        type: ManilaShareReady
+      - message: MariaDBAccount creation complete
+        reason: Ready
+        status: "True"
+        type: MariaDBAccountReady
+      - message: " Memcached instance has been provisioned"
+        reason: Ready
+        status: "True"
+        type: MemcachedReady
+      - message: NetworkAttachments completed
+        reason: Ready
+        status: "True"
+        type: NetworkAttachmentsReady
+      - message: RabbitMqTransportURL successfully created
+        reason: Ready
+        status: "True"
+        type: RabbitMqTransportURLReady
+      - message: RoleBinding created
+        reason: Ready
+        status: "True"
+        type: RoleBindingReady
+      - message: Role created
+        reason: Ready
+        status: "True"
+        type: RoleReady
+      - message: ServiceAccount created
+        reason: Ready
+        status: "True"
+        type: ServiceAccountReady
+      - message: Service config create completed
+        reason: Ready
+        status: "True"
+        type: ServiceConfigReady
+   manilaAPIReadyCount: 1
+   manilaSchedulerReadyCount: 1
+   manilaSharesReadyCounts:
+      share1: 1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: manila-db-purge
+---
+apiVersion: manila.openstack.org/v1beta1
+kind: ManilaShare
+metadata:
+  name: manila-share-share1
+status:
+  conditions:
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: Ready
+  - message: Deployment completed
+    reason: Ready
+    status: "True"
+    type: DeploymentReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: InputReady
+  - message: NetworkAttachments completed
+    reason: Ready
+    status: "True"
+    type: NetworkAttachmentsReady
+  - message: Service config create completed
+    reason: Ready
+    status: "True"
+    type: ServiceConfigReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: TLSInputReady
+  readyCount: 1

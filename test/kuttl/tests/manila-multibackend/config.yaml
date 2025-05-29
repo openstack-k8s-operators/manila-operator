@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+reportFormat: JSON
+reportName: kuttl-manila-multibackend-results
+namespace: manila-kuttl-tests
+timeout: 300
+parallel: 1
+skipDelete: true
+testDirs:
+  - test/kuttl/tests/manila-multibackend/tests
+suppress:
+  - events
+artifactsDir: tests/kuttl/tests/manila-multibackend/output
