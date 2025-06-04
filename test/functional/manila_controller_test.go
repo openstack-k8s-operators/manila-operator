@@ -254,6 +254,7 @@ var _ = Describe("Manila controller", func() {
 		})
 	})
 	When("All the Resources are ready", func() {
+		var keystoneAPIName types.NamespacedName
 		BeforeEach(func() {
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
@@ -273,7 +274,8 @@ var _ = Describe("Manila controller", func() {
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
-			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			keystoneAPIName = keystone.CreateKeystoneAPI(namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
 			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
 			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
@@ -311,6 +313,22 @@ var _ = Describe("Manila controller", func() {
 				manila := GetManila(manilaTest.Instance)
 				cron := GetCronJob(manilaTest.DBPurgeCronJob)
 				g.Expect(cron.Spec.Schedule).To(Equal(manila.Spec.DBPurge.Schedule))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("updates the KeystoneAuthURL if keystone internal endpoint changes", func() {
+			newInternalEndpoint := "https://keystone-internal"
+
+			keystone.UpdateKeystoneAPIEndpoint(keystoneAPIName, "internal", newInternalEndpoint)
+			logger.Info("Reconfigured")
+
+			Eventually(func(g Gomega) {
+				confSecret := th.GetSecret(manilaTest.ManilaConfigSecret)
+				g.Expect(confSecret).ShouldNot(BeNil())
+
+				conf := string(confSecret.Data["00-config.conf"])
+				g.Expect(string(conf)).Should(
+					ContainSubstring("auth_url = %s", newInternalEndpoint))
 			}, timeout, interval).Should(Succeed())
 		})
 	})
