@@ -84,6 +84,11 @@ type ManilaShareSpec struct {
 	ServiceAccount string `json:"serviceAccount"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=memcached
+	// Memcached instance name.
+	MemcachedInstance *string `json:"memcachedInstance"`
+
+	// +kubebuilder:validation:Optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// TLS - Parameters related to the TLS
 	TLS tls.Ca `json:"tls,omitempty"`

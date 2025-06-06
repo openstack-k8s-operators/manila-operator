@@ -725,7 +725,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	//
 
 	// deploy manila-api
-	manilaAPI, op, err := r.apiDeploymentCreateOrUpdate(ctx, instance)
+	manilaAPI, op, err := r.apiDeploymentCreateOrUpdate(ctx, instance, memcached)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaAPIReadyCondition,
@@ -773,7 +773,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	}
 
 	// Deploy ManilaScheduler
-	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(ctx, instance)
+	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(ctx, instance, memcached)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaSchedulerReadyCondition,
@@ -816,7 +816,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// Deploy ManilaShare
 	var shareCondition *condition.Condition
 	for name, share := range instance.Spec.ManilaShares {
-		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share, serviceLabels)
+		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share, serviceLabels, memcached)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				manilav1beta1.ManilaShareReadyCondition,
@@ -1002,7 +1002,15 @@ func (r *ManilaReconciler) generateServiceConfig(
 			instance.Status.DatabaseHostname,
 			manila.DatabaseCRName),
 		"MemcachedServersWithInet": memcached.GetMemcachedServerListWithInetString(),
+		"MemcachedServers":         memcached.GetMemcachedServerListString(),
 		"TimeOut":                  instance.Spec.APITimeout,
+	}
+
+	// MTLS
+	if memcached.GetMemcachedMTLSSecret() != "" {
+		templateParameters["MemcachedAuthCert"] = fmt.Sprint(memcachedv1.CertMountPath())
+		templateParameters["MemcachedAuthKey"] = fmt.Sprint(memcachedv1.KeyMountPath())
+		templateParameters["MemcachedAuthCa"] = fmt.Sprint(memcachedv1.CaMountPath())
 	}
 
 	// create httpd  vhost template parameters
@@ -1081,7 +1089,7 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 	return hash, changed, nil
 }
 
-func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila, memcached *memcachedv1.Memcached) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaAPI{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-api", instance.Name),
@@ -1108,6 +1116,12 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 		apiSpec.TopologyRef = instance.Spec.TopologyRef
 	}
 
+	// If memcached is not present in the underlying ManilaAPI Spec,
+	// inherit from the top-level CR (only when MTLS is in use)
+	if memcached.GetMemcachedMTLSSecret() != "" {
+		apiSpec.MemcachedInstance = &instance.Spec.MemcachedInstance
+	}
+
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = apiSpec
 
@@ -1126,7 +1140,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaScheduler, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila, memcached *memcachedv1.Memcached) (*manilav1beta1.ManilaScheduler, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaScheduler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-scheduler", instance.Name),
@@ -1154,6 +1168,12 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context
 		schedulerSpec.TopologyRef = instance.Spec.TopologyRef
 	}
 
+	// If memcached is not present in the underlying ManilaScheduler Spec,
+	// inherit from the top-level CR (only when MTLS is in use)
+	if memcached.GetMemcachedMTLSSecret() != "" {
+		schedulerSpec.MemcachedInstance = &instance.Spec.MemcachedInstance
+	}
+
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = schedulerSpec
 
@@ -1178,6 +1198,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 	name string,
 	share manilav1beta1.ManilaShareTemplate,
 	serviceLabels map[string]string,
+	memcached *memcachedv1.Memcached,
 ) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
 
 	// Add the ShareName to the ManilaShare instance as a label
@@ -1208,6 +1229,12 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 	// inherit from the top-level CR
 	if shareSpec.TopologyRef == nil {
 		shareSpec.TopologyRef = instance.Spec.TopologyRef
+	}
+
+	// If memcached is not present in the underlying ManilaSchare Spec,
+	// inherit from the top-level CR (only when MTLS is in use)
+	if memcached.GetMemcachedMTLSSecret() != "" {
+		shareSpec.MemcachedInstance = &instance.Spec.MemcachedInstance
 	}
 
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
