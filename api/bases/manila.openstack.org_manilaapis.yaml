@@ -536,6 +536,9 @@ spec:
                   - extraVol
                   type: object
                 type: array
+              memcachedInstance:
+                default: memcached
+                type: string
               networkAttachments:
                 items:
                   type: string
