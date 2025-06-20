@@ -1195,6 +1195,110 @@ var _ = Describe("Manila controller", func() {
 				ManilaCephExtraMountsPath, "", container.VolumeMounts)
 		})
 	})
+	When("Manila CR instance has notifications enabled", func() {
+		BeforeEach(func() {
+			rawSpec := map[string]interface{}{
+				"secret":                  SecretName,
+				"databaseInstance":        "openstack",
+				"rabbitMqClusterName":     "rabbitmq",
+				"notificationBusInstance": "rabbitmq",
+				"manilaAPI": map[string]interface{}{
+					"containerImage": manilav1.ManilaAPIContainerImage,
+				},
+				"manilaScheduler": map[string]interface{}{
+					"containerImage": manilav1.ManilaSchedulerContainerImage,
+				},
+				"manilaShares": map[string]interface{}{
+					"share0": map[string]interface{}{
+						"containerImage": manilav1.ManilaShareContainerImage,
+					},
+				},
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)
+			keystoneAPI.Status.APIEndpoints["internal"] = "http://keystone-internal-openstack.testing"
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+		})
+
+		It("Checks the status contains the notifications TransportURL entry", func() {
+			th.ExpectCondition(
+				manilaTest.Instance,
+				ConditionGetterFunc(ManilaConditionGetter),
+				condition.NotificationBusInstanceReadyCondition,
+				corev1.ConditionTrue,
+			)
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				g.Expect(manila.Status.TransportURLSecret).ToNot(Equal(""))
+				g.Expect(*manila.Status.NotificationURLSecret).ToNot(Equal(""))
+				g.Expect(manila.Status.TransportURLSecret).
+					To(Equal(*manila.Status.NotificationURLSecret))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("overrides manila CR notifications", func() {
+			// add new-rabbit in Manila CR
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.NotificationSecretName))
+
+			// update Manila CR to point to the new (dedicated) rabbit instance
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				*manila.Spec.NotificationBusInstance = "rabbitmq-notification"
+				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			th.ExpectCondition(
+				manilaTest.Instance,
+				ConditionGetterFunc(ManilaConditionGetter),
+				condition.NotificationBusInstanceReadyCondition,
+				corev1.ConditionTrue,
+			)
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				g.Expect(*manila.Status.NotificationURLSecret).ToNot(
+					Equal(manila.Status.TransportURLSecret))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("updates manila CR and disable notifications", func() {
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				manila.Spec.NotificationBusInstance = nil
+				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				g.Expect(manila.Status.NotificationURLSecret).To(BeNil())
+				g.Expect(manila.Status.TransportURLSecret).ToNot(Equal(""))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
 
 	// Run MariaDBAccount suite tests.  these are pre-packaged ginkgo tests
 	// that exercise standard account create / update patterns that should be
