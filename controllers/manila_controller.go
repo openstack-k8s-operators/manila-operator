@@ -194,6 +194,15 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		condition.UnknownCondition(condition.RoleBindingReadyCondition, condition.InitReason, condition.RoleBindingReadyInitMessage),
 		condition.UnknownCondition(condition.CronJobReadyCondition, condition.InitReason, condition.CronJobReadyInitMessage),
 	)
+
+	if instance.Spec.NotificationBusInstance != nil {
+		c := condition.UnknownCondition(
+			condition.NotificationBusInstanceReadyCondition,
+			condition.InitReason,
+			condition.NotificationBusInstanceReadyInitMessage)
+		cl.Set(c)
+	}
+
 	instance.Status.Conditions.Init(&cl)
 	instance.Status.ObservedGeneration = instance.Generation
 
@@ -490,7 +499,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// create RabbitMQ transportURL CR and get the actual URL from the associated secret that is created
 	//
 
-	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance)
+	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, "")
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.RabbitMqTransportURLReadyCondition,
@@ -520,6 +529,59 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	instance.Status.Conditions.MarkTrue(condition.RabbitMqTransportURLReadyCondition, condition.RabbitMqTransportURLReadyMessage)
 
 	// end transportURL
+
+	//
+	// create NotificationBus transportURL CR and get the actual URL from the
+	// associated secret that is created
+	//
+
+	// Request TransportURL when the parameter is provided in the CR
+	// and it does not match with the existing RabbitMqClusterName
+	if instance.Spec.NotificationBusInstance != nil {
+		// init .Status.NotificationURLSecret
+		instance.Status.NotificationURLSecret = ptr.To("")
+
+		// setting notificationBusName to an empty string ensures that we do not
+		// request a new transportURL unless the two spec fields do not match
+		var notificationBusName string
+		if *instance.Spec.NotificationBusInstance != instance.Spec.RabbitMqClusterName {
+			notificationBusName = *instance.Spec.NotificationBusInstance
+		}
+		notificationBusInstanceURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, notificationBusName)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.NotificationBusInstanceReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NotificationBusInstanceReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+
+		if op != controllerutil.OperationResultNone {
+			r.Log.Info(fmt.Sprintf("NotificationBusInstanceURL %s successfully reconciled - operation: %s", notificationBusInstanceURL.Name, string(op)))
+		}
+
+		*instance.Status.NotificationURLSecret = notificationBusInstanceURL.Status.SecretName
+
+		if instance.Status.NotificationURLSecret == nil {
+			r.Log.Info(fmt.Sprintf("Waiting for NotificationBusInstanceURL %s secret to be created", transportURL.Name))
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.NotificationBusInstanceReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.NotificationBusInstanceReadyRunningMessage))
+			return manila.ResultRequeue, nil
+		}
+
+		instance.Status.Conditions.MarkTrue(condition.NotificationBusInstanceReadyCondition, condition.NotificationBusInstanceReadyMessage)
+	} else {
+		// make sure we do not have an entry in the status if
+		// .Spec.NotificationURLSecret is not provided
+		instance.Status.NotificationURLSecret = nil
+	}
+
+	// end notificationBusInstanceURL
 
 	//
 	// Check for required memcached used for caching
@@ -922,17 +984,17 @@ func (r *ManilaReconciler) generateServiceConfig(
 	if err != nil {
 		return err
 	}
+	transportURLSecretData := string(transportURLSecret.Data["transport_url"])
 
 	databaseAccount := db.GetAccount()
 	databaseSecret := db.GetSecret()
 
-	// templateParameters := make(map[string]interface{})
 	templateParameters := map[string]interface{}{
 		"ServiceUser":         instance.Spec.ServiceUser,
 		"ServicePassword":     string(ospSecret.Data[instance.Spec.PasswordSelectors.Service]),
 		"KeystonePublicURL":   keystonePublicURL,
 		"KeystoneInternalURL": keystoneInternalURL,
-		"TransportURL":        string(transportURLSecret.Data["transport_url"]),
+		"TransportURL":        transportURLSecretData,
 		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s?read_default_file=/etc/my.cnf",
 			databaseAccount.Spec.UserName,
 			string(databaseSecret.Data[mariadbv1.DatabasePasswordSelector]),
@@ -956,6 +1018,21 @@ func (r *ManilaReconciler) generateServiceConfig(
 		httpdVhostConfig[endpt.String()] = endptConfig
 	}
 	templateParameters["VHosts"] = httpdVhostConfig
+
+	var notificationInstanceURLSecret *corev1.Secret
+	if instance.Status.NotificationURLSecret != nil {
+		// Get a notificationInstanceURLSecret only if rabbitMQ referenced in
+		// the spec is different, otherwise inherits the existing transport_url
+		if instance.Spec.RabbitMqClusterName != *instance.Spec.NotificationBusInstance {
+			notificationInstanceURLSecret, _, err = secret.GetSecret(ctx, h, *instance.Status.NotificationURLSecret, instance.Namespace)
+			if err != nil {
+				return err
+			}
+			templateParameters["NotificationsURL"] = string(notificationInstanceURLSecret.Data["transport_url"])
+		} else {
+			templateParameters["NotificationsURL"] = transportURLSecretData
+		}
+	}
 
 	configTemplates := []util.Template{
 		// ScriptsConfigMap
@@ -1033,7 +1110,9 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = apiSpec
 
-		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
+		if instance.Spec.NotificationBusInstance != nil {
+			deployment.Spec.NotificationURLSecret = *instance.Status.NotificationURLSecret
+		}
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -1076,7 +1155,10 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context
 
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = schedulerSpec
-		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
+
+		if instance.Spec.NotificationBusInstance != nil {
+			deployment.Spec.NotificationURLSecret = *instance.Status.NotificationURLSecret
+		}
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -1129,7 +1211,10 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = shareSpec
-		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
+
+		if instance.Spec.NotificationBusInstance != nil {
+			deployment.Spec.NotificationURLSecret = *instance.Status.NotificationURLSecret
+		}
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -1142,21 +1227,40 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) transportURLCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
+// transportURLCreateOrUpdate - this function is called in two different scenarios:
+// 1. request a messagingBus: it returns the regular transportURL that is used to
+// extract the messagingBus URL string
+// 2. request a notificationBus: it returns a transportURL that is used to extract
+// the notificationBus URL string
+func (r *ManilaReconciler) transportURLCreateOrUpdate(
+	ctx context.Context,
+	instance *manilav1beta1.Manila,
+	rabbitMqClusterName string,
+) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
+
+	// Default values used for regular messagingBus transportURL and explicitly
+	// set here to ensure backward compatibility with the previous versions
+	rmqName := fmt.Sprintf("%s-manila-transport", instance.Name)
+	transportURLName := instance.Spec.RabbitMqClusterName
+
+	// When a rabbitMqClusterName is passed as input (notificationBus use case)
+	// update the default rmqName and transportURLName values
+	if rabbitMqClusterName != "" {
+		rmqName = fmt.Sprintf("%s-manila-transport-%s", instance.Name, rabbitMqClusterName)
+		transportURLName = rabbitMqClusterName
+	}
 	transportURL := &rabbitmqv1.TransportURL{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-manila-transport", instance.Name),
+			Name:      rmqName,
 			Namespace: instance.Namespace,
 		},
 	}
-
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, transportURL, func() error {
-		transportURL.Spec.RabbitmqClusterName = instance.Spec.RabbitMqClusterName
+		transportURL.Spec.RabbitmqClusterName = transportURLName
 
 		err := controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
 		return err
 	})
-
 	return transportURL, op, err
 }
 

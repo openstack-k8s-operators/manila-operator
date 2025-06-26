@@ -41,40 +41,42 @@ const (
 
 // ManilaTestData is the data structure used to provide input data to envTest
 type ManilaTestData struct {
-	RabbitmqClusterName         string
-	RabbitmqSecretName          string
-	MemcachedInstance           string
-	ManilaPassword              string
-	ManilaServiceUser           string
-	Instance                    types.NamespacedName
-	ManilaRole                  types.NamespacedName
-	ManilaRoleBinding           types.NamespacedName
-	ManilaTransportURL          types.NamespacedName
-	ManilaMemcached             types.NamespacedName
-	ManilaDatabaseName          types.NamespacedName
-	ManilaDatabaseAccount       types.NamespacedName
-	ManilaSA                    types.NamespacedName
-	ManilaDBSync                types.NamespacedName
-	ManilaKeystoneEndpoint      types.NamespacedName
-	ManilaServicePublic         types.NamespacedName
-	ManilaServiceInternal       types.NamespacedName
-	ManilaConfigSecret          types.NamespacedName
-	ManilaAPIConfigSecret       types.NamespacedName
-	ManilaSchedulerConfigSecret types.NamespacedName
-	ManilaShareConfigSecret     types.NamespacedName
-	ManilaConfigScripts         types.NamespacedName
-	Manila                      types.NamespacedName
-	ManilaAPI                   types.NamespacedName
-	ManilaScheduler             types.NamespacedName
-	ManilaShares                []types.NamespacedName
-	ManilaDefaultShare          types.NamespacedName
-	InternalAPINAD              types.NamespacedName
-	ContainerImage              string
-	CABundleSecret              types.NamespacedName
-	InternalCertSecret          types.NamespacedName
-	PublicCertSecret            types.NamespacedName
-	DBPurgeCronJob              types.NamespacedName
-	ManilaTopologies            []types.NamespacedName
+	RabbitmqClusterName            string
+	RabbitmqSecretName             string
+	NotificationSecretName         string
+	MemcachedInstance              string
+	ManilaPassword                 string
+	ManilaServiceUser              string
+	Instance                       types.NamespacedName
+	ManilaRole                     types.NamespacedName
+	ManilaRoleBinding              types.NamespacedName
+	ManilaTransportURL             types.NamespacedName
+	ManilaTransportURLNotification types.NamespacedName
+	ManilaMemcached                types.NamespacedName
+	ManilaDatabaseName             types.NamespacedName
+	ManilaDatabaseAccount          types.NamespacedName
+	ManilaSA                       types.NamespacedName
+	ManilaDBSync                   types.NamespacedName
+	ManilaKeystoneEndpoint         types.NamespacedName
+	ManilaServicePublic            types.NamespacedName
+	ManilaServiceInternal          types.NamespacedName
+	ManilaConfigSecret             types.NamespacedName
+	ManilaAPIConfigSecret          types.NamespacedName
+	ManilaSchedulerConfigSecret    types.NamespacedName
+	ManilaShareConfigSecret        types.NamespacedName
+	ManilaConfigScripts            types.NamespacedName
+	Manila                         types.NamespacedName
+	ManilaAPI                      types.NamespacedName
+	ManilaScheduler                types.NamespacedName
+	ManilaShares                   []types.NamespacedName
+	ManilaDefaultShare             types.NamespacedName
+	InternalAPINAD                 types.NamespacedName
+	ContainerImage                 string
+	CABundleSecret                 types.NamespacedName
+	InternalCertSecret             types.NamespacedName
+	PublicCertSecret               types.NamespacedName
+	DBPurgeCronJob                 types.NamespacedName
+	ManilaTopologies               []types.NamespacedName
 }
 
 // GetManilaTestData is a function that initialize the ManilaTestData
@@ -135,6 +137,10 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("manila-%s-transport", manilaName.Name),
 		},
+		ManilaTransportURLNotification: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      fmt.Sprintf("manila-%s-transport-rabbitmq-notification", manilaName.Name),
+		},
 		ManilaMemcached: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      MemcachedInstance,
@@ -177,9 +183,10 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 			Namespace: manilaName.Namespace,
 			Name:      "internalapi",
 		},
-		RabbitmqClusterName: "rabbitmq",
-		RabbitmqSecretName:  "rabbitmq-secret",
-		MemcachedInstance:   MemcachedInstance,
+		RabbitmqClusterName:    "rabbitmq",
+		RabbitmqSecretName:     "rabbitmq-secret",
+		NotificationSecretName: "rabbitmq-notification-secret",
+		MemcachedInstance:      MemcachedInstance,
 		// Password used for service
 		ManilaPassword:    "12345678",
 		ManilaServiceUser: "manila",

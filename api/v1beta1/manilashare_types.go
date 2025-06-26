@@ -72,6 +72,9 @@ type ManilaShareSpec struct {
 	// Secret containing RabbitMq transport URL
 	TransportURLSecret string `json:"transportURLSecret,omitempty"`
 
+	// Secret containing Notification transport URL
+	NotificationURLSecret string `json:"notificationURLSecret,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
 	ExtraMounts []ManilaExtraVolMounts `json:"extraMounts,omitempty"`
