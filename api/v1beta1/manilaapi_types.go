@@ -90,6 +90,11 @@ type ManilaAPISpec struct {
 	// +kubebuilder:validation:Required
 	// ServiceAccount - service account name used internally to provide the default SA name
 	ServiceAccount string `json:"serviceAccount"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=memcached
+	// Memcached instance name.
+	MemcachedInstance *string `json:"memcachedInstance"`
 }
 
 // ManilaAPIStatus defines the observed state of ManilaAPI
