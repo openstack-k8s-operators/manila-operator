@@ -495,11 +495,15 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// ConfigMap
 	configVars := make(map[string]env.Setter)
 
+	serviceLabels := map[string]string{
+		common.AppSelector: manila.ServiceName,
+	}
+
 	//
 	// create RabbitMQ transportURL CR and get the actual URL from the associated secret that is created
 	//
 
-	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, "")
+	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, "")
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.RabbitMqTransportURLReadyCondition,
@@ -547,7 +551,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		if *instance.Spec.NotificationBusInstance != instance.Spec.RabbitMqClusterName {
 			notificationBusName = *instance.Spec.NotificationBusInstance
 		}
-		notificationBusInstanceURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, notificationBusName)
+		notificationBusInstanceURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, notificationBusName)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NotificationBusInstanceReadyCondition,
@@ -655,9 +659,6 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	//
 	// Create ConfigMaps and Secrets required as input for the Service and calculate an overall hash of hashes
 	//
-	serviceLabels := map[string]string{
-		common.AppSelector: manila.ServiceName,
-	}
 	//
 	// create Config required for Manila input
 	// - %-scripts configmap holding scripts to e.g. bootstrap the service
@@ -1235,6 +1236,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 func (r *ManilaReconciler) transportURLCreateOrUpdate(
 	ctx context.Context,
 	instance *manilav1beta1.Manila,
+	serviceLabels map[string]string,
 	rabbitMqClusterName string,
 ) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
 
@@ -1253,6 +1255,7 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rmqName,
 			Namespace: instance.Namespace,
+			Labels:    serviceLabels,
 		},
 	}
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, transportURL, func() error {
