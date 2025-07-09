@@ -133,11 +133,11 @@ var _ = Describe("ManilaAPI controller", func() {
 				ss := th.GetStatefulSet(manilaTest.ManilaAPI)
 				// Check the resulting deployment fields
 				Expect(int(*ss.Spec.Replicas)).To(Equal(1))
-				Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(6))
+				Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(5))
 				Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 				container := ss.Spec.Template.Spec.Containers[1]
-				Expect(container.VolumeMounts).To(HaveLen(8))
+				Expect(container.VolumeMounts).To(HaveLen(7))
 				Expect(container.Image).To(Equal(manilaTest.ContainerImage))
 				Expect(container.LivenessProbe.HTTPGet.Port.IntVal).To(Equal(int32(8786)))
 				Expect(container.ReadinessProbe.HTTPGet.Port.IntVal).To(Equal(int32(8786)))
