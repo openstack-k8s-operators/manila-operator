@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
+	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
@@ -516,9 +517,14 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 		return ctrl.Result{}, fmt.Errorf("waiting for Topology requirements: %w", err)
 	}
 
+	memcached, err := memcachedv1.GetMemcachedByName(ctx, helper, *instance.Spec.MemcachedInstance, instance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Deploy a statefulset
 	ss := statefulset.NewStatefulSet(
-		manilashare.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations, topology),
+		manilashare.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations, topology, memcached),
 		manila.ShortDuration,
 	)
 

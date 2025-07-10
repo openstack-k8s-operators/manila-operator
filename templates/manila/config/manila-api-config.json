@@ -34,6 +34,22 @@
       "perm": "0600",
       "optional": true,
       "merge": true
+    },
+    {
+      "source": "/var/lib/config-data/mtls/certs/*",
+      "dest": "/etc/pki/tls/certs/",
+      "owner": "manila",
+      "perm": "0640",
+      "optional": true,
+      "merge": true
+    },
+    {
+      "source": "/var/lib/config-data/mtls/private/*",
+      "dest": "/etc/pki/tls/private/",
+      "owner": "manila",
+      "perm": "0600",
+      "optional": true,
+      "merge": true
     }
   ],
   "permissions": [
