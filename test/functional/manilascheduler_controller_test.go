@@ -134,11 +134,11 @@ var _ = Describe("ManilaScheduler controller", func() {
 				ss := th.GetStatefulSet(manilaTest.ManilaScheduler)
 				// Check the resulting deployment fields
 				Expect(int(*ss.Spec.Replicas)).To(Equal(1))
-				Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(5))
+				Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(4))
 				Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 				container := ss.Spec.Template.Spec.Containers[1]
-				Expect(container.VolumeMounts).To(HaveLen(7))
+				Expect(container.VolumeMounts).To(HaveLen(6))
 				Expect(container.Image).To(Equal(manilaTest.ContainerImage))
 			})
 			It("stored the input hash in the Status", func() {
