@@ -64,7 +64,6 @@ type ManilaAPIReconciler struct {
 	client.Client
 	Scheme  *runtime.Scheme
 	Kclient kubernetes.Interface
-	Log     logr.Logger
 }
 
 var keystoneServices = []map[string]string{
@@ -104,19 +103,19 @@ func (r *ManilaAPIReconciler) GetKClient() kubernetes.Interface {
 	return r.Kclient
 }
 
-// GetLogger -
-func (r *ManilaAPIReconciler) GetLogger() logr.Logger {
-	return r.Log
-}
-
 // GetScheme -
 func (r *ManilaAPIReconciler) GetScheme() *runtime.Scheme {
 	return r.Scheme
 }
 
+// GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
+func (r *ManilaAPIReconciler) GetLogger(ctx context.Context) logr.Logger {
+	return log.FromContext(ctx).WithName("Controllers").WithName("ManilaAPI")
+}
+
 // Reconcile -
 func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
-	_ = log.FromContext(ctx)
+	Log := r.GetLogger(ctx)
 
 	// Fetch the ManilaAPI instance
 	instance := &manilav1beta1.ManilaAPI{}
@@ -129,7 +128,7 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		r.Log.Error(err, fmt.Sprintf("could not fetch ManilaAPI instance %s", instance.Name))
+		Log.Error(err, fmt.Sprintf("could not fetch ManilaAPI instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -138,10 +137,10 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		r.Client,
 		r.Kclient,
 		r.Scheme,
-		r.Log,
+		Log,
 	)
 	if err != nil {
-		r.Log.Error(err, fmt.Sprintf("could not instantiate helper for instance %s", instance.Name))
+		Log.Error(err, fmt.Sprintf("could not instantiate helper for instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -161,7 +160,7 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	defer func() {
 		// Don't update the status, if Reconciler Panics
 		if rc := recover(); rc != nil {
-			r.Log.Info(fmt.Sprintf("Panic during reconcile %v\n", rc))
+			Log.Info(fmt.Sprintf("Panic during reconcile %v\n", rc))
 			panic(rc)
 		}
 		condition.RestoreLastTransitionTimes(
@@ -223,7 +222,8 @@ func (r *ManilaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ManilaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	Log := r.GetLogger(ctx)
 	// Watch for changes to any CustomServiceConfigSecrets. Global secrets
 	// (e.g. TransportURLSecret) are handled by the top Manila controller.
 	secretFn := func(_ context.Context, o client.Object) []reconcile.Request {
@@ -237,7 +237,7 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			client.InNamespace(namespace),
 		}
 		if err := r.Client.List(context.Background(), apis, listOpts...); err != nil {
-			r.Log.Error(err, "Unable to retrieve API CRs %v")
+			Log.Error(err, "Unable to retrieve API CRs %v")
 			return nil
 		}
 		// Watch for changes to secrets where the owner label AND the
@@ -252,7 +252,7 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						Namespace: namespace,
 						Name:      cr.Name,
 					}
-					r.Log.Info(fmt.Sprintf("Secret %s and CR %s marked with label: %s", o.GetName(), cr.Name, l))
+					Log.Info(fmt.Sprintf("Secret %s and CR %s marked with label: %s", o.GetName(), cr.Name, l))
 
 					result = append(result, reconcile.Request{NamespacedName: name})
 				}
@@ -265,7 +265,7 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						Namespace: namespace,
 						Name:      cr.Name,
 					}
-					r.Log.Info(fmt.Sprintf("Secret %s is used by Manila CR %s", secretName, cr.Name))
+					Log.Info(fmt.Sprintf("Secret %s is used by Manila CR %s", secretName, cr.Name))
 					result = append(result, reconcile.Request{NamespacedName: name})
 				}
 			}
@@ -360,7 +360,7 @@ func (r *ManilaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ManilaAPIReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
-	l := log.FromContext(ctx).WithName("Controllers").WithName("ManilaAPI")
+	Log := r.GetLogger(ctx)
 
 	for _, field := range manilaAPIWatchFields {
 		crList := &manilav1beta1.ManilaAPIList{}
@@ -370,12 +370,12 @@ func (r *ManilaAPIReconciler) findObjectsForSrc(ctx context.Context, src client.
 		}
 		err := r.List(ctx, crList, listOps)
 		if err != nil {
-			l.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
+			Log.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
 			return requests
 		}
 
 		for _, item := range crList.Items {
-			l.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
+			Log.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
 
 			requests = append(requests,
 				reconcile.Request{
@@ -392,7 +392,8 @@ func (r *ManilaAPIReconciler) findObjectsForSrc(ctx context.Context, src client.
 }
 
 func (r *ManilaAPIReconciler) reconcileDelete(ctx context.Context, instance *manilav1beta1.ManilaAPI, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
+	Log := r.GetLogger(ctx)
+	Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
 
 	for _, ksSvc := range keystoneServices {
 
@@ -437,7 +438,7 @@ func (r *ManilaAPIReconciler) reconcileDelete(ctx context.Context, instance *man
 
 	// Service is deleted so remove the finalizer.
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
 
 	return ctrl.Result{}, nil
 }
@@ -448,7 +449,8 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	helper *helper.Helper,
 	serviceLabels map[string]string,
 ) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
+	Log := r.GetLogger(ctx)
+	Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
 
 	//
 	// expose the service (create service and return the created endpoint URLs)
@@ -666,12 +668,13 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		}
 	}
 
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' init successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' init successfully", instance.Name))
 	return ctrl.Result{}, nil
 }
 
 func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *manilav1beta1.ManilaAPI, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
+	Log := r.GetLogger(ctx)
+	Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
 
 	// ConfigVars
 	configVars := make(map[string]env.Setter)
@@ -806,7 +809,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, hashChanged, err := r.createHashOfInputHashes(instance, configVars)
+	inputHash, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -816,7 +819,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 			err.Error()))
 		return ctrl.Result{}, err
 	} else if hashChanged {
-		r.Log.Info(fmt.Sprintf("%s... requeueing", condition.ServiceConfigReadyInitMessage))
+		Log.Info(fmt.Sprintf("%s... requeueing", condition.ServiceConfigReadyInitMessage))
 		instance.Status.Conditions.MarkFalse(
 			condition.ServiceConfigReadyCondition,
 			condition.InitReason,
@@ -961,7 +964,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	}
 	// create StatefulSet - end
 
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	// update the overall status condition if service is ready
 	if instance.IsReady() {
 		instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
@@ -1047,9 +1050,11 @@ func (r *ManilaAPIReconciler) generateServiceConfig(
 //
 // returns the hash, whether the hash changed (as a bool) and any error
 func (r *ManilaAPIReconciler) createHashOfInputHashes(
+	ctx context.Context,
 	instance *manilav1beta1.ManilaAPI,
 	envVars map[string]env.Setter,
 ) (string, bool, error) {
+	Log := r.GetLogger(ctx)
 	var hashMap map[string]string
 	changed := false
 	mergedMapVars := env.MergeEnvs([]corev1.EnvVar{}, envVars)
@@ -1059,7 +1064,7 @@ func (r *ManilaAPIReconciler) createHashOfInputHashes(
 	}
 	if hashMap, changed = util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
+		Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, changed, nil
 }

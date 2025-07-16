@@ -69,11 +69,6 @@ func (r *ManilaReconciler) GetKClient() kubernetes.Interface {
 	return r.Kclient
 }
 
-// GetLogger -
-func (r *ManilaReconciler) GetLogger() logr.Logger {
-	return r.Log
-}
-
 // GetScheme -
 func (r *ManilaReconciler) GetScheme() *runtime.Scheme {
 	return r.Scheme
@@ -83,8 +78,12 @@ func (r *ManilaReconciler) GetScheme() *runtime.Scheme {
 type ManilaReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
-	Log     logr.Logger
 	Scheme  *runtime.Scheme
+}
+
+// GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
+func (r *ManilaReconciler) GetLogger(ctx context.Context) logr.Logger {
+	return log.FromContext(ctx).WithName("Controllers").WithName("Manila")
 }
 
 // +kubebuilder:rbac:groups=manila.openstack.org,resources=manilas,verbs=get;list;watch;create;update;patch;delete
@@ -122,7 +121,7 @@ type ManilaReconciler struct {
 
 // Reconcile -
 func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
-	_ = log.FromContext(ctx)
+	Log := r.GetLogger(ctx)
 
 	instance := &manilav1beta1.Manila{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
@@ -130,7 +129,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		if k8s_errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-		r.Log.Error(err, fmt.Sprintf("could not fetch Manila instance %s", instance.Name))
+		Log.Error(err, fmt.Sprintf("could not fetch Manila instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -139,10 +138,10 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		r.Client,
 		r.Kclient,
 		r.Scheme,
-		r.Log,
+		Log,
 	)
 	if err != nil {
-		r.Log.Error(err, fmt.Sprintf("could not instantiate helper for instance %s", instance.Name))
+		Log.Error(err, fmt.Sprintf("could not instantiate helper for instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -160,7 +159,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 	defer func() {
 		// Don't update the status, if Reconciler Panics
 		if rc := recover(); rc != nil {
-			r.Log.Info(fmt.Sprintf("Panic during reconcile %v\n", rc))
+			Log.Info(fmt.Sprintf("Panic during reconcile %v\n", rc))
 			panic(rc)
 		}
 		condition.RestoreLastTransitionTimes(
@@ -253,7 +252,8 @@ var (
 )
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ManilaReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	Log := r.GetLogger(ctx)
 	// transportURLSecretFn - Watch for changes made to the secret associated with the RabbitMQ
 	// TransportURL created and used by Manila CRs. Watch functions return a list of namespace-scoped
 	// CRs that then get fed to the reconciler. Hence, in this case, we need to know the name of the
@@ -274,7 +274,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			client.InNamespace(o.GetNamespace()),
 		}
 		if err := r.Client.List(context.Background(), manilas, listOpts...); err != nil {
-			r.Log.Error(err, "Unable to retrieve Manila CRs %v")
+			Log.Error(err, "Unable to retrieve Manila CRs %v")
 			return nil
 		}
 
@@ -287,7 +287,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 							Namespace: o.GetNamespace(),
 							Name:      cr.Name,
 						}
-						r.Log.Info(fmt.Sprintf("TransportURL Secret %s belongs to TransportURL belonging to Manila CR %s", o.GetName(), cr.Name))
+						Log.Info(fmt.Sprintf("TransportURL Secret %s belongs to TransportURL belonging to Manila CR %s", o.GetName(), cr.Name))
 						result = append(result, reconcile.Request{NamespacedName: name})
 					}
 				}
@@ -308,7 +308,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			client.InNamespace(o.GetNamespace()),
 		}
 		if err := r.Client.List(context.Background(), manilas, listOpts...); err != nil {
-			r.Log.Error(err, "Unable to retrieve Manila CRs %w")
+			Log.Error(err, "Unable to retrieve Manila CRs %w")
 			return nil
 		}
 
@@ -318,7 +318,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					Namespace: o.GetNamespace(),
 					Name:      cr.Name,
 				}
-				r.Log.Info(fmt.Sprintf("Memcached %s is used by Manila CR %s", o.GetName(), cr.Name))
+				Log.Info(fmt.Sprintf("Memcached %s is used by Manila CR %s", o.GetName(), cr.Name))
 				result = append(result, reconcile.Request{NamespacedName: name})
 			}
 		}
@@ -356,7 +356,7 @@ func (r *ManilaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ManilaReconciler) findObjectForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
-	l := log.FromContext(ctx).WithName("Controllers").WithName("Manila")
+	Log := r.GetLogger(ctx)
 
 	crList := &manilav1beta1.ManilaList{}
 	listOps := &client.ListOptions{
@@ -364,12 +364,12 @@ func (r *ManilaReconciler) findObjectForSrc(ctx context.Context, src client.Obje
 	}
 	err := r.Client.List(ctx, crList, listOps)
 	if err != nil {
-		l.Error(err, fmt.Sprintf("listing %s for namespace: %s", crList.GroupVersionKind().Kind, src.GetNamespace()))
+		Log.Error(err, fmt.Sprintf("listing %s for namespace: %s", crList.GroupVersionKind().Kind, src.GetNamespace()))
 		return requests
 	}
 
 	for _, item := range crList.Items {
-		l.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
+		Log.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
 
 		requests = append(requests,
 			reconcile.Request{
@@ -385,7 +385,8 @@ func (r *ManilaReconciler) findObjectForSrc(ctx context.Context, src client.Obje
 }
 
 func (r *ManilaReconciler) reconcileDelete(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
+	Log := r.GetLogger(ctx)
+	Log.Info(fmt.Sprintf("Reconciling Service '%s' delete", instance.Name))
 
 	// remove db finalizer first
 	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, helper, manila.DatabaseCRName, instance.Spec.DatabaseAccount, instance.Namespace)
@@ -401,7 +402,7 @@ func (r *ManilaReconciler) reconcileDelete(ctx context.Context, instance *manila
 
 	// Service is deleted so remove the finalizer.
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
 
 	return ctrl.Result{}, nil
 }
@@ -413,7 +414,8 @@ func (r *ManilaReconciler) reconcileInit(
 	serviceLabels map[string]string,
 	serviceAnnotations map[string]string,
 ) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
+	Log := r.GetLogger(ctx)
+	Log.Info(fmt.Sprintf("Reconciling Service '%s' init", instance.Name))
 
 	//
 	// run manila db sync
@@ -458,18 +460,19 @@ func (r *ManilaReconciler) reconcileInit(
 	}
 	if dbSyncjob.HasChanged() {
 		instance.Status.Hash[manilav1beta1.DbSyncHash] = dbSyncjob.GetHash()
-		r.Log.Info(fmt.Sprintf("Service '%s' - Job %s hash added - %s", instance.Name, jobDef.Name, instance.Status.Hash[manilav1beta1.DbSyncHash]))
+		Log.Info(fmt.Sprintf("Service '%s' - Job %s hash added - %s", instance.Name, jobDef.Name, instance.Status.Hash[manilav1beta1.DbSyncHash]))
 	}
 	instance.Status.Conditions.MarkTrue(condition.DBSyncReadyCondition, condition.DBSyncReadyMessage)
 
 	// run Manila db sync - end
 
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' init successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' init successfully", instance.Name))
 	return ctrl.Result{}, nil
 }
 
 func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manilav1beta1.Manila, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
+	Log := r.GetLogger(ctx)
+	Log.Info(fmt.Sprintf("Reconciling Service '%s'", instance.Name))
 
 	// Service account, role, binding
 	rbacRules := []rbacv1.PolicyRule{
@@ -515,13 +518,13 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	}
 
 	if op != controllerutil.OperationResultNone {
-		r.Log.Info(fmt.Sprintf("TransportURL %s successfully reconciled - operation: %s", transportURL.Name, string(op)))
+		Log.Info(fmt.Sprintf("TransportURL %s successfully reconciled - operation: %s", transportURL.Name, string(op)))
 	}
 
 	instance.Status.TransportURLSecret = transportURL.Status.SecretName
 
 	if instance.Status.TransportURLSecret == "" {
-		r.Log.Info(fmt.Sprintf("Waiting for TransportURL %s secret to be created", transportURL.Name))
+		Log.Info(fmt.Sprintf("Waiting for TransportURL %s secret to be created", transportURL.Name))
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.RabbitMqTransportURLReadyCondition,
 			condition.RequestedReason,
@@ -563,13 +566,13 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		}
 
 		if op != controllerutil.OperationResultNone {
-			r.Log.Info(fmt.Sprintf("NotificationBusInstanceURL %s successfully reconciled - operation: %s", notificationBusInstanceURL.Name, string(op)))
+			Log.Info(fmt.Sprintf("NotificationBusInstanceURL %s successfully reconciled - operation: %s", notificationBusInstanceURL.Name, string(op)))
 		}
 
 		*instance.Status.NotificationURLSecret = notificationBusInstanceURL.Status.SecretName
 
 		if instance.Status.NotificationURLSecret == nil {
-			r.Log.Info(fmt.Sprintf("Waiting for NotificationBusInstanceURL %s secret to be created", transportURL.Name))
+			Log.Info(fmt.Sprintf("Waiting for NotificationBusInstanceURL %s secret to be created", transportURL.Name))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NotificationBusInstanceReadyCondition,
 				condition.RequestedReason,
@@ -593,7 +596,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	memcached, err := memcachedv1.GetMemcachedByName(ctx, helper, instance.Spec.MemcachedInstance, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
-			r.Log.Info(fmt.Sprintf("memcached %s not found", instance.Spec.MemcachedInstance))
+			Log.Info(fmt.Sprintf("memcached %s not found", instance.Spec.MemcachedInstance))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.MemcachedReadyCondition,
 				condition.RequestedReason,
@@ -611,7 +614,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	}
 
 	if !memcached.IsReady() {
-		r.Log.Info(fmt.Sprintf("memcached %s is not ready", memcached.Name))
+		Log.Info(fmt.Sprintf("memcached %s is not ready", memcached.Name))
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.MemcachedReadyCondition,
 			condition.RequestedReason,
@@ -680,7 +683,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	_, hashChanged, err := r.createHashOfInputHashes(instance, configVars)
+	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -690,7 +693,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	} else if hashChanged {
-		r.Log.Info(fmt.Sprintf("%s... requeueing", condition.ServiceConfigReadyInitMessage))
+		Log.Info(fmt.Sprintf("%s... requeueing", condition.ServiceConfigReadyInitMessage))
 		instance.Status.Conditions.MarkFalse(
 			condition.ServiceConfigReadyCondition,
 			condition.InitReason,
@@ -735,7 +738,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	apiObsGen, err := r.checkManilaAPIGeneration(instance)
+	apiObsGen, err := r.checkManilaAPIGeneration(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaAPIReadyCondition,
@@ -761,7 +764,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		}
 	}
 	if op != controllerutil.OperationResultNone && apiObsGen {
-		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	// remove finalizers from unused MariaDBAccount records
@@ -783,7 +786,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	schedObsGen, err := r.checkManilaSchedulerGeneration(instance)
+	schedObsGen, err := r.checkManilaSchedulerGeneration(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaSchedulerReadyCondition,
@@ -810,7 +813,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		}
 	}
 	if op != controllerutil.OperationResultNone && schedObsGen {
-		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	// Deploy ManilaShare
@@ -826,7 +829,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 				err.Error()))
 			return ctrl.Result{}, err
 		}
-		shareObsGen, err := r.checkManilaShareGeneration(instance)
+		shareObsGen, err := r.checkManilaShareGeneration(ctx, instance)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				manilav1beta1.ManilaShareReadyCondition,
@@ -850,7 +853,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			instance.Status.ManilaSharesReadyCounts[name] = manilaShare.Status.ReadyCount
 		}
 		if op != controllerutil.OperationResultNone && shareObsGen {
-			r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+			Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 		}
 
 		// If this manilaShare is not IsReady, mirror the condition to get the latest step it is in.
@@ -923,7 +926,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			return ctrlResult, err
 		}
 	}
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	// update the overall status condition if service is ready
 	if instance.IsReady() {
 		instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
@@ -1072,9 +1075,11 @@ func (r *ManilaReconciler) generateServiceConfig(
 //
 // returns the hash, whether the hash changed (as a bool) and any error
 func (r *ManilaReconciler) createHashOfInputHashes(
+	ctx context.Context,
 	instance *manilav1beta1.Manila,
 	envVars map[string]env.Setter,
 ) (string, bool, error) {
+	Log := r.GetLogger(ctx)
 	var hashMap map[string]string
 	changed := false
 	mergedMapVars := env.MergeEnvs([]corev1.EnvVar{}, envVars)
@@ -1084,7 +1089,7 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 	}
 	if hashMap, changed = util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
+		Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, changed, nil
 }
@@ -1384,14 +1389,16 @@ func (r *ManilaReconciler) ensureDB(
 
 // checkManilaAPIGeneration -
 func (r *ManilaReconciler) checkManilaAPIGeneration(
+	ctx context.Context,
 	instance *manilav1beta1.Manila,
 ) (bool, error) {
+	Log := r.GetLogger(ctx)
 	api := &manilav1beta1.ManilaAPIList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(context.Background(), api, listOpts...); err != nil {
-		r.Log.Error(err, "Unable to retrieve ManilaAPI %w")
+		Log.Error(err, "Unable to retrieve ManilaAPI %w")
 		return false, err
 	}
 	for _, item := range api.Items {
@@ -1404,14 +1411,16 @@ func (r *ManilaReconciler) checkManilaAPIGeneration(
 
 // checkManilaSchedulerGeneration -
 func (r *ManilaReconciler) checkManilaSchedulerGeneration(
+	ctx context.Context,
 	instance *manilav1beta1.Manila,
 ) (bool, error) {
+	Log := r.GetLogger(ctx)
 	sched := &manilav1beta1.ManilaSchedulerList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(context.Background(), sched, listOpts...); err != nil {
-		r.Log.Error(err, "Unable to retrieve ManilaScheduler %w")
+		Log.Error(err, "Unable to retrieve ManilaScheduler %w")
 		return false, err
 	}
 	for _, item := range sched.Items {
@@ -1424,14 +1433,16 @@ func (r *ManilaReconciler) checkManilaSchedulerGeneration(
 
 // checkManilaShareGeneration -
 func (r *ManilaReconciler) checkManilaShareGeneration(
+	ctx context.Context,
 	instance *manilav1beta1.Manila,
 ) (bool, error) {
+	Log := r.GetLogger(ctx)
 	share := &manilav1beta1.ManilaShareList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(context.Background(), share, listOpts...); err != nil {
-		r.Log.Error(err, "Unable to retrieve ManilaShare %w")
+		Log.Error(err, "Unable to retrieve ManilaShare %w")
 		return false, err
 	}
 	for _, item := range share.Items {
@@ -1447,6 +1458,7 @@ func (r *ManilaReconciler) shareCleanup(
 	ctx context.Context,
 	instance *manilav1beta1.Manila,
 ) (bool, string, error) {
+	Log := r.GetLogger(ctx)
 	cleanJob := false
 	var deletedShares = []string{}
 	// Generate a list of share CRs
@@ -1456,7 +1468,7 @@ func (r *ManilaReconciler) shareCleanup(
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(ctx, shares, listOpts...); err != nil {
-		r.Log.Error(err, "Unable to retrieve Manila Share CRs %v")
+		Log.Error(err, "Unable to retrieve Manila Share CRs %v")
 		return cleanJob, "", nil
 	}
 	for _, share := range shares.Items {
