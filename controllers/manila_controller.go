@@ -194,7 +194,7 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		condition.UnknownCondition(condition.CronJobReadyCondition, condition.InitReason, condition.CronJobReadyInitMessage),
 	)
 
-	if instance.Spec.NotificationBusInstance != nil {
+	if instance.Spec.NotificationsBusInstance != nil {
 		c := condition.UnknownCondition(
 			condition.NotificationBusInstanceReadyCondition,
 			condition.InitReason,
@@ -544,15 +544,15 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	// Request TransportURL when the parameter is provided in the CR
 	// and it does not match with the existing RabbitMqClusterName
-	if instance.Spec.NotificationBusInstance != nil {
-		// init .Status.NotificationURLSecret
-		instance.Status.NotificationURLSecret = ptr.To("")
+	if instance.Spec.NotificationsBusInstance != nil {
+		// init .Status.NotificationsURLSecret
+		instance.Status.NotificationsURLSecret = ptr.To("")
 
 		// setting notificationBusName to an empty string ensures that we do not
 		// request a new transportURL unless the two spec fields do not match
 		var notificationBusName string
-		if *instance.Spec.NotificationBusInstance != instance.Spec.RabbitMqClusterName {
-			notificationBusName = *instance.Spec.NotificationBusInstance
+		if *instance.Spec.NotificationsBusInstance != instance.Spec.RabbitMqClusterName {
+			notificationBusName = *instance.Spec.NotificationsBusInstance
 		}
 		notificationBusInstanceURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, notificationBusName)
 		if err != nil {
@@ -569,9 +569,9 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			Log.Info(fmt.Sprintf("NotificationBusInstanceURL %s successfully reconciled - operation: %s", notificationBusInstanceURL.Name, string(op)))
 		}
 
-		*instance.Status.NotificationURLSecret = notificationBusInstanceURL.Status.SecretName
+		*instance.Status.NotificationsURLSecret = notificationBusInstanceURL.Status.SecretName
 
-		if instance.Status.NotificationURLSecret == nil {
+		if instance.Status.NotificationsURLSecret == nil {
 			Log.Info(fmt.Sprintf("Waiting for NotificationBusInstanceURL %s secret to be created", transportURL.Name))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NotificationBusInstanceReadyCondition,
@@ -584,8 +584,8 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		instance.Status.Conditions.MarkTrue(condition.NotificationBusInstanceReadyCondition, condition.NotificationBusInstanceReadyMessage)
 	} else {
 		// make sure we do not have an entry in the status if
-		// .Spec.NotificationURLSecret is not provided
-		instance.Status.NotificationURLSecret = nil
+		// .Spec.NotificationsURLSecret is not provided
+		instance.Status.NotificationsURLSecret = nil
 	}
 
 	// end notificationBusInstanceURL
@@ -1032,11 +1032,11 @@ func (r *ManilaReconciler) generateServiceConfig(
 	templateParameters["VHosts"] = httpdVhostConfig
 
 	var notificationInstanceURLSecret *corev1.Secret
-	if instance.Status.NotificationURLSecret != nil {
+	if instance.Status.NotificationsURLSecret != nil {
 		// Get a notificationInstanceURLSecret only if rabbitMQ referenced in
 		// the spec is different, otherwise inherits the existing transport_url
-		if instance.Spec.RabbitMqClusterName != *instance.Spec.NotificationBusInstance {
-			notificationInstanceURLSecret, _, err = secret.GetSecret(ctx, h, *instance.Status.NotificationURLSecret, instance.Namespace)
+		if instance.Spec.RabbitMqClusterName != *instance.Spec.NotificationsBusInstance {
+			notificationInstanceURLSecret, _, err = secret.GetSecret(ctx, h, *instance.Status.NotificationsURLSecret, instance.Namespace)
 			if err != nil {
 				return err
 			}
@@ -1125,8 +1125,8 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = apiSpec
 
-		if instance.Spec.NotificationBusInstance != nil {
-			deployment.Spec.NotificationURLSecret = *instance.Status.NotificationURLSecret
+		if instance.Spec.NotificationsBusInstance != nil {
+			deployment.Spec.NotificationsURLSecret = *instance.Status.NotificationsURLSecret
 		}
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
@@ -1172,8 +1172,8 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = schedulerSpec
 
-		if instance.Spec.NotificationBusInstance != nil {
-			deployment.Spec.NotificationURLSecret = *instance.Status.NotificationURLSecret
+		if instance.Spec.NotificationsBusInstance != nil {
+			deployment.Spec.NotificationsURLSecret = *instance.Status.NotificationsURLSecret
 		}
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
@@ -1229,8 +1229,8 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = shareSpec
 
-		if instance.Spec.NotificationBusInstance != nil {
-			deployment.Spec.NotificationURLSecret = *instance.Status.NotificationURLSecret
+		if instance.Spec.NotificationsBusInstance != nil {
+			deployment.Spec.NotificationsURLSecret = *instance.Status.NotificationsURLSecret
 		}
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)

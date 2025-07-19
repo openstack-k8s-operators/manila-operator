@@ -386,7 +386,7 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 
 	parentManilaName := manila.GetOwningManilaName(instance)
 	secretNames := []string{
-		instance.Spec.NotificationURLSecret,             // NotificationURLSecret
+		instance.Spec.NotificationsURLSecret,            // NotificationsURLSecret
 		instance.Spec.TransportURLSecret,                // TransportURLSecret
 		fmt.Sprintf("%s-scripts", parentManilaName),     // ScriptsSecret
 		fmt.Sprintf("%s-config-data", parentManilaName), // ConfigSecret

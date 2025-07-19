@@ -801,8 +801,8 @@ func (in *ManilaSpecBase) DeepCopyInto(out *ManilaSpecBase) {
 		*out = new(topologyv1beta1.TopoRef)
 		**out = **in
 	}
-	if in.NotificationBusInstance != nil {
-		in, out := &in.NotificationBusInstance, &out.NotificationBusInstance
+	if in.NotificationsBusInstance != nil {
+		in, out := &in.NotificationsBusInstance, &out.NotificationsBusInstance
 		*out = new(string)
 		**out = **in
 	}
@@ -860,8 +860,8 @@ func (in *ManilaStatus) DeepCopyInto(out *ManilaStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.NotificationURLSecret != nil {
-		in, out := &in.NotificationURLSecret, &out.NotificationURLSecret
+	if in.NotificationsURLSecret != nil {
+		in, out := &in.NotificationsURLSecret, &out.NotificationsURLSecret
 		*out = new(string)
 		**out = **in
 	}

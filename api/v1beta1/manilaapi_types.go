@@ -81,7 +81,7 @@ type ManilaAPISpec struct {
 	TransportURLSecret string `json:"transportURLSecret,omitempty"`
 
 	// Secret containing Notification transport URL
-	NotificationURLSecret string `json:"notificationURLSecret,omitempty"`
+	NotificationsURLSecret string `json:"notificationsURLSecret,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
