@@ -269,9 +269,6 @@ spec:
         - mountPath: /etc/machine-id
           name: etc-machine-id
           readOnly: true
-        - mountPath: /etc/localtime
-          name: etc-localtime
-          readOnly: true
         - mountPath: /var/lib/config-data/default
           name: config-data
         - mountPath: /usr/local/bin/container-scripts
@@ -312,9 +309,6 @@ spec:
       - name: etc-machine-id
         hostPath:
           path: /etc/machine-id
-      - name: etc-localtime
-        hostPath:
-          path: /etc/localtime
       - name: scripts
         secret:
           secretName: manila-scripts
@@ -369,9 +363,6 @@ spec:
         volumeMounts:
         - mountPath: /etc/machine-id
           name: etc-machine-id
-        - mountPath: /etc/localtime
-          name: etc-localtime
-          readOnly: true
         - mountPath: /var/lib/config-data/default
           name: config-data
           readOnly: true
@@ -405,9 +396,6 @@ spec:
         volumeMounts:
         - mountPath: /etc/machine-id
           name: etc-machine-id
-        - mountPath: /etc/localtime
-          name: etc-localtime
-          readOnly: true
         - mountPath: /var/lib/config-data/default
           name: config-data
           readOnly: true
@@ -438,9 +426,6 @@ spec:
         - name: etc-machine-id
           hostPath:
             path: /etc/machine-id
-        - name: etc-localtime
-          hostPath:
-            path: /etc/localtime
         - name: scripts
           secret:
             secretName: manila-scripts
@@ -490,9 +475,6 @@ spec:
         volumeMounts:
         - mountPath: /etc/machine-id
           name: etc-machine-id
-        - mountPath: /etc/localtime
-          name: etc-localtime
-          readOnly: true
         - mountPath: /var/lib/config-data/default
           name: config-data
           readOnly: true
@@ -522,9 +504,6 @@ spec:
         - mountPath: /etc/machine-id
           name: etc-machine-id
           readOnly: true
-        - mountPath: /etc/localtime
-          name: etc-localtime
-          readOnly: true
         - mountPath: /var/lib/config-data/default
           name: config-data
           readOnly: true
@@ -550,9 +529,6 @@ spec:
         - name: etc-machine-id
           hostPath:
             path: /etc/machine-id
-        - name: etc-localtime
-          hostPath:
-            path: /etc/localtime
         - name: scripts
           secret:
             secretName: manila-scripts
