@@ -132,7 +132,7 @@ type ManilaSpecBase struct {
 	// +kubebuilder:validation:Optional
 	// RabbitMQ instance name used to request a transportURL that is used for
 	// notification purposes
-	NotificationBusInstance *string `json:"notificationBusInstance,omitempty"`
+	NotificationsBusInstance *string `json:"notificationsBusInstance,omitempty"`
 }
 
 // ManilaStatus defines the observed state of Manila
@@ -149,8 +149,8 @@ type ManilaStatus struct {
 	// TransportURLSecret - Secret containing RabbitMQ transportURL
 	TransportURLSecret string `json:"transportURLSecret,omitempty"`
 
-	// NotificationURLSecret - Secret containing RabbitMQ notificationURL
-	NotificationURLSecret *string `json:"notificationURLSecret,omitempty"`
+	// NotificationsURLSecret - Secret containing RabbitMQ notificationsURL
+	NotificationsURLSecret *string `json:"notificationsURLSecret,omitempty"`
 
 	// ReadyCount of Manila API instance
 	ManilaAPIReadyCount int32 `json:"manilaAPIReadyCount,omitempty"`

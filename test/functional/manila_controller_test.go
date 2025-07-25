@@ -1198,10 +1198,10 @@ var _ = Describe("Manila controller", func() {
 	When("Manila CR instance has notifications enabled", func() {
 		BeforeEach(func() {
 			rawSpec := map[string]interface{}{
-				"secret":                  SecretName,
-				"databaseInstance":        "openstack",
-				"rabbitMqClusterName":     "rabbitmq",
-				"notificationBusInstance": "rabbitmq",
+				"secret":                   SecretName,
+				"databaseInstance":         "openstack",
+				"rabbitMqClusterName":      "rabbitmq",
+				"notificationsBusInstance": "rabbitmq",
 				"manilaAPI": map[string]interface{}{
 					"containerImage": manilav1.ManilaAPIContainerImage,
 				},
@@ -1254,9 +1254,9 @@ var _ = Describe("Manila controller", func() {
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
 				g.Expect(manila.Status.TransportURLSecret).ToNot(Equal(""))
-				g.Expect(*manila.Status.NotificationURLSecret).ToNot(Equal(""))
+				g.Expect(*manila.Status.NotificationsURLSecret).ToNot(Equal(""))
 				g.Expect(manila.Status.TransportURLSecret).
-					To(Equal(*manila.Status.NotificationURLSecret))
+					To(Equal(*manila.Status.NotificationsURLSecret))
 			}, timeout, interval).Should(Succeed())
 		})
 
@@ -1267,7 +1267,7 @@ var _ = Describe("Manila controller", func() {
 			// update Manila CR to point to the new (dedicated) rabbit instance
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
-				*manila.Spec.NotificationBusInstance = "rabbitmq-notification"
+				*manila.Spec.NotificationsBusInstance = "rabbitmq-notification"
 				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
@@ -1280,7 +1280,7 @@ var _ = Describe("Manila controller", func() {
 
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
-				g.Expect(*manila.Status.NotificationURLSecret).ToNot(
+				g.Expect(*manila.Status.NotificationsURLSecret).ToNot(
 					Equal(manila.Status.TransportURLSecret))
 			}, timeout, interval).Should(Succeed())
 		})
@@ -1288,13 +1288,13 @@ var _ = Describe("Manila controller", func() {
 		It("updates manila CR and disable notifications", func() {
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
-				manila.Spec.NotificationBusInstance = nil
+				manila.Spec.NotificationsBusInstance = nil
 				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
-				g.Expect(manila.Status.NotificationURLSecret).To(BeNil())
+				g.Expect(manila.Status.NotificationsURLSecret).To(BeNil())
 				g.Expect(manila.Status.TransportURLSecret).ToNot(Equal(""))
 			}, timeout, interval).Should(Succeed())
 		})
