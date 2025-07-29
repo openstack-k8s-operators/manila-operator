@@ -52,6 +52,26 @@ BINARIES = ('share', 'scheduler')
 STATE_UP = ":-)"
 STATUS_ENABLED = "enabled"
 
+'''
+manila-manage returns services using the following layout:
+
+# SERVICE LAYOUT
+
+| binary    | -> 0
+| host      | -> 1
+| zone      | -> 2
+| status    | -> 3
+| state     | -> 4
+| udated_at | -> 5
+
+The layout is defined in the upstream manila-manage code [1].
+Every time a manila-manage command is performed, we can resolve the position
+of each field, and we can easily decode into a dict.
+
+[1] https://github.com/openstack/manila/blob/master/manila/cmd/manage.py#L376
+'''
+
+
 class HTTPServerV6(server.HTTPServer):
     address_family = socket.AF_INET6
 
@@ -97,6 +117,47 @@ class HeartbeatServer(server.BaseHTTPRequestHandler):
         cls.services_filters = services_filters
 
     @staticmethod
+    def get_status(service):
+        """
+        Because status is either enabled or disabled, this function looks for
+        it by iterating the array; by doing this it does not ave to rely on a
+        particular position
+        """
+        return STATUS_ENABLED if STATUS_ENABLED in service else "disabled"
+
+    @staticmethod
+    def validate_line(service):
+        """
+        Process the line if there's at least one element
+        """
+        return False if ((len(service) - 1) <= 0) else True
+
+    @staticmethod
+    def get_state(service):
+        """
+        Because STATE_UP has a special symbol, the function does not need to
+        search for it at a given position, but it can match it by iterating
+        the array and return a negative result if the symbol is not found
+        """
+        return STATE_UP if STATE_UP in service else "XXX"
+
+    @staticmethod
+    def get_hostgroup(service):
+        """
+        As per the layout defined in the manila-manage command, hostgroup is
+        always the second entry of the table
+        """
+        return service[1] if len(service) > 1 else None
+
+    @staticmethod
+    def get_service_name(service):
+        """
+        Service name is always the first entry of the table defined by the
+        manila-manage command
+        """
+        return service[0] if service else None
+
+    @staticmethod
     def check_service(services, **filters):
         # Check if services were already created and are registered in the db
         our_services = [service for service in services
@@ -114,49 +175,34 @@ class HeartbeatServer(server.BaseHTTPRequestHandler):
             raise ServiceNotUp()
 
     def _parse_service_list_output(self, services_list):
+        # reuse the existing BINARIES tuple to resolve the allowed services
+        # and prefix each item
+        allowed_services = tuple('manila-{}'.format(item) for item in BINARIES)
         # Decode the characters, remove the line splits and the
         # blank spaces
         services_list = services_list.decode('utf-8').split('\n')
-        parsed_service_list = []
+        services = []
         for service in services_list:
-            if "DEBUG" in service:
+            # clean up tokens of the current line
+            tokens = [token for token in service.split() if token]
+            # invalid line: stop early and move to the next item, no need to
+            # try to process each element
+            if not self.validate_line(tokens):
                 continue
-            parsed_service_list.append(service)
-
-        if not parsed_service_list:
-            raise ServiceNotFoundException(filters={})
-
-        parsed_service_list = [
-            service.split() for service in parsed_service_list]
-
-        # First line is related to the headers. We don't care about the
-        # updated at, so we drop it and sanitize the strings.
-        services_list_headers = parsed_service_list[0]
-        columns_to_ignore_starts_at = (
-            services_list_headers.index("Updated")
-            if "Updated" in services_list_headers else None)
-
-        if not columns_to_ignore_starts_at:
-            raise ServiceNotFoundException(filters={})
-
-        services_list_headers = (
-            services_list_headers[0:columns_to_ignore_starts_at])
-        services_list_headers = (
-            [header.lower() for header in services_list_headers])
-
-        # Remove the headers from the list, so we can iterate on the items
-        parsed_service_list.pop(0)
-
-        # Finally, we can get a dictionary out of the manila-manage command.
-        parsed_services_dict_list = []
-
-        for service in parsed_service_list:
-            if service:
-                service_dict = {}
-                for i, header in enumerate(services_list_headers):
-                    service_dict[header] = service[i]
-                parsed_services_dict_list.append(service_dict)
-        return parsed_services_dict_list
+            # First line is related to the headers. We don't care about the
+            # updated at, so we ignore it
+            if "Binary" in tokens:
+                continue
+            # Process a valid line for a given service and fill the dict
+            service_name = self.get_service_name(tokens)
+            if service_name and service_name in allowed_services:
+                services.append({
+                    'binary': service_name,
+                    'host': self.get_hostgroup(tokens),
+                    'status': self.get_status(tokens),
+                    'state': self.get_state(tokens),
+                })
+        return services
 
     def do_GET(self):
         try:
