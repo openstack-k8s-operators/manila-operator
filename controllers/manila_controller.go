@@ -989,6 +989,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 		return err
 	}
 	transportURLSecretData := string(transportURLSecret.Data["transport_url"])
+	transportURLQuorumQueues := string(transportURLSecret.Data["quorumqueues"]) == "true"
 
 	databaseAccount := db.GetAccount()
 	databaseSecret := db.GetSecret()
@@ -1015,6 +1016,9 @@ func (r *ManilaReconciler) generateServiceConfig(
 		templateParameters["MemcachedAuthKey"] = fmt.Sprint(memcachedv1.KeyMountPath())
 		templateParameters["MemcachedAuthCa"] = fmt.Sprint(memcachedv1.CaMountPath())
 	}
+
+	// Check if Quorum Queues are enabled
+	templateParameters["QuorumQueues"] = transportURLQuorumQueues
 
 	// create httpd  vhost template parameters
 	httpdVhostConfig := map[string]interface{}{}
