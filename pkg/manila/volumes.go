@@ -45,7 +45,7 @@ func GetVolumes(name string, extraVol []manilav1.ManilaExtraVolMounts, svc []sto
 	for _, exv := range extraVol {
 		for _, vol := range exv.Propagate(svc) {
 			for _, v := range vol.Volumes {
-				volumeSource, _ := v.VolumeSource.ToCoreVolumeSource()
+				volumeSource, _ := v.ToCoreVolumeSource()
 				convertedVolume := corev1.Volume{
 					Name:         v.Name,
 					VolumeSource: *volumeSource,

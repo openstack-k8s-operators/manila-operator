@@ -461,13 +461,13 @@ var _ = Describe("Manila controller", func() {
 			sched := GetManilaScheduler(manilaTest.ManilaScheduler)
 			share := GetManilaShare(manilaTest.ManilaShares[0])
 			// Check ManilaAPI NADs
-			Expect(api.Spec.NetworkAttachments).To(Equal(manila.Spec.ManilaAPI.ManilaServiceTemplate.NetworkAttachments))
+			Expect(api.Spec.NetworkAttachments).To(Equal(manila.Spec.ManilaAPI.NetworkAttachments))
 			// Check ManilaScheduler NADs
-			Expect(sched.Spec.NetworkAttachments).To(Equal(manila.Spec.ManilaScheduler.ManilaServiceTemplate.NetworkAttachments))
+			Expect(sched.Spec.NetworkAttachments).To(Equal(manila.Spec.ManilaScheduler.NetworkAttachments))
 			// Check ManilaShare exists
 			ManilaShareExists(manilaTest.ManilaShares[0])
 			// Check ManilaShare NADs
-			Expect(share.Spec.NetworkAttachments).To(Equal(share.Spec.ManilaServiceTemplate.NetworkAttachments))
+			Expect(share.Spec.NetworkAttachments).To(Equal(share.Spec.NetworkAttachments))
 
 			// As the internal endpoint has service override configured it
 			// gets a LoadBalancer Service with MetalLB annotations

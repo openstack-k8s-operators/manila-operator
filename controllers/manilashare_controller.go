@@ -98,7 +98,7 @@ func (r *ManilaShareReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Fetch the ManilaShare instance
 	instance := &manilav1beta1.ManilaShare{}
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -199,8 +199,8 @@ func (r *ManilaShareReconciler) SetupWithManager(ctx context.Context, mgr ctrl.M
 	// (e.g. TransportURLSecret) are handled by the top Manila controller.
 	Log := r.GetLogger(ctx)
 	secretFn := func(_ context.Context, o client.Object) []reconcile.Request {
-		var namespace string = o.GetNamespace()
-		var secretName string = o.GetName()
+		var namespace = o.GetNamespace()
+		var secretName = o.GetName()
 		result := []reconcile.Request{}
 
 		// get all API CRs
@@ -208,7 +208,7 @@ func (r *ManilaShareReconciler) SetupWithManager(ctx context.Context, mgr ctrl.M
 		listOpts := []client.ListOption{
 			client.InNamespace(namespace),
 		}
-		if err := r.Client.List(context.Background(), shares, listOpts...); err != nil {
+		if err := r.List(context.Background(), shares, listOpts...); err != nil {
 			Log.Error(err, "Unable to retrieve API CRs %v")
 			return nil
 		}
@@ -427,7 +427,7 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 					condition.TLSInputReadyCondition,
 					condition.RequestedReason,
 					condition.SeverityInfo,
-					fmt.Sprintf(condition.TLSInputReadyWaitingMessage, err.Error())))
+					condition.TLSInputReadyWaitingMessage, err.Error()))
 				return ctrl.Result{}, nil
 			}
 			instance.Status.Conditions.Set(condition.FalseCondition(
@@ -581,7 +581,7 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 		if networkReady {
 			instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 		} else {
-			err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+			err := fmt.Errorf("%w: %s", ErrNetworkAttachmentConfig, instance.Spec.NetworkAttachments)
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NetworkAttachmentsReadyCondition,
 				condition.ErrorReason,
