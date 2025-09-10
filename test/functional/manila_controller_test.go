@@ -1300,6 +1300,86 @@ var _ = Describe("Manila controller", func() {
 		})
 	})
 
+	When("Manila is created with quorum queues enabled in transport secret", func() {
+		BeforeEach(func() {
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(k8sClient.Delete, ctx, infra.CreateTransportURLSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName, true))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaName).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+		})
+
+		It("should create config with quorum queue settings enabled", func() {
+			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPI)
+
+			Eventually(func(g Gomega) {
+				secretDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
+				g.Expect(secretDataMap).ShouldNot(BeNil())
+
+				conf := string(secretDataMap.Data["00-config.conf"])
+
+				// Check that quorum queue settings are present in oslo_messaging_rabbit section
+				g.Expect(conf).To(ContainSubstring("[oslo_messaging_rabbit]"))
+				g.Expect(conf).To(ContainSubstring("rabbit_quorum_queue=true"))
+				g.Expect(conf).To(ContainSubstring("rabbit_transient_quorum_queue=true"))
+				g.Expect(conf).To(ContainSubstring("amqp_durable_queues=true"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila is created with quorum queues disabled in transport secret", func() {
+		BeforeEach(func() {
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(k8sClient.Delete, ctx, infra.CreateTransportURLSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName, false))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaName).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+		})
+
+		It("should create config without quorum queue settings", func() {
+			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPI)
+
+			Eventually(func(g Gomega) {
+				secretDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
+				g.Expect(secretDataMap).ShouldNot(BeNil())
+
+				conf := string(secretDataMap.Data["00-config.conf"])
+
+				// Check that oslo_messaging_rabbit section exists but without quorum queue settings
+				g.Expect(conf).To(ContainSubstring("[oslo_messaging_rabbit]"))
+				g.Expect(conf).ToNot(ContainSubstring("rabbit_quorum_queue=true"))
+				g.Expect(conf).ToNot(ContainSubstring("rabbit_transient_quorum_queue=true"))
+				g.Expect(conf).ToNot(ContainSubstring("amqp_durable_queues=true"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 	// Run MariaDBAccount suite tests.  these are pre-packaged ginkgo tests
 	// that exercise standard account create / update patterns that should be
 	// common to all controllers that ensure MariaDBAccount CRs.
