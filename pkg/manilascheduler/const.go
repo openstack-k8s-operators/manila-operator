@@ -10,6 +10,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package manilascheduler contains manila scheduler constants and configuration.
 package manilascheduler
 
 const (

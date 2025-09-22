@@ -28,11 +28,11 @@ const (
 	// MemcachedInstance - name of the memcached instance
 	MemcachedInstance = "memcached"
 	//PublicCertSecretName -
-	PublicCertSecretName = "public-tls-certs"
+	PublicCertSecretName = "public-tls-certs" // #nosec G101
 	//InternalCertSecretName -
-	InternalCertSecretName = "internal-tls-certs"
+	InternalCertSecretName = "internal-tls-certs" // #nosec G101
 	//CABundleSecretName -
-	CABundleSecretName = "combined-ca-bundle"
+	CABundleSecretName = "combined-ca-bundle" // #nosec G101
 	// ManilaCephExtraMountsPath -
 	ManilaCephExtraMountsPath = "/etc/ceph"
 	// ManilaCephExtraMountsSecretName -
