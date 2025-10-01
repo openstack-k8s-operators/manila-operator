@@ -999,7 +999,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 	databaseAccount := db.GetAccount()
 	databaseSecret := db.GetSecret()
 
-	templateParameters := map[string]interface{}{
+	templateParameters := map[string]any{
 		"ServiceUser":         instance.Spec.ServiceUser,
 		"ServicePassword":     string(ospSecret.Data[instance.Spec.PasswordSelectors.Service]),
 		"KeystonePublicURL":   keystonePublicURL,
@@ -1026,9 +1026,9 @@ func (r *ManilaReconciler) generateServiceConfig(
 	templateParameters["QuorumQueues"] = transportURLQuorumQueues
 
 	// create httpd  vhost template parameters
-	httpdVhostConfig := map[string]interface{}{}
+	httpdVhostConfig := map[string]any{}
 	for _, endpt := range []service.Endpoint{service.EndpointInternal, service.EndpointPublic} {
-		endptConfig := map[string]interface{}{}
+		endptConfig := map[string]any{}
 		endptConfig["ServerName"] = fmt.Sprintf("%s-%s.%s.svc", manila.ServiceName, endpt.String(), instance.Namespace)
 		endptConfig["TLS"] = false // default TLS to false, and set it bellow to true if enabled
 		if instance.Spec.ManilaAPI.TLS.API.Enabled(endpt) {

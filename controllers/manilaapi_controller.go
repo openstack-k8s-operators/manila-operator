@@ -1028,7 +1028,7 @@ func (r *ManilaAPIReconciler) generateServiceConfig(
 	}
 	customData[manila.CustomServiceConfigSecretsFileName] = customSecrets
 
-	templateParameters := map[string]interface{}{
+	templateParameters := map[string]any{
 		"LogFile": manilaapi.LogFile,
 	}
 	configTemplates := []util.Template{

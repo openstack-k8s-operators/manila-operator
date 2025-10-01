@@ -15,6 +15,7 @@ package functional
 
 import (
 	"fmt"
+	maps0 "maps"
 
 	. "github.com/onsi/gomega" //revive:disable:dot-imports
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
@@ -44,14 +45,14 @@ func CreateManilaMessageBusSecret(namespace string, name string) *corev1.Secret 
 	s := th.CreateSecret(
 		types.NamespacedName{Namespace: namespace, Name: name},
 		map[string][]byte{
-			"transport_url": []byte(fmt.Sprintf("rabbit://%s/fake", name)),
+			"transport_url": fmt.Appendf(nil, "rabbit://%s/fake", name),
 		},
 	)
 	logger.Info("Secret created", "name", name)
 	return s
 }
 
-func CreateUnstructured(rawObj map[string]interface{}) *unstructured.Unstructured {
+func CreateUnstructured(rawObj map[string]any) *unstructured.Unstructured {
 	logger.Info("Creating", "raw", rawObj)
 	unstructuredObj := &unstructured.Unstructured{Object: rawObj}
 	_, err := controllerutil.CreateOrPatch(
@@ -60,40 +61,40 @@ func CreateUnstructured(rawObj map[string]interface{}) *unstructured.Unstructure
 	return unstructuredObj
 }
 
-func GetManilaEmptySpec() map[string]interface{} {
-	return map[string]interface{}{
+func GetManilaEmptySpec() map[string]any {
+	return map[string]any{
 		"databaseInstance": "openstack",
 		"secret":           SecretName,
 	}
 }
 
-func GetDefaultManilaSpec() map[string]interface{} {
-	return map[string]interface{}{
+func GetDefaultManilaSpec() map[string]any {
+	return map[string]any{
 		"databaseInstance": "openstack",
 		"secret":           SecretName,
 		"manilaAPI":        GetDefaultManilaAPISpec(),
 		"manilaScheduler":  GetDefaultManilaSchedulerSpec(),
-		"manilaShares": map[string]interface{}{
+		"manilaShares": map[string]any{
 			"share0": GetDefaultManilaShareSpec(),
 		},
 	}
 }
 
-func GetManilaSpec(customSpec map[string]interface{}) map[string]interface{} {
-	return map[string]interface{}{
+func GetManilaSpec(customSpec map[string]any) map[string]any {
+	return map[string]any{
 		"databaseInstance": "openstack",
 		"secret":           SecretName,
 		"manilaAPI":        GetManilaCommonSpec(customSpec),
 		"manilaScheduler":  GetManilaCommonSpec(customSpec),
-		"manilaShares": map[string]interface{}{
+		"manilaShares": map[string]any{
 			"share0": GetManilaCommonSpec(customSpec),
 			"share1": GetManilaCommonSpec(customSpec),
 		},
 	}
 }
 
-func GetManilaCommonSpec(spec map[string]interface{}) map[string]interface{} {
-	defaultSpec := map[string]interface{}{
+func GetManilaCommonSpec(spec map[string]any) map[string]any {
+	defaultSpec := map[string]any{
 		"secret":             SecretName,
 		"replicas":           1,
 		"containerImage":     manilaTest.ContainerImage,
@@ -101,14 +102,12 @@ func GetManilaCommonSpec(spec map[string]interface{}) map[string]interface{} {
 		"transportURLSecret": manilaTest.RabbitmqSecretName,
 	}
 	// append to the defaultSpec map the additional keys passed as input
-	for k, v := range spec {
-		defaultSpec[k] = v
-	}
+	maps0.Copy(defaultSpec, spec)
 	return defaultSpec
 }
 
-func GetTLSManilaSpec() map[string]interface{} {
-	return map[string]interface{}{
+func GetTLSManilaSpec() map[string]any {
+	return map[string]any{
 		"databaseInstance": "openstack",
 		"secret":           SecretName,
 		"manilaAPI":        GetTLSManilaAPISpec(),
@@ -116,8 +115,8 @@ func GetTLSManilaSpec() map[string]interface{} {
 	}
 }
 
-func GetDefaultManilaAPISpec() map[string]interface{} {
-	return map[string]interface{}{
+func GetDefaultManilaAPISpec() map[string]any {
+	return map[string]any{
 		"secret":             SecretName,
 		"replicas":           1,
 		"containerImage":     manilaTest.ContainerImage,
@@ -126,8 +125,8 @@ func GetDefaultManilaAPISpec() map[string]interface{} {
 	}
 }
 
-func GetDefaultManilaSchedulerSpec() map[string]interface{} {
-	return map[string]interface{}{
+func GetDefaultManilaSchedulerSpec() map[string]any {
+	return map[string]any{
 		"secret":         SecretName,
 		"replicas":       1,
 		"containerImage": manilaTest.ContainerImage,
@@ -135,8 +134,8 @@ func GetDefaultManilaSchedulerSpec() map[string]interface{} {
 	}
 }
 
-func GetDefaultManilaShareSpec() map[string]interface{} {
-	return map[string]interface{}{
+func GetDefaultManilaShareSpec() map[string]any {
+	return map[string]any{
 		"secret":         SecretName,
 		"replicas":       1,
 		"containerImage": manilaTest.ContainerImage,
@@ -152,12 +151,12 @@ func GetManila(name types.NamespacedName) *manilav1.Manila {
 	return instance
 }
 
-func CreateManila(name types.NamespacedName, spec map[string]interface{}) client.Object {
+func CreateManila(name types.NamespacedName, spec map[string]any) client.Object {
 
-	raw := map[string]interface{}{
+	raw := map[string]any{
 		"apiVersion": "manila.openstack.org/v1beta1",
 		"kind":       "Manila",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      name.Name,
 			"namespace": name.Namespace,
 		},
@@ -171,16 +170,16 @@ func ManilaConditionGetter(name types.NamespacedName) condition.Conditions {
 	return instance.Status.Conditions
 }
 
-func CreateManilaAPI(name types.NamespacedName, spec map[string]interface{}) client.Object {
+func CreateManilaAPI(name types.NamespacedName, spec map[string]any) client.Object {
 	// we get the parent CR and set ownership to the manilaAPI CR
 	parent := GetManila(manilaTest.Instance)
-	raw := map[string]interface{}{
+	raw := map[string]any{
 		"apiVersion": "manila.openstack.org/v1beta1",
 		"kind":       "ManilaAPI",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      name.Name,
 			"namespace": name.Namespace,
-			"ownerReferences": []map[string]interface{}{
+			"ownerReferences": []map[string]any{
 				{
 					"apiVersion":         "manila.openstack.org/v1beta1",
 					"blockOwnerDeletion": true,
@@ -197,11 +196,11 @@ func CreateManilaAPI(name types.NamespacedName, spec map[string]interface{}) cli
 	return CreateUnstructured(raw)
 }
 
-func CreateManilaScheduler(name types.NamespacedName, spec map[string]interface{}) client.Object {
-	raw := map[string]interface{}{
+func CreateManilaScheduler(name types.NamespacedName, spec map[string]any) client.Object {
+	raw := map[string]any{
 		"apiVersion": "manila.openstack.org/v1beta1",
 		"kind":       "ManilaScheduler",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      name.Name,
 			"namespace": name.Namespace,
 		},
@@ -210,11 +209,11 @@ func CreateManilaScheduler(name types.NamespacedName, spec map[string]interface{
 	return CreateUnstructured(raw)
 }
 
-func CreateManilaShare(name types.NamespacedName, spec map[string]interface{}) client.Object {
-	raw := map[string]interface{}{
+func CreateManilaShare(name types.NamespacedName, spec map[string]any) client.Object {
+	raw := map[string]any{
 		"apiVersion": "manila.openstack.org/v1beta1",
 		"kind":       "ManilaShare",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      name.Name,
 			"namespace": name.Namespace,
 		},
@@ -271,15 +270,15 @@ func GetManilaShare(name types.NamespacedName) *manilav1.ManilaShare {
 	return instance
 }
 
-func GetTLSManilaAPISpec() map[string]interface{} {
+func GetTLSManilaAPISpec() map[string]any {
 	spec := GetDefaultManilaAPISpec()
-	maps.Copy(spec, map[string]interface{}{
-		"tls": map[string]interface{}{
-			"api": map[string]interface{}{
-				"internal": map[string]interface{}{
+	maps.Copy(spec, map[string]any{
+		"tls": map[string]any{
+			"api": map[string]any{
+				"internal": map[string]any{
 					"secretName": InternalCertSecretName,
 				},
-				"public": map[string]interface{}{
+				"public": map[string]any{
 					"secretName": PublicCertSecretName,
 				},
 			},
@@ -363,26 +362,26 @@ func GetCronJob(name types.NamespacedName) *batchv1.CronJob {
 
 // GetExtraMounts - Utility function that simulates extraMounts pointing
 // to a Ceph secret
-func GetExtraMounts() []map[string]interface{} {
-	return []map[string]interface{}{
+func GetExtraMounts() []map[string]any {
+	return []map[string]any{
 		{
 			"name":   manilaTest.Instance.Name,
 			"region": "az0",
-			"extraVol": []map[string]interface{}{
+			"extraVol": []map[string]any{
 				{
 					"extraVolType": ManilaCephExtraMountsSecretName,
 					"propagation": []string{
 						"ManilaShare",
 					},
-					"volumes": []map[string]interface{}{
+					"volumes": []map[string]any{
 						{
 							"name": ManilaCephExtraMountsSecretName,
-							"secret": map[string]interface{}{
+							"secret": map[string]any{
 								"secretName": ManilaCephExtraMountsSecretName,
 							},
 						},
 					},
-					"mounts": []map[string]interface{}{
+					"mounts": []map[string]any{
 						{
 							"name":      ManilaCephExtraMountsSecretName,
 							"mountPath": ManilaCephExtraMountsPath,
@@ -400,28 +399,28 @@ func GetExtraMounts() []map[string]interface{} {
 // CreateManilaWithTopologySpec - It returns a ManilaSpec where a
 // topology is referenced. It also overrides the top-level parameter of
 // the top-level manila controller
-func CreateManilaWithTopologySpec() map[string]interface{} {
+func CreateManilaWithTopologySpec() map[string]any {
 	rawSpec := GetDefaultManilaSpec()
 	// Add top-level topologyRef
-	rawSpec["topologyRef"] = map[string]interface{}{
+	rawSpec["topologyRef"] = map[string]any{
 		"name": manilaTest.ManilaTopologies[0].Name,
 	}
 	// Override topologyRef for manilaAPI subCR
-	rawSpec["manilaAPI"] = map[string]interface{}{
-		"topologyRef": map[string]interface{}{
+	rawSpec["manilaAPI"] = map[string]any{
+		"topologyRef": map[string]any{
 			"name": manilaTest.ManilaTopologies[1].Name,
 		},
 	}
 	// Override topologyRef for manilaScheduler subCR
-	rawSpec["manilaScheduler"] = map[string]interface{}{
-		"topologyRef": map[string]interface{}{
+	rawSpec["manilaScheduler"] = map[string]any{
+		"topologyRef": map[string]any{
 			"name": manilaTest.ManilaTopologies[2].Name,
 		},
 	}
 	// Override topologyRef for manilaShare subCR
-	rawSpec["manilaShares"] = map[string]interface{}{
-		"share0": map[string]interface{}{
-			"topologyRef": map[string]interface{}{
+	rawSpec["manilaShares"] = map[string]any{
+		"share0": map[string]any{
+			"topologyRef": map[string]any{
 				"name": manilaTest.ManilaTopologies[3].Name,
 			},
 		},
@@ -433,16 +432,16 @@ func CreateManilaWithTopologySpec() map[string]interface{} {
 // test Service components. It returns both the user input representation
 // in the form of map[string]string, and the Golang expected representation
 // used in the test asserts.
-func GetSampleTopologySpec(label string) (map[string]interface{}, []corev1.TopologySpreadConstraint) {
+func GetSampleTopologySpec(label string) (map[string]any, []corev1.TopologySpreadConstraint) {
 	// Build the topology Spec
-	topologySpec := map[string]interface{}{
-		"topologySpreadConstraints": []map[string]interface{}{
+	topologySpec := map[string]any{
+		"topologySpreadConstraints": []map[string]any{
 			{
 				"maxSkew":           1,
 				"topologyKey":       corev1.LabelHostname,
 				"whenUnsatisfiable": "ScheduleAnyway",
-				"labelSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+				"labelSelector": map[string]any{
+					"matchLabels": map[string]any{
 						"component": label,
 					},
 				},

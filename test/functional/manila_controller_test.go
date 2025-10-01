@@ -370,8 +370,8 @@ var _ = Describe("Manila controller", func() {
 		BeforeEach(func() {
 			nad := th.CreateNetworkAttachmentDefinition(manilaTest.InternalAPINAD)
 			DeferCleanup(th.DeleteInstance, nad)
-			serviceOverride := map[string]interface{}{}
-			serviceOverride["internal"] = map[string]interface{}{
+			serviceOverride := map[string]any{}
+			serviceOverride["internal"] = map[string]any{
 				"metadata": map[string]map[string]string{
 					"annotations": {
 						"metallb.universe.tf/address-pool":    "osp-internalapi",
@@ -383,28 +383,28 @@ var _ = Describe("Manila controller", func() {
 						"service":  "nova",
 					},
 				},
-				"spec": map[string]interface{}{
+				"spec": map[string]any{
 					"type": "LoadBalancer",
 				},
 			}
 
-			rawSpec := map[string]interface{}{
+			rawSpec := map[string]any{
 				"secret":              SecretName,
 				"databaseInstance":    "openstack",
 				"rabbitMqClusterName": "rabbitmq",
-				"manilaAPI": map[string]interface{}{
+				"manilaAPI": map[string]any{
 					"containerImage":     manilav1.ManilaAPIContainerImage,
 					"networkAttachments": []string{"internalapi"},
-					"override": map[string]interface{}{
+					"override": map[string]any{
 						"service": serviceOverride,
 					},
 				},
-				"manilaScheduler": map[string]interface{}{
+				"manilaScheduler": map[string]any{
 					"containerImage":     manilav1.ManilaSchedulerContainerImage,
 					"networkAttachments": []string{"internalapi"},
 				},
-				"manilaShares": map[string]interface{}{
-					"share0": map[string]interface{}{
+				"manilaShares": map[string]any{
+					"share0": map[string]any{
 						"containerImage":     manilav1.ManilaShareContainerImage,
 						"networkAttachments": []string{"internalapi"},
 					},
@@ -698,7 +698,7 @@ var _ = Describe("Manila controller", func() {
 				Name:      manilaTest.ManilaTopologies[1].Name,
 				Namespace: manilaTest.ManilaTopologies[1].Namespace,
 			}
-			spec["topologyRef"] = map[string]interface{}{
+			spec["topologyRef"] = map[string]any{
 				"name": topologyRef.Name,
 			}
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
@@ -937,7 +937,7 @@ var _ = Describe("Manila controller", func() {
 	When("A Manila is created with nodeSelector", func() {
 		BeforeEach(func() {
 			spec := GetDefaultManilaSpec()
-			spec["nodeSelector"] = map[string]interface{}{
+			spec["nodeSelector"] = map[string]any{
 				"foo": "bar",
 			}
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
@@ -1127,19 +1127,19 @@ var _ = Describe("Manila controller", func() {
 	})
 	When("Manila CR instance is built with ExtraMounts", func() {
 		BeforeEach(func() {
-			rawSpec := map[string]interface{}{
+			rawSpec := map[string]any{
 				"secret":              SecretName,
 				"databaseInstance":    "openstack",
 				"rabbitMqClusterName": "rabbitmq",
 				"extraMounts":         GetExtraMounts(),
-				"manilaAPI": map[string]interface{}{
+				"manilaAPI": map[string]any{
 					"containerImage": manilav1.ManilaAPIContainerImage,
 				},
-				"manilaScheduler": map[string]interface{}{
+				"manilaScheduler": map[string]any{
 					"containerImage": manilav1.ManilaSchedulerContainerImage,
 				},
-				"manilaShares": map[string]interface{}{
-					"share0": map[string]interface{}{
+				"manilaShares": map[string]any{
+					"share0": map[string]any{
 						"containerImage": manilav1.ManilaShareContainerImage,
 					},
 				},
@@ -1197,19 +1197,19 @@ var _ = Describe("Manila controller", func() {
 	})
 	When("Manila CR instance has notifications enabled", func() {
 		BeforeEach(func() {
-			rawSpec := map[string]interface{}{
+			rawSpec := map[string]any{
 				"secret":                   SecretName,
 				"databaseInstance":         "openstack",
 				"rabbitMqClusterName":      "rabbitmq",
 				"notificationsBusInstance": "rabbitmq",
-				"manilaAPI": map[string]interface{}{
+				"manilaAPI": map[string]any{
 					"containerImage": manilav1.ManilaAPIContainerImage,
 				},
-				"manilaScheduler": map[string]interface{}{
+				"manilaScheduler": map[string]any{
 					"containerImage": manilav1.ManilaSchedulerContainerImage,
 				},
-				"manilaShares": map[string]interface{}{
-					"share0": map[string]interface{}{
+				"manilaShares": map[string]any{
+					"share0": map[string]any{
 						"containerImage": manilav1.ManilaShareContainerImage,
 					},
 				},
@@ -1471,18 +1471,18 @@ var _ = Describe("Manila Webhook", func() {
 	It("rejects with wrong ManilaAPI service override endpoint type", func() {
 		spec := GetDefaultManilaSpec()
 		apiSpec := GetDefaultManilaAPISpec()
-		apiSpec["override"] = map[string]interface{}{
-			"service": map[string]interface{}{
-				"internal": map[string]interface{}{},
-				"wrooong":  map[string]interface{}{},
+		apiSpec["override"] = map[string]any{
+			"service": map[string]any{
+				"internal": map[string]any{},
+				"wrooong":  map[string]any{},
 			},
 		}
 		spec["manilaAPI"] = apiSpec
 
-		raw := map[string]interface{}{
+		raw := map[string]any{
 			"apiVersion": "manila.openstack.org/v1beta1",
 			"kind":       "Manila",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      manilaTest.Instance.Name,
 				"namespace": manilaTest.Instance.Namespace,
 			},
@@ -1509,8 +1509,8 @@ var _ = Describe("Manila Webhook", func() {
 			spec := GetDefaultManilaSpec()
 			// API and Scheduler
 			if component != "top-level" && component != "share0" {
-				spec[component] = map[string]interface{}{
-					"topologyRef": map[string]interface{}{
+				spec[component] = map[string]any{
+					"topologyRef": map[string]any{
 						"name":      "bar",
 						"namespace": "foo",
 					},
@@ -1518,9 +1518,9 @@ var _ = Describe("Manila Webhook", func() {
 			}
 			// manilaShares share0
 			if component == "share0" {
-				shareList := map[string]interface{}{
-					"share0": map[string]interface{}{
-						"topologyRef": map[string]interface{}{
+				shareList := map[string]any{
+					"share0": map[string]any{
+						"topologyRef": map[string]any{
 							"name":      "foo",
 							"namespace": "bar",
 						},
@@ -1529,16 +1529,16 @@ var _ = Describe("Manila Webhook", func() {
 				spec["manilaShares"] = shareList
 				// top-level topologyRef
 			} else {
-				spec["topologyRef"] = map[string]interface{}{
+				spec["topologyRef"] = map[string]any{
 					"name":      "bar",
 					"namespace": "foo",
 				}
 			}
 			// Build the manila CR
-			raw := map[string]interface{}{
+			raw := map[string]any{
 				"apiVersion": "manila.openstack.org/v1beta1",
 				"kind":       "Manila",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      manilaTest.Instance.Name,
 					"namespace": manilaTest.Instance.Namespace,
 				},
