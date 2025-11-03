@@ -27,11 +27,13 @@ import (
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
 	mariadb_test "github.com/openstack-k8s-operators/mariadb-operator/api/test/helpers"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
+	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
@@ -1459,6 +1461,106 @@ var _ = Describe("Manila controller", func() {
 
 	})
 
+	When("An ApplicationCredential is created for Manila", func() {
+		var (
+			acName                string
+			acSecretName          string
+			servicePasswordSecret string
+			passwordSelector      string
+		)
+		BeforeEach(func() {
+			servicePasswordSecret = "ac-test-osp-secret" //nolint:gosec // G101
+			passwordSelector = "ManilaPassword"
+
+			DeferCleanup(th.DeleteInstance, CreateManilaSecret(manilaTest.Instance.Namespace, servicePasswordSecret))
+			DeferCleanup(th.DeleteInstance, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				infra.DeleteMemcached,
+				infra.CreateMemcached(manilaTest.ManilaMemcached.Namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+
+			spec := GetDefaultManilaSpec()
+			spec["secret"] = servicePasswordSecret
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.ManilaDatabaseName.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+
+			acName = fmt.Sprintf("ac-%s", manila.ServiceName)
+			acSecretName = acName + "-secret"
+			secret := &corev1.Secret{}
+			secret.Name = acSecretName
+			secret.Namespace = manilaTest.Instance.Namespace
+			secret.Data = map[string][]byte{
+				"AC_ID":     []byte("test-ac-id"),
+				"AC_SECRET": []byte("test-ac-secret"),
+			}
+			DeferCleanup(k8sClient.Delete, ctx, secret)
+			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+
+			ac := &keystonev1.KeystoneApplicationCredential{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      acName,
+				},
+				Spec: keystonev1.KeystoneApplicationCredentialSpec{
+					UserName:         manila.ServiceName,
+					Secret:           servicePasswordSecret,
+					PasswordSelector: passwordSelector,
+					Roles:            []string{"admin", "member"},
+					AccessRules:      []keystonev1.ACRule{{Service: "identity", Method: "POST", Path: "/auth/tokens"}},
+					ExpirationDays:   30,
+					GracePeriodDays:  5,
+				},
+			}
+			DeferCleanup(k8sClient.Delete, ctx, ac)
+			Expect(k8sClient.Create(ctx, ac)).To(Succeed())
+
+			fetched := &keystonev1.KeystoneApplicationCredential{}
+			key := types.NamespacedName{Namespace: ac.Namespace, Name: ac.Name}
+			Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+
+			fetched.Status.SecretName = acSecretName
+			now := metav1.Now()
+			readyCond := condition.Condition{
+				Type:               condition.ReadyCondition,
+				Status:             corev1.ConditionTrue,
+				Reason:             condition.ReadyReason,
+				Message:            condition.ReadyMessage,
+				LastTransitionTime: now,
+			}
+			fetched.Status.Conditions = condition.Conditions{readyCond}
+			Expect(k8sClient.Status().Update(ctx, fetched)).To(Succeed())
+
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should render ApplicationCredential auth in 00-config.conf", func() {
+			// Retrieve the generated config secret
+			configDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
+
+			conf := configDataMap.Data["00-config.conf"]
+			Expect(string(conf)).Should(
+				ContainSubstring("auth_type = v3applicationcredential"))
+			Expect(string(conf)).Should(
+				ContainSubstring("application_credential_id = test-ac-id"))
+			Expect(string(conf)).Should(
+				ContainSubstring("application_credential_secret = test-ac-secret"))
+			Expect(string(conf)).Should(
+				Not(ContainSubstring("auth_type = password")))
+		})
+	})
+
 })
 
 var _ = Describe("Manila Webhook", func() {
@@ -1567,4 +1669,5 @@ var _ = Describe("Manila Webhook", func() {
 			return instance, fmt.Sprintf("manilaShares[%s].topologyRef", instance)
 		}),
 	)
+
 })
