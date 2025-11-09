@@ -276,6 +276,41 @@ func (r *ManilaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Man
 		return nil
 	}
 
+	// Application Credential secret watching function
+	acSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
+		name := o.GetName()
+		ns := o.GetNamespace()
+		result := []reconcile.Request{}
+
+		// Only handle Secret objects
+		if _, isSecret := o.(*corev1.Secret); !isSecret {
+			return nil
+		}
+
+		// Check if this is a manila AC secret by name pattern (ac-manila-secret)
+		if name == keystonev1.GetACSecretName(manila.ServiceName) {
+			// get all ManilaAPI CRs in this namespace
+			manilaAPIs := &manilav1beta1.ManilaAPIList{}
+			listOpts := []client.ListOption{
+				client.InNamespace(ns),
+			}
+			if err := r.List(context.Background(), manilaAPIs, listOpts...); err != nil {
+				return nil
+			}
+
+			// Enqueue reconcile for all manila API instances
+			for _, cr := range manilaAPIs.Items {
+				objKey := client.ObjectKey{
+					Namespace: ns,
+					Name:      cr.Name,
+				}
+				result = append(result, reconcile.Request{NamespacedName: objKey})
+			}
+		}
+
+		return result
+	}
+
 	// index passwordSecretField
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &manilav1beta1.ManilaAPI{}, passwordSecretField, func(rawObj client.Object) []string {
 		// Extract the secret name from the spec, if one is provided
@@ -351,6 +386,8 @@ func (r *ManilaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Man
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		Watches(&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(acSecretFn)).
 		Watches(&topologyv1.Topology{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.GenerationChangedPredicate{})).
@@ -724,6 +761,11 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 		return ctrlResult, err
 	}
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
+
+	// Verify Application Credentials if available
+	if ctrlResult, err = keystonev1.VerifyApplicationCredentialsForService(ctx, r.Client, instance.Namespace, manila.ServiceName, &configVars, manila.NormalDuration); err != nil || ctrlResult.RequeueAfter > 0 {
+		return ctrlResult, err
+	}
 
 	//
 	// TLS input validation
