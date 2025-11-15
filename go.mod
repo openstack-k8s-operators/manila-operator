@@ -13,9 +13,9 @@ require (
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20251103072528-9eb684fef4ef
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
 	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20251110170510-e669472c745c
-	k8s.io/api v0.31.13
-	k8s.io/apimachinery v0.31.13
-	k8s.io/client-go v0.31.13
+	k8s.io/api v0.31.14
+	k8s.io/apimachinery v0.31.14
+	k8s.io/client-go v0.31.14
 	sigs.k8s.io/controller-runtime v0.19.7
 )
 
