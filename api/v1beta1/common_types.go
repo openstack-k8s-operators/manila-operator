@@ -17,8 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -59,7 +59,7 @@ type ManilaTemplate struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={service: ManilaPassword}
 	// PasswordSelectors - Selectors to identify the ServiceUser password from the Secret
-	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
+	PasswordSelectors PasswordSelector `json:"passwordSelectors"`
 }
 
 // ManilaServiceTemplate defines the input parameters that can be defined for a given
@@ -76,7 +76,7 @@ type ManilaServiceTemplate struct {
 	// CustomServiceConfig - customize the service config using this parameter to change service defaults,
 	// or overwrite rendered information using raw OpenStack config format. The content gets added to
 	// to /etc/<service>/<service>.conf.d directory a custom config file.
-	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
+	CustomServiceConfig string `json:"customServiceConfig"`
 
 	// +kubebuilder:validation:Optional
 	// CustomServiceConfigSecrets - customize the service config using this parameter to specify Secrets
@@ -103,7 +103,7 @@ type PasswordSelector struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="ManilaPassword"
 	// Service - Selector to get the manila service password from the Secret
-	Service string `json:"service,omitempty"`
+	Service string `json:"service"`
 }
 
 // ValidateTopology -

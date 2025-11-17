@@ -20,7 +20,7 @@ package functional
 import (
 	"fmt"
 
-	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
+	"github.com/openstack-k8s-operators/manila-operator/internal/manila"
 	"k8s.io/apimachinery/pkg/types"
 )
 

@@ -12,7 +12,7 @@ webhooks:
       namespace: system
       path: /mutate-manila-openstack-org-v1beta1-manila
   failurePolicy: Fail
-  name: mmanila.kb.io
+  name: mmanila-v1beta1.kb.io
   rules:
   - apiGroups:
     - manila.openstack.org
@@ -38,7 +38,7 @@ webhooks:
       namespace: system
       path: /validate-manila-openstack-org-v1beta1-manila
   failurePolicy: Fail
-  name: vmanila.kb.io
+  name: vmanila-v1beta1.kb.io
   rules:
   - apiGroups:
     - manila.openstack.org
