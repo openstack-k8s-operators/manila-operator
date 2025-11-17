@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/storage"
-	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -95,14 +95,14 @@ type ManilaSpecBase struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// PreserveJobs - do not delete jobs after they finished e.g. to check logs
-	PreserveJobs bool `json:"preserveJobs,omitempty"`
+	PreserveJobs bool `json:"preserveJobs"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="# add your customization here"
 	// CustomServiceConfig - customize the service config for all Manila services using this parameter to change service defaults,
 	// or overwrite rendered information using raw OpenStack config format. The content gets added to
 	// to /etc/<service>/<service>.conf.d directory a custom config file.
-	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
+	CustomServiceConfig string `json:"customServiceConfig"`
 
 	// +kubebuilder:validation:Optional
 	// ExtraMounts containing conf files and credentials
@@ -116,7 +116,7 @@ type ManilaSpecBase struct {
 
 	// +kubebuilder:validation:Optional
 	// DBPurge parameters -
-	DBPurge DBPurge `json:"dbPurge,omitempty"`
+	DBPurge DBPurge `json:"dbPurge"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=60
@@ -215,7 +215,7 @@ type ManilaDebug struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// DBPurge increases log verbosity by executing the db_purge command with "--debug".
-	DBPurge bool `json:"dbPurge,omitempty"`
+	DBPurge bool `json:"dbPurge"`
 }
 
 // IsReady - returns true if all subresources Ready condition is true

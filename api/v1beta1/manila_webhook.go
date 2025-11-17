@@ -25,14 +25,13 @@ package v1beta1
 import (
 	"fmt"
 
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
-	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -68,15 +67,6 @@ func SetupDefaults() {
 
 	manilalog.Info("Manila defaults initialized", "defaults", manilaDefaults)
 }
-
-// SetupWebhookWithManager sets up the webhook with the Manager
-func (r *Manila) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
-}
-
-//+kubebuilder:webhook:path=/mutate-manila-openstack-org-v1beta1-manila,mutating=true,failurePolicy=fail,sideEffects=None,groups=manila.openstack.org,resources=manilas,verbs=create;update,versions=v1beta1,name=mmanila.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Manila{}
 
@@ -130,9 +120,6 @@ func (spec *ManilaSpecCore) Default() {
 
 	spec.ManilaSpecBase.Default()
 }
-
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-manila-openstack-org-v1beta1-manila,mutating=false,failurePolicy=fail,sideEffects=None,groups=manila.openstack.org,resources=manilas,verbs=create;update,versions=v1beta1,name=vmanila.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Manila{}
 
