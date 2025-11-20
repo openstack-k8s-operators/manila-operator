@@ -59,7 +59,8 @@ import (
 	mariadb_test "github.com/openstack-k8s-operators/mariadb-operator/api/test/helpers"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 
-	"github.com/openstack-k8s-operators/manila-operator/controllers"
+	controllers "github.com/openstack-k8s-operators/manila-operator/internal/controller"
+	webhookv1 "github.com/openstack-k8s-operators/manila-operator/internal/webhook/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -205,7 +206,7 @@ var _ = BeforeSuite(func() {
 
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&manila.Manila{}).SetupWebhookWithManager(k8sManager)
+	err = webhookv1.SetupManilaWebhookWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&controllers.ManilaAPIReconciler{

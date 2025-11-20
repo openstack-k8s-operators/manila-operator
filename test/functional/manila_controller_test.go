@@ -35,7 +35,7 @@ import (
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
-	"github.com/openstack-k8s-operators/manila-operator/pkg/manila"
+	"github.com/openstack-k8s-operators/manila-operator/internal/manila"
 )
 
 var _ = Describe("Manila controller", func() {
