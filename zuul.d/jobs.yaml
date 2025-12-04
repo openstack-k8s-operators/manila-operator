@@ -25,6 +25,7 @@
         - manila
 
 - job:
+    # Testing Tentacle release
     name: manila-operator-tempest
     parent: podified-multinode-hci-deployment-crc-1comp-backends
     vars:
