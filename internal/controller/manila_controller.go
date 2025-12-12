@@ -1025,6 +1025,17 @@ func (r *ManilaReconciler) generateServiceConfig(
 	// Check if Quorum Queues are enabled
 	templateParameters["QuorumQueues"] = transportURLQuorumQueues
 
+	// Check for Application Credentials
+	templateParameters["UseApplicationCredentials"] = false
+	if acData, err := keystonev1.GetApplicationCredentialFromSecret(ctx, r.Client, instance.Namespace, manila.ServiceName); err != nil {
+		h.GetLogger().Error(err, "Failed to get ApplicationCredential for service", "service", manila.ServiceName)
+	} else if acData != nil {
+		templateParameters["UseApplicationCredentials"] = true
+		templateParameters["ApplicationCredentialID"] = acData.ID
+		templateParameters["ApplicationCredentialSecret"] = acData.Secret
+		h.GetLogger().Info("Using ApplicationCredentials auth", "service", manila.ServiceName)
+	}
+
 	// create httpd  vhost template parameters
 	httpdVhostConfig := map[string]any{}
 	for _, endpt := range []service.Endpoint{service.EndpointInternal, service.EndpointPublic} {
