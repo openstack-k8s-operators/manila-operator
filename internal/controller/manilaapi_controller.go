@@ -276,6 +276,41 @@ func (r *ManilaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Man
 		return nil
 	}
 
+	// Application Credential secret watching function
+	acSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
+		name := o.GetName()
+		ns := o.GetNamespace()
+		result := []reconcile.Request{}
+
+		// Only handle Secret objects
+		if _, isSecret := o.(*corev1.Secret); !isSecret {
+			return nil
+		}
+
+		// Check if this is a manila AC secret by name pattern (ac-manila-secret)
+		if name == keystonev1.GetACSecretName(manila.ServiceName) {
+			// get all ManilaAPI CRs in this namespace
+			manilaAPIs := &manilav1beta1.ManilaAPIList{}
+			listOpts := []client.ListOption{
+				client.InNamespace(ns),
+			}
+			if err := r.List(context.Background(), manilaAPIs, listOpts...); err != nil {
+				return nil
+			}
+
+			// Enqueue reconcile for all manila API instances
+			for _, cr := range manilaAPIs.Items {
+				objKey := client.ObjectKey{
+					Namespace: ns,
+					Name:      cr.Name,
+				}
+				result = append(result, reconcile.Request{NamespacedName: objKey})
+			}
+		}
+
+		return result
+	}
+
 	// index passwordSecretField
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &manilav1beta1.ManilaAPI{}, passwordSecretField, func(rawObj client.Object) []string {
 		// Extract the secret name from the spec, if one is provided
@@ -351,6 +386,8 @@ func (r *ManilaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Man
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		Watches(&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(acSecretFn)).
 		Watches(&topologyv1.Topology{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.GenerationChangedPredicate{})).
@@ -808,6 +845,16 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 			err.Error()))
 		return ctrl.Result{}, err
 	}
+
+	// Verify Application Credential secret if available (optional)
+	acSecretName := keystonev1.GetACSecretName(manila.ServiceName)
+	acSecretKey := types.NamespacedName{Namespace: instance.Namespace, Name: acSecretName}
+	acHash, _, err := secret.VerifySecret(ctx, acSecretKey, []string{keystonev1.ACIDSecretKey, keystonev1.ACSecretSecretKey}, helper.GetClient(), 0)
+	if err == nil && acHash != "" {
+		// AC secret exists and is valid - add to configVars for hash tracking
+		configVars[acSecretName] = env.SetValue(acHash)
+	}
+
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
