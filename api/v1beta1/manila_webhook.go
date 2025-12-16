@@ -25,6 +25,7 @@ package v1beta1
 import (
 	"fmt"
 
+	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
@@ -101,6 +102,20 @@ func (spec *ManilaSpec) Default() {
 
 // Default - set defaults for this Manila spec base
 func (spec *ManilaSpecBase) Default() {
+	// Default MessagingBus with cluster name from RabbitMqClusterName
+	rabbitmqv1.DefaultRabbitMqConfig(&spec.MessagingBus, spec.RabbitMqClusterName)
+
+	// Default NotificationsBus if NotificationsBusInstance is specified
+	if spec.NotificationsBusInstance != nil && *spec.NotificationsBusInstance != "" {
+		if spec.NotificationsBus == nil {
+			// Initialize NotificationsBus with MessagingBus values to inherit user/vhost
+			spec.NotificationsBus = &rabbitmqv1.RabbitMqConfig{
+				User:  spec.MessagingBus.User,
+				Vhost: spec.MessagingBus.Vhost,
+			}
+		}
+		rabbitmqv1.DefaultRabbitMqConfig(spec.NotificationsBus, *spec.NotificationsBusInstance)
+	}
 
 	if spec.APITimeout == 0 {
 		spec.APITimeout = manilaDefaults.APITimeout
@@ -200,6 +215,21 @@ func (r *Manila) ValidateUpdate(old runtime.Object) (admission.Warnings, error) 
 func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
+	// Reject changes to deprecated RabbitMqClusterName field - users should use the new messagingBus.cluster field instead
+	if spec.RabbitMqClusterName != old.RabbitMqClusterName {
+		allErrs = append(allErrs, field.Forbidden(
+			basePath.Child("rabbitMqClusterName"),
+			"rabbitMqClusterName is deprecated and cannot be changed. Please use messagingBus.cluster instead"))
+	}
+
+	// Reject changes to deprecated NotificationsBusInstance field
+	if spec.NotificationsBusInstance != nil && old.NotificationsBusInstance != nil &&
+		*spec.NotificationsBusInstance != *old.NotificationsBusInstance {
+		allErrs = append(allErrs, field.Forbidden(
+			basePath.Child("notificationsBusInstance"),
+			"notificationsBusInstance is deprecated and cannot be changed. Please use notificationsBus.cluster instead"))
+	}
+
 	// validate the service base parameters
 	allErrs = append(allErrs, spec.ValidateBaseParams(basePath)...)
 
@@ -216,6 +246,21 @@ func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, nam
 // ValidateUpdate -
 func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
+
+	// Reject changes to deprecated RabbitMqClusterName field - users should use the new messagingBus.cluster field instead
+	if spec.RabbitMqClusterName != old.RabbitMqClusterName {
+		allErrs = append(allErrs, field.Forbidden(
+			basePath.Child("rabbitMqClusterName"),
+			"rabbitMqClusterName is deprecated and cannot be changed. Please use messagingBus.cluster instead"))
+	}
+
+	// Reject changes to deprecated NotificationsBusInstance field
+	if spec.NotificationsBusInstance != nil && old.NotificationsBusInstance != nil &&
+		*spec.NotificationsBusInstance != *old.NotificationsBusInstance {
+		allErrs = append(allErrs, field.Forbidden(
+			basePath.Child("notificationsBusInstance"),
+			"notificationsBusInstance is deprecated and cannot be changed. Please use notificationsBus.cluster instead"))
+	}
 
 	// validate the service base parameters
 	allErrs = append(allErrs, spec.ValidateBaseParams(basePath)...)

@@ -1788,6 +1788,22 @@ spec:
                 default: memcached
                 description: Memcached instance name.
                 type: string
+              messagingBus:
+                description: MessagingBus configuration (username, vhost, and cluster)
+                properties:
+                  cluster:
+                    description: Name of the cluster
+                    minLength: 1
+                    type: string
+                  user:
+                    description: User - RabbitMQ username
+                    type: string
+                  vhost:
+                    description: Vhost - RabbitMQ vhost name
+                    type: string
+                required:
+                - cluster
+                type: object
               nodeSelector:
                 additionalProperties:
                   type: string
@@ -1795,6 +1811,23 @@ spec:
                   NodeSelector to target subset of worker nodes running this service. Setting
                   NodeSelector here acts as a default value and can be overridden by service
                   specific NodeSelector Settings.
+                type: object
+              notificationsBus:
+                description: NotificationsBus configuration (username, vhost, and
+                  cluster) for notifications
+                properties:
+                  cluster:
+                    description: Name of the cluster
+                    minLength: 1
+                    type: string
+                  user:
+                    description: User - RabbitMQ username
+                    type: string
+                  vhost:
+                    description: Vhost - RabbitMQ vhost name
+                    type: string
+                required:
+                - cluster
                 type: object
               notificationsBusInstance:
                 description: |-
