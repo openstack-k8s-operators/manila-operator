@@ -541,7 +541,17 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 			condition.DeploymentReadyErrorMessage,
 			err.Error()))
 		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
+
+	} else if (ctrlResult == ctrl.Result{}) {
+		// Wait until the data in the StatefulSet is for the current generation
+		ssData := ss.GetStatefulSet()
+		if ssData.Generation != ssData.Status.ObservedGeneration {
+			ctrlResult = manila.ResultRequeue
+			err = fmt.Errorf("%w: %s", ErrStatefulSetWaiting, ssData.Name)
+		}
+	}
+
+	if (ctrlResult != ctrl.Result{}) {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DeploymentReadyCondition,
 			condition.RequestedReason,
@@ -550,8 +560,9 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 		return ctrlResult, nil
 	}
 
-	if ss.GetStatefulSet().Generation == ss.GetStatefulSet().Status.ObservedGeneration {
-		instance.Status.ReadyCount = ss.GetStatefulSet().Status.ReadyReplicas
+	ssData := ss.GetStatefulSet()
+	if ssData.Generation == ssData.Status.ObservedGeneration {
+		instance.Status.ReadyCount = ssData.Status.ReadyReplicas
 
 		// verify if network attachment matches expectations
 		networkReady := false
