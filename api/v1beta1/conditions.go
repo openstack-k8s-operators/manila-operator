@@ -27,6 +27,9 @@ const (
 
 	// ManilaShareReadyCondition Status=True condition which indicates if the ManilaShare is configured and operational
 	ManilaShareReadyCondition condition.Type = "ManilaShareReady"
+
+	// ManilaNotificationBusReadyCondition Status=True condition which indicates if the NotificationBus is configured
+	ManilaNotificationBusReadyCondition condition.Type = "ManilaNotificationBusReady"
 )
 
 // Common Messages used by API objects.
@@ -60,4 +63,19 @@ const (
 
 	// ManilaShareReadyRunningMessage
 	ManilaShareReadyRunningMessage = "ManilaShare deployments in progress"
+
+	//
+	// ManilaNotificationBusReady condition messages
+	//
+	// ManilaNotificationBusReadyInitMessage
+	ManilaNotificationBusReadyInitMessage = "ManilaNotificationBus not started"
+
+	// ManilaNotificationBusReadyRunningMessage
+	ManilaNotificationBusReadyRunningMessage = "ManilaNotificationBus creation in progress"
+
+	// ManilaNotificationBusReadyMessage
+	ManilaNotificationBusReadyMessage = "ManilaNotificationBus successfully created"
+
+	// ManilaNotificationBusReadyErrorMessage
+	ManilaNotificationBusReadyErrorMessage = "ManilaNotificationBus error occured %s"
 )

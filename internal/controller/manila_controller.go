@@ -194,7 +194,9 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		condition.UnknownCondition(condition.CronJobReadyCondition, condition.InitReason, condition.CronJobReadyInitMessage),
 	)
 
-	if instance.Spec.NotificationsBusInstance != nil {
+	// Initialize notification bus condition if configured via either the new or deprecated field
+	if instance.Spec.NotificationsBusInstance != nil ||
+		(instance.Spec.NotificationsBus != nil && instance.Spec.NotificationsBus.Cluster != "") {
 		c := condition.UnknownCondition(
 			condition.NotificationBusInstanceReadyCondition,
 			condition.InitReason,
@@ -506,7 +508,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// create RabbitMQ transportURL CR and get the actual URL from the associated secret that is created
 	//
 
-	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, "")
+	transportURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, "", instance.Spec.MessagingBus)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.RabbitMqTransportURLReadyCondition,
@@ -542,19 +544,42 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// associated secret that is created
 	//
 
-	// Request TransportURL when the parameter is provided in the CR
-	// and it does not match with the existing RabbitMqClusterName
-	if instance.Spec.NotificationsBusInstance != nil {
-		// init .Status.NotificationsURLSecret
-		instance.Status.NotificationsURLSecret = ptr.To("")
+	// Request TransportURL when notifications are configured either via:
+	// - the deprecated NotificationsBusInstance field (for backward compatibility), or
+	// - the new NotificationsBus.Cluster field (takes precedence)
+	var notificationsEnabled bool
+	var notificationBusName string
 
+	// Check deprecated NotificationsBusInstance field first
+	if instance.Spec.NotificationsBusInstance != nil && *instance.Spec.NotificationsBusInstance != "" {
+		notificationsEnabled = true
 		// setting notificationBusName to an empty string ensures that we do not
 		// request a new transportURL unless the two spec fields do not match
-		var notificationBusName string
 		if *instance.Spec.NotificationsBusInstance != instance.Spec.RabbitMqClusterName {
 			notificationBusName = *instance.Spec.NotificationsBusInstance
 		}
-		notificationBusInstanceURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, notificationBusName)
+	}
+
+	// Check new NotificationsBus.Cluster field (takes precedence)
+	if instance.Spec.NotificationsBus != nil && instance.Spec.NotificationsBus.Cluster != "" {
+		notificationsEnabled = true
+		// setting notificationBusName to an empty string ensures that we do not
+		// request a new transportURL unless the two spec fields do not match
+		if instance.Spec.NotificationsBus.Cluster != instance.Spec.RabbitMqClusterName {
+			notificationBusName = instance.Spec.NotificationsBus.Cluster
+		}
+	}
+
+	if notificationsEnabled {
+		// init .Status.NotificationsURLSecret
+		instance.Status.NotificationsURLSecret = ptr.To("")
+
+		// Use NotificationsBus if specified, otherwise fall back to main MessagingBus config
+		notificationsRabbitMqConfig := instance.Spec.MessagingBus
+		if instance.Spec.NotificationsBus != nil {
+			notificationsRabbitMqConfig = *instance.Spec.NotificationsBus
+		}
+		notificationBusInstanceURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, notificationBusName, notificationsRabbitMqConfig)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NotificationBusInstanceReadyCondition,
@@ -1044,7 +1069,15 @@ func (r *ManilaReconciler) generateServiceConfig(
 	if instance.Status.NotificationsURLSecret != nil {
 		// Get a notificationInstanceURLSecret only if rabbitMQ referenced in
 		// the spec is different, otherwise inherits the existing transport_url
-		if instance.Spec.RabbitMqClusterName != *instance.Spec.NotificationsBusInstance {
+		// Check both the new NotificationsBus.Cluster field and deprecated NotificationsBusInstance
+		notificationCluster := instance.Spec.RabbitMqClusterName
+		if instance.Spec.NotificationsBus != nil && instance.Spec.NotificationsBus.Cluster != "" {
+			notificationCluster = instance.Spec.NotificationsBus.Cluster
+		} else if instance.Spec.NotificationsBusInstance != nil {
+			notificationCluster = *instance.Spec.NotificationsBusInstance
+		}
+
+		if instance.Spec.RabbitMqClusterName != notificationCluster {
 			notificationInstanceURLSecret, _, err = secret.GetSecret(ctx, h, *instance.Status.NotificationsURLSecret, instance.Namespace)
 			if err != nil {
 				return err
@@ -1134,7 +1167,8 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = apiSpec
 
-		if instance.Spec.NotificationsBusInstance != nil {
+		if instance.Spec.NotificationsBusInstance != nil ||
+			(instance.Spec.NotificationsBus != nil && instance.Spec.NotificationsBus.Cluster != "") {
 			deployment.Spec.NotificationsURLSecret = *instance.Status.NotificationsURLSecret
 		}
 
@@ -1181,7 +1215,8 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = schedulerSpec
 
-		if instance.Spec.NotificationsBusInstance != nil {
+		if instance.Spec.NotificationsBusInstance != nil ||
+			(instance.Spec.NotificationsBus != nil && instance.Spec.NotificationsBus.Cluster != "") {
 			deployment.Spec.NotificationsURLSecret = *instance.Status.NotificationsURLSecret
 		}
 
@@ -1238,7 +1273,8 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
 		deployment.Spec = shareSpec
 
-		if instance.Spec.NotificationsBusInstance != nil {
+		if instance.Spec.NotificationsBusInstance != nil ||
+			(instance.Spec.NotificationsBus != nil && instance.Spec.NotificationsBus.Cluster != "") {
 			deployment.Spec.NotificationsURLSecret = *instance.Status.NotificationsURLSecret
 		}
 
@@ -1263,6 +1299,7 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(
 	instance *manilav1beta1.Manila,
 	serviceLabels map[string]string,
 	rabbitMqClusterName string,
+	rabbitMqConfig rabbitmqv1.RabbitMqConfig,
 ) (*rabbitmqv1.TransportURL, controllerutil.OperationResult, error) {
 
 	// Default values used for regular messagingBus transportURL and explicitly
@@ -1285,9 +1322,12 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(
 	}
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, transportURL, func() error {
 		transportURL.Spec.RabbitmqClusterName = transportURLName
-
-		err := controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
-		return err
+		if rabbitMqConfig.User != "" {
+			transportURL.Spec.Username = rabbitMqConfig.User
+		}
+		// Always set Vhost - empty string means use default "/" vhost
+		transportURL.Spec.Vhost = rabbitMqConfig.Vhost
+		return controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
 	})
 	return transportURL, op, err
 }
