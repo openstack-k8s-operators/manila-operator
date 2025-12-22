@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
+	"gopkg.in/ini.v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	//revive:disable-next-line:dot-imports
@@ -1337,6 +1338,59 @@ var _ = Describe("Manila controller", func() {
 				g.Expect(conf).To(ContainSubstring("rabbit_transient_quorum_queue=true"))
 				g.Expect(conf).To(ContainSubstring("amqp_durable_queues=true"))
 			}, timeout, interval).Should(Succeed())
+		})
+
+		It("includes region_name in config when KeystoneAPI has region set", func() {
+			const testRegion = "regionTwo"
+			// Create and update KeystoneAPI with region in status
+			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)
+			keystoneAPI.Status.Region = testRegion
+			keystoneAPI.Status.APIEndpoints = map[string]string{
+				"internal": "http://keystone-internal-openstack.testing",
+				"public":   "http://keystone-public-openstack.testing",
+			}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Trigger reconciliation
+			th.ExpectCondition(
+				manilaTest.Instance,
+				ConditionGetterFunc(ManilaConditionGetter),
+				condition.ServiceConfigReadyCondition,
+				corev1.ConditionTrue,
+			)
+
+			configSecret := th.GetSecret(manilaTest.ManilaConfigSecret)
+			Expect(configSecret).ShouldNot(BeNil())
+			Expect(configSecret.Data).Should(HaveKey("00-config.conf"))
+			configData := string(configSecret.Data["00-config.conf"])
+
+			// Parse the INI file to properly access sections
+			cfg, err := ini.Load([]byte(configData))
+			Expect(err).ShouldNot(HaveOccurred(), "Should be able to parse config as INI")
+
+			// Verify region_name in [keystone_authtoken]
+			section := cfg.Section("keystone_authtoken")
+			Expect(section).ShouldNot(BeNil(), "Should find [keystone_authtoken] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
+
+			// Verify region_name in [neutron]
+			section = cfg.Section("neutron")
+			Expect(section).ShouldNot(BeNil(), "Should find [neutron] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
+
+			// Verify region_name in [nova]
+			section = cfg.Section("nova")
+			Expect(section).ShouldNot(BeNil(), "Should find [nova] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
+
+			// Verify region_name in [barbican]
+			section = cfg.Section("barbican")
+			Expect(section).ShouldNot(BeNil(), "Should find [barbican] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
 		})
 	})
 
