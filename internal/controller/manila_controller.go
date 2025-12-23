@@ -1013,6 +1013,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 		"MemcachedServersWithInet": memcached.GetMemcachedServerListWithInetString(),
 		"MemcachedServers":         memcached.GetMemcachedServerListString(),
 		"TimeOut":                  instance.Spec.APITimeout,
+		"Region":                   keystoneAPI.GetRegion(),
 	}
 
 	// MTLS
