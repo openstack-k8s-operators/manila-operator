@@ -42,6 +42,7 @@ import (
 // Static errors for manila controllers
 var (
 	ErrNetworkAttachmentConfig = errors.New("not all pods have interfaces with ips as configured in NetworkAttachments")
+	ErrStatefulSetWaiting      = errors.New("waiting for StatefulSet to start reconciling")
 )
 
 type conditionUpdater interface {

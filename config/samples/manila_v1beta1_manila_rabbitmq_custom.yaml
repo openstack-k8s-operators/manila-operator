@@ -1,0 +1,34 @@
+apiVersion: manila.openstack.org/v1beta1
+kind: Manila
+metadata:
+  name: manila-rabbitmq-custom
+  namespace: openstack
+spec:
+  secret: osp-secret
+  databaseInstance: openstack
+  databaseAccount: manila
+  rabbitMqClusterName: rabbitmq
+  # Custom RabbitMQ configuration for the main messaging bus
+  rabbitmq:
+    user: main-user
+    vhost: main-vhost
+  # Optional: Separate RabbitMQ configuration for notifications
+  notificationsBusInstance: rabbitmq-notification
+  notificationsRabbitmq:
+    user: notifications-user
+    vhost: notifications-vhost
+  memcachedInstance: memcached
+  serviceUser: manila
+  customServiceConfig: |
+    [DEFAULT]
+    debug = true
+  manilaAPI:
+    replicas: 1
+    containerImage: quay.io/podified-antelope-centos9/openstack-manila-api:current-podified
+  manilaScheduler:
+    replicas: 1
+    containerImage: quay.io/podified-antelope-centos9/openstack-manila-scheduler:current-podified
+  manilaShares:
+    share0:
+      replicas: 1
+      containerImage: quay.io/podified-antelope-centos9/openstack-manila-share:current-podified
