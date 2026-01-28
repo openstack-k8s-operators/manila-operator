@@ -336,6 +336,18 @@ func (r *ManilaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Man
 		return err
 	}
 
+	// index authAppCredSecretField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &manilav1beta1.ManilaAPI{}, authAppCredSecretField, func(rawObj client.Object) []string {
+		// Extract the application credential secret name from the spec, if one is provided
+		cr := rawObj.(*manilav1beta1.ManilaAPI)
+		if cr.Spec.Auth.ApplicationCredentialSecret == "" {
+			return nil
+		}
+		return []string{cr.Spec.Auth.ApplicationCredentialSecret}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&manilav1beta1.ManilaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
@@ -808,6 +820,16 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 			err.Error()))
 		return ctrl.Result{}, err
 	}
+
+	// Verify Application Credential secret if available (optional)
+	acSecretName := keystonev1.GetACSecretName(manila.ServiceName)
+	acSecretKey := types.NamespacedName{Namespace: instance.Namespace, Name: acSecretName}
+	acHash, _, err := secret.VerifySecret(ctx, acSecretKey, []string{keystonev1.ACIDSecretKey, keystonev1.ACSecretSecretKey}, helper.GetClient(), 0)
+	if err == nil && acHash != "" {
+		// AC secret exists and is valid - add to configVars for hash tracking
+		configVars[acSecretName] = env.SetValue(acHash)
+	}
+
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
