@@ -77,12 +77,11 @@ type ManilaSpecBase struct {
 	// Might not be required in future
 	DatabaseInstance string `json:"databaseInstance"`
 
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=rabbitmq
+	// +kubebuilder:validation:Optional
 	// RabbitMQ instance name
 	// Needed to request a transportURL that is created and used in Manila
 	// Deprecated: Use MessagingBus.Cluster instead
-	RabbitMqClusterName string `json:"rabbitMqClusterName" deprecated:"messagingBus.cluster"`
+	RabbitMqClusterName string `json:"rabbitMqClusterName,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// MessagingBus configuration (username, vhost, and cluster)

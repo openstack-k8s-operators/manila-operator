@@ -1861,7 +1861,6 @@ spec:
                   e.g. to check logs
                 type: boolean
               rabbitMqClusterName:
-                default: rabbitmq
                 description: |-
                   RabbitMQ instance name
                   Needed to request a transportURL that is created and used in Manila
@@ -1898,7 +1897,6 @@ spec:
             - manilaAPI
             - manilaScheduler
             - memcachedInstance
-            - rabbitMqClusterName
             type: object
           status:
             description: ManilaStatus defines the observed state of Manila

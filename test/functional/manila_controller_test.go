@@ -73,7 +73,7 @@ var _ = Describe("Manila controller", func() {
 			Expect(Manila.Spec.DatabaseInstance).Should(Equal("openstack"))
 			Expect(Manila.Spec.DatabaseAccount).Should(Equal(manilaTest.ManilaDatabaseAccount.Name))
 			Expect(Manila.Spec.MemcachedInstance).Should(Equal(manilaTest.MemcachedInstance))
-			Expect(Manila.Spec.RabbitMqClusterName).Should(Equal(manilaTest.RabbitmqClusterName))
+			Expect(Manila.Spec.MessagingBus.Cluster).Should(Equal(manilaTest.RabbitmqClusterName))
 			Expect(Manila.Spec.ServiceUser).Should(Equal(manilaTest.ManilaServiceUser))
 		})
 		It("should have the Status fields initialized", func() {
@@ -392,9 +392,11 @@ var _ = Describe("Manila controller", func() {
 			}
 
 			rawSpec := map[string]any{
-				"secret":              SecretName,
-				"databaseInstance":    "openstack",
-				"rabbitMqClusterName": "rabbitmq",
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus": map[string]any{
+					"cluster": "rabbitmq",
+				},
 				"manilaAPI": map[string]any{
 					"containerImage":     manilav1.ManilaAPIContainerImage,
 					"networkAttachments": []string{"internalapi"},
@@ -1131,10 +1133,12 @@ var _ = Describe("Manila controller", func() {
 	When("Manila CR instance is built with ExtraMounts", func() {
 		BeforeEach(func() {
 			rawSpec := map[string]any{
-				"secret":              SecretName,
-				"databaseInstance":    "openstack",
-				"rabbitMqClusterName": "rabbitmq",
-				"extraMounts":         GetExtraMounts(),
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus": map[string]any{
+					"cluster": "rabbitmq",
+				},
+				"extraMounts": GetExtraMounts(),
 				"manilaAPI": map[string]any{
 					"containerImage": manilav1.ManilaAPIContainerImage,
 				},
@@ -1201,9 +1205,11 @@ var _ = Describe("Manila controller", func() {
 	When("Manila CR instance has notifications enabled", func() {
 		BeforeEach(func() {
 			rawSpec := map[string]any{
-				"secret":              SecretName,
-				"databaseInstance":    "openstack",
-				"rabbitMqClusterName": "rabbitmq",
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus": map[string]any{
+					"cluster": "rabbitmq",
+				},
 				"notificationsBus": map[string]any{
 					"cluster": "rabbitmq",
 				},
@@ -1470,12 +1476,12 @@ var _ = Describe("Manila controller", func() {
 	When("Manila is created with custom RabbitMQ user and vhost", func() {
 		BeforeEach(func() {
 			rawSpec := map[string]any{
-				"secret":              SecretName,
-				"databaseInstance":    "openstack",
-				"rabbitMqClusterName": "rabbitmq",
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
 				"messagingBus": map[string]any{
-					"user":  "main-user",
-					"vhost": "main-vhost",
+					"cluster": "rabbitmq",
+					"user":    "main-user",
+					"vhost":   "main-vhost",
 				},
 				"manilaAPI": map[string]any{
 					"containerImage": manilav1.ManilaAPIContainerImage,
@@ -1519,17 +1525,17 @@ var _ = Describe("Manila controller", func() {
 	When("Manila is created with separate notifications RabbitMQ config", func() {
 		BeforeEach(func() {
 			rawSpec := map[string]any{
-				"secret":                   SecretName,
-				"databaseInstance":         "openstack",
-				"rabbitMqClusterName":      "rabbitmq",
-				"notificationsBusInstance": "rabbitmq-notification",
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
 				"messagingBus": map[string]any{
-					"user":  "main-user",
-					"vhost": "main-vhost",
+					"cluster": "rabbitmq",
+					"user":    "main-user",
+					"vhost":   "main-vhost",
 				},
 				"notificationsBus": map[string]any{
-					"user":  "notifications-user",
-					"vhost": "notifications-vhost",
+					"cluster": "rabbitmq-notification",
+					"user":    "notifications-user",
+					"vhost":   "notifications-vhost",
 				},
 				"manilaAPI": map[string]any{
 					"containerImage": manilav1.ManilaAPIContainerImage,
@@ -2178,8 +2184,9 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				"user":  "custom-user",
 				"vhost": "custom-vhost",
 			}
-			notificationsBusInstance := "rabbitmq-notifications"
-			spec["notificationsBusInstance"] = &notificationsBusInstance
+			spec["notificationsBus"] = map[string]any{
+				"cluster": "rabbitmq-notifications",
+			}
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
@@ -2233,11 +2240,10 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				"vhost": "main-vhost",
 			}
 			spec["notificationsBus"] = map[string]any{
-				"user":  "notifications-user",
-				"vhost": "notifications-vhost",
+				"cluster": "rabbitmq-notifications",
+				"user":    "notifications-user",
+				"vhost":   "notifications-vhost",
 			}
-			notificationsBusInstance := "rabbitmq-notifications"
-			spec["notificationsBusInstance"] = &notificationsBusInstance
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
@@ -2290,8 +2296,9 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				"user":  "shared-user",
 				"vhost": "shared-vhost",
 			}
-			notificationsBusInstance := "rabbitmq-notifications"
-			spec["notificationsBusInstance"] = &notificationsBusInstance
+			spec["notificationsBus"] = map[string]any{
+				"cluster": "rabbitmq-notifications",
+			}
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
