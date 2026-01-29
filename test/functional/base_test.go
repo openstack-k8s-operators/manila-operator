@@ -18,8 +18,10 @@ import (
 	maps0 "maps"
 
 	. "github.com/onsi/gomega" //revive:disable:dot-imports
+	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/manila-operator/internal/manila"
 	"golang.org/x/exp/maps"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -462,4 +464,53 @@ func GetSampleTopologySpec(label string) (map[string]any, []corev1.TopologySprea
 		},
 	}
 	return topologySpec, topologySpecObj
+}
+
+// GetManilaSpecWithAC returns a Manila spec with Application Credential configured
+func GetManilaSpecWithAC(acSecretName string, servicePasswordSecret string) map[string]interface{} {
+	spec := GetDefaultManilaSpec()
+	spec["secret"] = servicePasswordSecret
+	spec["auth"] = map[string]interface{}{
+		"applicationCredentialSecret": acSecretName,
+	}
+	return spec
+}
+
+// GetDefaultManilaAC returns a default KeystoneApplicationCredential spec for testing
+func GetDefaultManilaAC(namespace string, acName string, servicePasswordSecret string, passwordSelector string) *keystonev1.KeystoneApplicationCredential {
+	return &keystonev1.KeystoneApplicationCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      acName,
+		},
+		Spec: keystonev1.KeystoneApplicationCredentialSpec{
+			UserName:         manila.ServiceName,
+			Secret:           servicePasswordSecret,
+			PasswordSelector: passwordSelector,
+			Roles:            []string{"admin", "member"},
+			AccessRules:      []keystonev1.ACRule{{Service: "identity", Method: "POST", Path: "/auth/tokens"}},
+			ExpirationDays:   30,
+			GracePeriodDays:  5,
+		},
+	}
+}
+
+// CreateACSecret creates an Application Credential secret for testing
+func CreateACSecret(namespace string, secretName string) *corev1.Secret {
+	return th.CreateSecret(
+		types.NamespacedName{Namespace: namespace, Name: secretName},
+		map[string][]byte{
+			keystonev1.ACIDSecretKey:     []byte("test-ac-id"),
+			keystonev1.ACSecretSecretKey: []byte("test-ac-secret"),
+		},
+	)
+}
+
+// GetKeystoneAC fetches a KeystoneApplicationCredential by name
+func GetKeystoneAC(name types.NamespacedName) *keystonev1.KeystoneApplicationCredential {
+	instance := &keystonev1.KeystoneApplicationCredential{}
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, name, instance)).Should(Succeed())
+	}, timeout, interval).Should(Succeed())
+	return instance
 }
