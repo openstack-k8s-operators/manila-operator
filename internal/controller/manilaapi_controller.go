@@ -808,6 +808,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 			err.Error()))
 		return ctrl.Result{}, err
 	}
+
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//

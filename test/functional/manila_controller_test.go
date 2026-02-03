@@ -28,11 +28,13 @@ import (
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
 	mariadb_test "github.com/openstack-k8s-operators/mariadb-operator/api/test/helpers"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
+	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
@@ -1513,6 +1515,188 @@ var _ = Describe("Manila controller", func() {
 
 	})
 
+	When("An ApplicationCredential is created for Manila", func() {
+		var (
+			acName                string
+			acSecretName          string
+			servicePasswordSecret string
+			passwordSelector      string
+		)
+		BeforeEach(func() {
+			servicePasswordSecret = "ac-test-osp-secret" //nolint:gosec // G101
+			passwordSelector = "ManilaPassword"
+
+			DeferCleanup(th.DeleteInstance, CreateManilaSecret(manilaTest.Instance.Namespace, servicePasswordSecret))
+			DeferCleanup(th.DeleteInstance, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				infra.DeleteMemcached,
+				infra.CreateMemcached(manilaTest.ManilaMemcached.Namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+
+			acName = fmt.Sprintf("ac-%s", manila.ServiceName)
+			acSecretName = acName + "-secret"
+			DeferCleanup(k8sClient.Delete, ctx, CreateACSecret(manilaTest.Instance.Namespace, acSecretName))
+
+			spec := GetManilaSpecWithAC(acSecretName, servicePasswordSecret)
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.ManilaDatabaseName.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+
+			ac := GetDefaultManilaAC(manilaTest.Instance.Namespace, acName, servicePasswordSecret, passwordSelector)
+			DeferCleanup(k8sClient.Delete, ctx, ac)
+			Expect(k8sClient.Create(ctx, ac)).To(Succeed())
+
+			fetched := &keystonev1.KeystoneApplicationCredential{}
+			key := types.NamespacedName{Namespace: ac.Namespace, Name: ac.Name}
+			Expect(k8sClient.Get(ctx, key, fetched)).To(Succeed())
+
+			fetched.Status.SecretName = acSecretName
+			now := metav1.Now()
+			readyCond := condition.Condition{
+				Type:               condition.ReadyCondition,
+				Status:             corev1.ConditionTrue,
+				Reason:             condition.ReadyReason,
+				Message:            condition.ReadyMessage,
+				LastTransitionTime: now,
+			}
+			fetched.Status.Conditions = condition.Conditions{readyCond}
+			Expect(k8sClient.Status().Update(ctx, fetched)).To(Succeed())
+
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should render ApplicationCredential auth in 00-config.conf", func() {
+			// Verify Manila has AC configured at top level
+			Eventually(func(g Gomega) {
+				manilaInstance := GetManila(manilaTest.Instance)
+				g.Expect(manilaInstance).NotTo(BeNil())
+				g.Expect(manilaInstance.Spec.Auth.ApplicationCredentialSecret).To(Equal(acSecretName))
+			}, timeout, interval).Should(Succeed())
+
+			// Check Manila config secret for AC auth
+			Eventually(func(g Gomega) {
+				configSecretName := types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      manilaTest.Instance.Name + "-config-data",
+				}
+				cfgSecret := th.GetSecret(configSecretName)
+				g.Expect(cfgSecret).NotTo(BeNil())
+
+				conf := string(cfgSecret.Data["00-config.conf"])
+
+				// AC auth is configured
+				g.Expect(conf).To(ContainSubstring("auth_type = v3applicationcredential"))
+				g.Expect(conf).To(ContainSubstring("application_credential_id = test-ac-id"))
+				g.Expect(conf).To(ContainSubstring("application_credential_secret = test-ac-secret"))
+
+				// Password auth fields should not be present
+				g.Expect(conf).NotTo(ContainSubstring("auth_type = password"))
+				g.Expect(conf).NotTo(ContainSubstring("username = manila"))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should update config when AC secret is updated", func() {
+			// Wait for initial AC config
+			Eventually(func(g Gomega) {
+				configSecretName := types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      manilaTest.Instance.Name + "-config-data",
+				}
+				cfgSecret := th.GetSecret(configSecretName)
+				g.Expect(cfgSecret).NotTo(BeNil())
+				conf := string(cfgSecret.Data["00-config.conf"])
+				g.Expect(conf).To(ContainSubstring("application_credential_id = test-ac-id"))
+			}, timeout, interval).Should(Succeed())
+
+			// Update the AC secret with new values
+			secret := th.GetSecret(types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      acSecretName,
+			})
+			secret.Data[keystonev1.ACIDSecretKey] = []byte("updated-ac-id")
+			secret.Data[keystonev1.ACSecretSecretKey] = []byte("updated-ac-secret")
+			Expect(k8sClient.Update(ctx, &secret)).Should(Succeed())
+
+			// Wait for Manila ServiceConfig update
+			Eventually(func(_ Gomega) {
+				th.ExpectCondition(
+					manilaTest.Instance,
+					ConditionGetterFunc(ManilaConditionGetter),
+					condition.InputReadyCondition,
+					corev1.ConditionTrue,
+				)
+			}, timeout, interval).Should(Succeed())
+
+			// Verify config is updated with new values
+			Eventually(func(g Gomega) {
+				configSecretName := types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      manilaTest.Instance.Name + "-config-data",
+				}
+				cfgSecret := th.GetSecret(configSecretName)
+				g.Expect(cfgSecret).NotTo(BeNil())
+				conf := string(cfgSecret.Data["00-config.conf"])
+				g.Expect(conf).To(ContainSubstring("application_credential_id = updated-ac-id"))
+				g.Expect(conf).To(ContainSubstring("application_credential_secret = updated-ac-secret"))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should fallback to password auth when AC is removed", func() {
+			// Wait for initial AC config
+			Eventually(func(g Gomega) {
+				configSecretName := types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      manilaTest.Instance.Name + "-config-data",
+				}
+				cfgSecret := th.GetSecret(configSecretName)
+				g.Expect(cfgSecret).NotTo(BeNil())
+				conf := string(cfgSecret.Data["00-config.conf"])
+				g.Expect(conf).To(ContainSubstring("auth_type = v3applicationcredential"))
+			}, timeout, interval).Should(Succeed())
+
+			// Remove AC secret reference from Manila CR
+			Eventually(func(g Gomega) {
+				manilaInstance := GetManila(manilaTest.Instance)
+				manilaInstance.Spec.Auth.ApplicationCredentialSecret = ""
+				g.Expect(k8sClient.Update(ctx, manilaInstance)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Wait for Manila ServiceConfig update
+			Eventually(func(_ Gomega) {
+				th.ExpectCondition(
+					manilaTest.Instance,
+					ConditionGetterFunc(ManilaConditionGetter),
+					condition.InputReadyCondition,
+					corev1.ConditionTrue,
+				)
+			}, timeout, interval).Should(Succeed())
+
+			// Verify config falls back to password auth
+			Eventually(func(g Gomega) {
+				configSecretName := types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      manilaTest.Instance.Name + "-config-data",
+				}
+				cfgSecret := th.GetSecret(configSecretName)
+				g.Expect(cfgSecret).NotTo(BeNil())
+				conf := string(cfgSecret.Data["00-config.conf"])
+				g.Expect(conf).To(ContainSubstring("auth_type = password"))
+				g.Expect(conf).NotTo(ContainSubstring("auth_type = v3applicationcredential"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 })
 
 var _ = Describe("Manila Webhook", func() {
@@ -1621,4 +1805,5 @@ var _ = Describe("Manila Webhook", func() {
 			return instance, fmt.Sprintf("manilaShares[%s].topologyRef", instance)
 		}),
 	)
+
 })
