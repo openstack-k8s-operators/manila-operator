@@ -48,6 +48,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -56,6 +57,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -252,6 +254,9 @@ var (
 		tlsAPIPublicField,
 		topologyField,
 	}
+	manilaWatchFields = []string{
+		authAppCredSecretField,
+	}
 )
 
 // SetupWithManager sets up the controller with the Manager.
@@ -360,12 +365,50 @@ func (r *ManilaReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 		// Watch for TransportURL Secrets which belong to any TransportURLs created by Manila CRs
 		Watches(&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(transportURLSecretFn)).
+		// Watch for secrets we don't own (password, CA bundle, ApplicationCredential)
+		Watches(&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{})).
 		Watches(&memcachedv1.Memcached{},
 			handler.EnqueueRequestsFromMapFunc(memcachedFn)).
 		Watches(&keystonev1.KeystoneAPI{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectForSrc),
 			builder.WithPredicates(keystonev1.KeystoneAPIStatusChangedPredicate)).
 		Complete(r)
+}
+
+func (r *ManilaReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
+	requests := []reconcile.Request{}
+
+	Log := r.GetLogger(ctx)
+
+	for _, field := range manilaWatchFields {
+		crList := &manilav1beta1.ManilaList{}
+		listOps := &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(field, src.GetName()),
+			Namespace:     src.GetNamespace(),
+		}
+		err := r.List(ctx, crList, listOps)
+		if err != nil {
+			Log.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
+			return requests
+		}
+
+		for _, item := range crList.Items {
+			Log.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
+
+			requests = append(requests,
+				reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      item.GetName(),
+						Namespace: item.GetNamespace(),
+					},
+				},
+			)
+		}
+	}
+
+	return requests
 }
 
 func (r *ManilaReconciler) findObjectForSrc(ctx context.Context, src client.Object) []reconcile.Request {
