@@ -1715,6 +1715,8 @@ var _ = Describe("Manila controller", func() {
 			acSecretName = acName + "-secret"
 			DeferCleanup(k8sClient.Delete, ctx, CreateACSecret(manilaTest.Instance.Namespace, acSecretName))
 
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+
 			spec := GetManilaSpecWithAC(acSecretName, servicePasswordSecret)
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
 			DeferCleanup(
@@ -1727,7 +1729,6 @@ var _ = Describe("Manila controller", func() {
 					},
 				),
 			)
-			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 
 			ac := GetDefaultManilaAC(manilaTest.Instance.Namespace, acName, servicePasswordSecret, passwordSelector)
 			DeferCleanup(k8sClient.Delete, ctx, ac)
