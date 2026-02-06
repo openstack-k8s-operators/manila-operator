@@ -73,7 +73,7 @@ var _ = Describe("Manila controller", func() {
 			Expect(Manila.Spec.DatabaseInstance).Should(Equal("openstack"))
 			Expect(Manila.Spec.DatabaseAccount).Should(Equal(manilaTest.ManilaDatabaseAccount.Name))
 			Expect(Manila.Spec.MemcachedInstance).Should(Equal(manilaTest.MemcachedInstance))
-			Expect(Manila.Spec.RabbitMqClusterName).Should(Equal(manilaTest.RabbitmqClusterName))
+			Expect(Manila.Spec.MessagingBus.Cluster).Should(Equal(manilaTest.RabbitmqClusterName))
 			Expect(Manila.Spec.ServiceUser).Should(Equal(manilaTest.ManilaServiceUser))
 		})
 		It("should have the Status fields initialized", func() {
@@ -392,9 +392,11 @@ var _ = Describe("Manila controller", func() {
 			}
 
 			rawSpec := map[string]any{
-				"secret":              SecretName,
-				"databaseInstance":    "openstack",
-				"rabbitMqClusterName": "rabbitmq",
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus": map[string]any{
+					"cluster": "rabbitmq",
+				},
 				"manilaAPI": map[string]any{
 					"containerImage":     manilav1.ManilaAPIContainerImage,
 					"networkAttachments": []string{"internalapi"},
@@ -1131,10 +1133,12 @@ var _ = Describe("Manila controller", func() {
 	When("Manila CR instance is built with ExtraMounts", func() {
 		BeforeEach(func() {
 			rawSpec := map[string]any{
-				"secret":              SecretName,
-				"databaseInstance":    "openstack",
-				"rabbitMqClusterName": "rabbitmq",
-				"extraMounts":         GetExtraMounts(),
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus": map[string]any{
+					"cluster": "rabbitmq",
+				},
+				"extraMounts": GetExtraMounts(),
 				"manilaAPI": map[string]any{
 					"containerImage": manilav1.ManilaAPIContainerImage,
 				},
@@ -1201,10 +1205,14 @@ var _ = Describe("Manila controller", func() {
 	When("Manila CR instance has notifications enabled", func() {
 		BeforeEach(func() {
 			rawSpec := map[string]any{
-				"secret":                   SecretName,
-				"databaseInstance":         "openstack",
-				"rabbitMqClusterName":      "rabbitmq",
-				"notificationsBusInstance": "rabbitmq",
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus": map[string]any{
+					"cluster": "rabbitmq",
+				},
+				"notificationsBus": map[string]any{
+					"cluster": "rabbitmq",
+				},
 				"manilaAPI": map[string]any{
 					"containerImage": manilav1.ManilaAPIContainerImage,
 				},
@@ -1230,6 +1238,12 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			// Simulate the notifications TransportURL being ready (separate from messaging)
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
@@ -1254,12 +1268,26 @@ var _ = Describe("Manila controller", func() {
 				corev1.ConditionTrue,
 			)
 
+			// Verify that separate TransportURL CRs exist even with same cluster
+			Eventually(func(g Gomega) {
+				mainTransportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(mainTransportURL).ToNot(BeNil())
+
+				notificationsTransportURLName := types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+				}
+				notificationsTransportURL := infra.GetTransportURL(notificationsTransportURLName)
+				g.Expect(notificationsTransportURL).ToNot(BeNil())
+
+				// Verify they are different TransportURL CRs
+				g.Expect(mainTransportURL.Name).ToNot(Equal(notificationsTransportURL.Name))
+			}, timeout, interval).Should(Succeed())
+
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
 				g.Expect(manila.Status.TransportURLSecret).ToNot(Equal(""))
 				g.Expect(*manila.Status.NotificationsURLSecret).ToNot(Equal(""))
-				g.Expect(manila.Status.TransportURLSecret).
-					To(Equal(*manila.Status.NotificationsURLSecret))
 			}, timeout, interval).Should(Succeed())
 		})
 
@@ -1270,9 +1298,24 @@ var _ = Describe("Manila controller", func() {
 			// update Manila CR to point to the new (dedicated) rabbit instance
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
-				*manila.Spec.NotificationsBusInstance = "rabbitmq-notification"
+				manila.Spec.NotificationsBus.Cluster = "rabbitmq-notification"
 				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
+
+			// Verify that the TransportURL was updated with the new cluster
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+
+			Eventually(func(g Gomega) {
+				notificationsTransportURL := infra.GetTransportURL(notificationsTransportURLName)
+				g.Expect(notificationsTransportURL).ToNot(BeNil())
+				g.Expect(notificationsTransportURL.Spec.RabbitmqClusterName).To(Equal("rabbitmq-notification"))
+			}, timeout, interval).Should(Succeed())
+
+			// Simulate the notifications TransportURL being ready with the new cluster
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
 
 			th.ExpectCondition(
 				manilaTest.Instance,
@@ -1280,18 +1323,12 @@ var _ = Describe("Manila controller", func() {
 				condition.NotificationBusInstanceReadyCondition,
 				corev1.ConditionTrue,
 			)
-
-			Eventually(func(g Gomega) {
-				manila := GetManila(manilaTest.Instance)
-				g.Expect(*manila.Status.NotificationsURLSecret).ToNot(
-					Equal(manila.Status.TransportURLSecret))
-			}, timeout, interval).Should(Succeed())
 		})
 
 		It("updates manila CR and disable notifications", func() {
 			Eventually(func(g Gomega) {
 				manila := GetManila(manilaTest.Instance)
-				manila.Spec.NotificationsBusInstance = nil
+				manila.Spec.NotificationsBus = nil
 				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
@@ -1436,6 +1473,147 @@ var _ = Describe("Manila controller", func() {
 		})
 	})
 
+	When("Manila is created with custom RabbitMQ user and vhost", func() {
+		BeforeEach(func() {
+			rawSpec := map[string]any{
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus": map[string]any{
+					"cluster": "rabbitmq",
+					"user":    "main-user",
+					"vhost":   "main-vhost",
+				},
+				"manilaAPI": map[string]any{
+					"containerImage": manilav1.ManilaAPIContainerImage,
+				},
+				"manilaScheduler": map[string]any{
+					"containerImage": manilav1.ManilaSchedulerContainerImage,
+				},
+				"manilaShares": map[string]any{
+					"share0": map[string]any{
+						"containerImage": manilav1.ManilaShareContainerImage,
+					},
+				},
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+		})
+
+		It("creates TransportURL with custom user and vhost", func() {
+			transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+			Expect(transportURL.Spec.Username).To(Equal("main-user"))
+			Expect(transportURL.Spec.Vhost).To(Equal("main-vhost"))
+		})
+	})
+
+	When("Manila is created with separate notifications RabbitMQ config", func() {
+		BeforeEach(func() {
+			rawSpec := map[string]any{
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus": map[string]any{
+					"cluster": "rabbitmq",
+					"user":    "main-user",
+					"vhost":   "main-vhost",
+				},
+				"notificationsBus": map[string]any{
+					"cluster": "rabbitmq-notification",
+					"user":    "notifications-user",
+					"vhost":   "notifications-vhost",
+				},
+				"manilaAPI": map[string]any{
+					"containerImage": manilav1.ManilaAPIContainerImage,
+				},
+				"manilaScheduler": map[string]any{
+					"containerImage": manilav1.ManilaSchedulerContainerImage,
+				},
+				"manilaShares": map[string]any{
+					"share0": map[string]any{
+						"containerImage": manilav1.ManilaShareContainerImage,
+					},
+				},
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.NotificationSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+		})
+
+		It("creates separate TransportURLs with different configs", func() {
+			// Check main transport URL
+			transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+			Expect(transportURL.Spec.Username).To(Equal("main-user"))
+			Expect(transportURL.Spec.Vhost).To(Equal("main-vhost"))
+
+			// Check notifications transport URL
+			notificationTransportURL := infra.GetTransportURL(types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			})
+			Expect(notificationTransportURL.Spec.Username).To(Equal("notifications-user"))
+			Expect(notificationTransportURL.Spec.Vhost).To(Equal("notifications-vhost"))
+		})
+	})
+
+	When("Manila is created with default RabbitMQ config", func() {
+		BeforeEach(func() {
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+		})
+
+		It("creates TransportURL without custom user and vhost", func() {
+			transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+			Expect(transportURL.Spec.Username).To(Equal(""))
+			Expect(transportURL.Spec.Vhost).To(Equal(""))
+		})
+	})
+
 	// Run MariaDBAccount suite tests.  these are pre-packaged ginkgo tests
 	// that exercise standard account create / update patterns that should be
 	// common to all controllers that ensure MariaDBAccount CRs.
@@ -1537,6 +1715,8 @@ var _ = Describe("Manila controller", func() {
 			acSecretName = acName + "-secret"
 			DeferCleanup(k8sClient.Delete, ctx, CreateACSecret(manilaTest.Instance.Namespace, acSecretName))
 
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+
 			spec := GetManilaSpecWithAC(acSecretName, servicePasswordSecret)
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
 			DeferCleanup(
@@ -1549,7 +1729,6 @@ var _ = Describe("Manila controller", func() {
 					},
 				),
 			)
-			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 
 			ac := GetDefaultManilaAC(manilaTest.Instance.Namespace, acName, servicePasswordSecret, passwordSelector)
 			DeferCleanup(k8sClient.Delete, ctx, ac)
@@ -1806,4 +1985,433 @@ var _ = Describe("Manila Webhook", func() {
 		}),
 	)
 
+})
+
+var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
+	var memcachedSpec memcachedv1.MemcachedSpec
+
+	BeforeEach(func() {
+		memcachedSpec = infra.GetDefaultMemcachedSpec()
+	})
+
+	When("Manila is created with custom RabbitMQ vhost and user", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["messagingBus"] = map[string]any{
+				"user":  "custom-user",
+				"vhost": "custom-vhost",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should create TransportURL with custom vhost and user", func() {
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal("custom-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("custom-vhost"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila is created with default RabbitMQ configuration", func() {
+		BeforeEach(func() {
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should create TransportURL with default vhost and user", func() {
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal(""))
+				g.Expect(transportURL.Spec.Vhost).To(Equal(""))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila is created with only custom RabbitMQ user", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["messagingBus"] = map[string]any{
+				"user": "custom-user-only",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should create TransportURL with custom user and default vhost", func() {
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal("custom-user-only"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal(""))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila is created with only custom RabbitMQ vhost", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["messagingBus"] = map[string]any{
+				"vhost": "custom-vhost-only",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should create TransportURL with custom vhost and default user", func() {
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal(""))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("custom-vhost-only"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila RabbitMQ configuration is updated", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["messagingBus"] = map[string]any{
+				"user":  "initial-user",
+				"vhost": "initial-vhost",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should update TransportURL when RabbitMQ configuration changes", func() {
+			// Verify initial configuration
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal("initial-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("initial-vhost"))
+			}, timeout, interval).Should(Succeed())
+
+			// Update the Manila CR with new RabbitMQ configuration
+			Eventually(func(g Gomega) {
+				manila := GetManila(manilaTest.Instance)
+				manila.Spec.MessagingBus.User = "updated-user"
+				manila.Spec.MessagingBus.Vhost = "updated-vhost"
+				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Verify the TransportURL is updated
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal("updated-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("updated-vhost"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila is created with custom RabbitMQ config and notifications bus", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["messagingBus"] = map[string]any{
+				"user":  "custom-user",
+				"vhost": "custom-vhost",
+			}
+			spec["notificationsBus"] = map[string]any{
+				"cluster": "rabbitmq-notifications",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should apply custom RabbitMQ config to main but NOT inherit to notifications TransportURL", func() {
+			// Verify main TransportURL has custom config
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal("custom-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("custom-vhost"))
+			}, timeout, interval).Should(Succeed())
+
+			// Verify notifications TransportURL does NOT inherit custom config (for separation)
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
+
+			Eventually(func(g Gomega) {
+				notificationsTransportURL := infra.GetTransportURL(notificationsTransportURLName)
+				// User and vhost should be empty (dynamically generated) to ensure separation
+				g.Expect(notificationsTransportURL.Spec.Username).To(Equal(""))
+				g.Expect(notificationsTransportURL.Spec.Vhost).To(Equal(""))
+				g.Expect(notificationsTransportURL.Spec.RabbitmqClusterName).To(Equal("rabbitmq-notifications"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila is created with different RabbitMQ configs for main and notifications", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["messagingBus"] = map[string]any{
+				"user":  "main-user",
+				"vhost": "main-vhost",
+			}
+			spec["notificationsBus"] = map[string]any{
+				"cluster": "rabbitmq-notifications",
+				"user":    "notifications-user",
+				"vhost":   "notifications-vhost",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should use different credentials for main and notifications TransportURLs", func() {
+			// Verify main TransportURL has main-specific config
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal("main-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("main-vhost"))
+				g.Expect(transportURL.Spec.RabbitmqClusterName).To(Equal(manilaTest.RabbitmqClusterName))
+			}, timeout, interval).Should(Succeed())
+
+			// Verify notifications TransportURL has notifications-specific config
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
+
+			Eventually(func(g Gomega) {
+				notificationsTransportURL := infra.GetTransportURL(notificationsTransportURLName)
+				g.Expect(notificationsTransportURL.Spec.Username).To(Equal("notifications-user"))
+				g.Expect(notificationsTransportURL.Spec.Vhost).To(Equal("notifications-vhost"))
+				g.Expect(notificationsTransportURL.Spec.RabbitmqClusterName).To(Equal("rabbitmq-notifications"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila has notifications bus but only main RabbitMQ config", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["messagingBus"] = map[string]any{
+				"user":  "shared-user",
+				"vhost": "shared-vhost",
+			}
+			spec["notificationsBus"] = map[string]any{
+				"cluster": "rabbitmq-notifications",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should NOT fall back to main RabbitMQ config for notifications (ensure separation)", func() {
+			// Verify main TransportURL has custom config
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal("shared-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("shared-vhost"))
+			}, timeout, interval).Should(Succeed())
+
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
+
+			Eventually(func(g Gomega) {
+				notificationsTransportURL := infra.GetTransportURL(notificationsTransportURLName)
+				// Notifications should NOT fall back to main config - ensure separation
+				g.Expect(notificationsTransportURL.Spec.Username).To(Equal(""))
+				g.Expect(notificationsTransportURL.Spec.Vhost).To(Equal(""))
+				g.Expect(notificationsTransportURL.Spec.RabbitmqClusterName).To(Equal("rabbitmq-notifications"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Manila is created with same RabbitMQ cluster but different vhost/user for notifications", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+			spec["messagingBus"] = map[string]any{
+				"cluster": "rabbitmq",
+				"user":    "main-user",
+				"vhost":   "main-vhost",
+			}
+			spec["notificationsBus"] = map[string]any{
+				"cluster": "rabbitmq", // Same cluster as messaging
+				"user":    "notifications-user",
+				"vhost":   "notifications-vhost",
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should create separate TransportURLs for main and notifications even with same cluster", func() {
+			// Verify main TransportURL has main-specific config
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				g.Expect(transportURL.Spec.Username).To(Equal("main-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("main-vhost"))
+				g.Expect(transportURL.Spec.RabbitmqClusterName).To(Equal(manilaTest.RabbitmqClusterName))
+			}, timeout, interval).Should(Succeed())
+
+			// Verify notifications TransportURL has notifications-specific config
+			// Even though using same cluster, it should create a separate TransportURL CR
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
+
+			Eventually(func(g Gomega) {
+				notificationsTransportURL := infra.GetTransportURL(notificationsTransportURLName)
+				g.Expect(notificationsTransportURL.Spec.Username).To(Equal("notifications-user"))
+				g.Expect(notificationsTransportURL.Spec.Vhost).To(Equal("notifications-vhost"))
+				g.Expect(notificationsTransportURL.Spec.RabbitmqClusterName).To(Equal("rabbitmq"))
+			}, timeout, interval).Should(Succeed())
+
+			// Verify that both TransportURLs exist and are different CRs
+			Eventually(func(g Gomega) {
+				mainTransportURL := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				notificationsTransportURL := infra.GetTransportURL(notificationsTransportURLName)
+
+				// They should have the same cluster name
+				g.Expect(mainTransportURL.Spec.RabbitmqClusterName).To(Equal(notificationsTransportURL.Spec.RabbitmqClusterName))
+
+				// But different vhosts and users
+				g.Expect(mainTransportURL.Spec.Vhost).ToNot(Equal(notificationsTransportURL.Spec.Vhost))
+				g.Expect(mainTransportURL.Spec.Username).ToNot(Equal(notificationsTransportURL.Spec.Username))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
 })

@@ -44,7 +44,8 @@ spec:
    passwordSelectors:
       service: ManilaPassword
    preserveJobs: false
-   rabbitMqClusterName: rabbitmq
+   messagingBus:
+    cluster: rabbitmq
    secret: osp-secret
    serviceUser: manila
 status:

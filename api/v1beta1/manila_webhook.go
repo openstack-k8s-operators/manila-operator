@@ -27,6 +27,7 @@ import (
 
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
+	common_webhook "github.com/openstack-k8s-operators/lib-common/modules/common/webhook"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -101,6 +102,14 @@ func (spec *ManilaSpec) Default() {
 
 // Default - set defaults for this Manila spec base
 func (spec *ManilaSpecBase) Default() {
+	// Default MessagingBus.Cluster if not set
+	// Migration from deprecated fields is handled by openstack-operator
+	if spec.MessagingBus.Cluster == "" {
+		spec.MessagingBus.Cluster = "rabbitmq"
+	}
+
+	// NotificationsBus.Cluster is not defaulted - it must be explicitly set if NotificationsBus is configured
+	// This ensures users make a conscious choice about which cluster to use for notifications
 
 	if spec.APITimeout == 0 {
 		spec.APITimeout = manilaDefaults.APITimeout
@@ -121,32 +130,92 @@ func (spec *ManilaSpecCore) Default() {
 	spec.ManilaSpecBase.Default()
 }
 
+// getDeprecatedFields returns the centralized list of deprecated fields for ManilaSpecBase
+func (spec *ManilaSpecBase) getDeprecatedFields(old *ManilaSpecBase) []common_webhook.DeprecatedFieldUpdate {
+	// Get new field value (handle nil NotificationsBus)
+	var newNotifBusCluster *string
+	if spec.NotificationsBus != nil {
+		newNotifBusCluster = &spec.NotificationsBus.Cluster
+	}
+
+	deprecatedFields := []common_webhook.DeprecatedFieldUpdate{
+		{
+			DeprecatedFieldName: "rabbitMqClusterName",
+			NewFieldPath:        []string{"messagingBus", "cluster"},
+			NewDeprecatedValue:  &spec.RabbitMqClusterName,
+			NewValue:            &spec.MessagingBus.Cluster,
+		},
+		{
+			DeprecatedFieldName: "notificationsBusInstance",
+			NewFieldPath:        []string{"notificationsBus", "cluster"},
+			NewDeprecatedValue:  spec.NotificationsBusInstance,
+			NewValue:            newNotifBusCluster,
+		},
+	}
+
+	// If old spec is provided (UPDATE operation), add old values
+	if old != nil {
+		deprecatedFields[0].OldDeprecatedValue = &old.RabbitMqClusterName
+		deprecatedFields[1].OldDeprecatedValue = old.NotificationsBusInstance
+	}
+
+	return deprecatedFields
+}
+
+// validateDeprecatedFieldsCreate validates deprecated fields during CREATE operations
+func (spec *ManilaSpecBase) validateDeprecatedFieldsCreate(basePath *field.Path) ([]string, field.ErrorList) {
+	// Get deprecated fields list (without old values for CREATE)
+	deprecatedFieldsUpdate := spec.getDeprecatedFields(nil)
+
+	// Convert to DeprecatedField list for CREATE validation
+	deprecatedFields := make([]common_webhook.DeprecatedField, len(deprecatedFieldsUpdate))
+	for i, df := range deprecatedFieldsUpdate {
+		deprecatedFields[i] = common_webhook.DeprecatedField{
+			DeprecatedFieldName: df.DeprecatedFieldName,
+			NewFieldPath:        df.NewFieldPath,
+			DeprecatedValue:     df.NewDeprecatedValue,
+			NewValue:            df.NewValue,
+		}
+	}
+
+	return common_webhook.ValidateDeprecatedFieldsCreate(deprecatedFields, basePath), nil
+}
+
+// validateDeprecatedFieldsUpdate validates deprecated fields during UPDATE operations
+func (spec *ManilaSpecBase) validateDeprecatedFieldsUpdate(old ManilaSpecBase, basePath *field.Path) ([]string, field.ErrorList) {
+	// Get deprecated fields list with old values
+	deprecatedFields := spec.getDeprecatedFields(&old)
+	return common_webhook.ValidateDeprecatedFieldsUpdate(deprecatedFields, basePath)
+}
+
 var _ webhook.Validator = &Manila{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Manila) ValidateCreate() (admission.Warnings, error) {
 	manilalog.Info("validate create", "name", r.Name)
 
-	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
-
-	if err := r.Spec.ValidateCreate(basePath, r.Namespace); err != nil {
-		allErrs = append(allErrs, err...)
-	}
+	warnings, allErrs := r.Spec.ValidateCreate(basePath, r.Namespace)
 
 	if len(allErrs) != 0 {
-		return nil, apierrors.NewInvalid(
+		return warnings, apierrors.NewInvalid(
 			schema.GroupKind{Group: "manila.openstack.org", Kind: "Manila"},
 			r.Name, allErrs)
 	}
 
-	return nil, nil
+	return warnings, nil
 }
 
 // ValidateCreate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an manila spec.
-func (spec *ManilaSpec) ValidateCreate(basePath *field.Path, namespace string) field.ErrorList {
+func (spec *ManilaSpec) ValidateCreate(basePath *field.Path, namespace string) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
+	var warnings admission.Warnings
+
+	// Validate deprecated fields
+	deprecatedWarnings, deprecatedErrors := spec.ManilaSpecBase.validateDeprecatedFieldsCreate(basePath)
+	warnings = append(warnings, deprecatedWarnings...)
+	allErrs = append(allErrs, deprecatedErrors...)
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
@@ -154,12 +223,18 @@ func (spec *ManilaSpec) ValidateCreate(basePath *field.Path, namespace string) f
 		spec.ManilaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
-	return allErrs
+	return warnings, allErrs
 }
 
 // ValidateCreate -
-func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path, namespace string) field.ErrorList {
+func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path, namespace string) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
+	var warnings admission.Warnings
+
+	// Validate deprecated fields
+	deprecatedWarnings, deprecatedErrors := spec.ManilaSpecBase.validateDeprecatedFieldsCreate(basePath)
+	warnings = append(warnings, deprecatedWarnings...)
+	allErrs = append(allErrs, deprecatedErrors...)
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
@@ -167,7 +242,7 @@ func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path, namespace strin
 		spec.ManilaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
-	return allErrs
+	return warnings, allErrs
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -179,26 +254,28 @@ func (r *Manila) ValidateUpdate(old runtime.Object) (admission.Warnings, error) 
 		return nil, apierrors.NewInternalError(fmt.Errorf("unable to convert existing object"))
 	}
 
-	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
-
-	if err := r.Spec.ValidateUpdate(oldManila.Spec, basePath, r.Namespace); err != nil {
-		allErrs = append(allErrs, err...)
-	}
+	warnings, allErrs := r.Spec.ValidateUpdate(oldManila.Spec, basePath, r.Namespace)
 
 	if len(allErrs) != 0 {
-		return nil, apierrors.NewInvalid(
+		return warnings, apierrors.NewInvalid(
 			schema.GroupKind{Group: "manila.openstack.org", Kind: "Manila"},
 			r.Name, allErrs)
 	}
 
-	return nil, nil
+	return warnings, nil
 }
 
 // ValidateUpdate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an manila spec.
-func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, namespace string) field.ErrorList {
+func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, namespace string) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
+	var warnings admission.Warnings
+
+	// Validate deprecated fields
+	deprecatedWarnings, deprecatedErrors := spec.ManilaSpecBase.validateDeprecatedFieldsUpdate(old.ManilaSpecBase, basePath)
+	warnings = append(warnings, deprecatedWarnings...)
+	allErrs = append(allErrs, deprecatedErrors...)
 
 	// validate the service base parameters
 	allErrs = append(allErrs, spec.ValidateBaseParams(basePath)...)
@@ -210,12 +287,18 @@ func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, nam
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
 
-	return allErrs
+	return warnings, allErrs
 }
 
 // ValidateUpdate -
-func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.Path, namespace string) field.ErrorList {
+func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.Path, namespace string) (admission.Warnings, field.ErrorList) {
 	var allErrs field.ErrorList
+	var warnings admission.Warnings
+
+	// Validate deprecated fields
+	deprecatedWarnings, deprecatedErrors := spec.ManilaSpecBase.validateDeprecatedFieldsUpdate(old.ManilaSpecBase, basePath)
+	warnings = append(warnings, deprecatedWarnings...)
+	allErrs = append(allErrs, deprecatedErrors...)
 
 	// validate the service base parameters
 	allErrs = append(allErrs, spec.ValidateBaseParams(basePath)...)
@@ -226,7 +309,7 @@ func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.P
 		spec.ManilaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
-	return allErrs
+	return warnings, allErrs
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -329,10 +412,10 @@ func (spec *ManilaSpec) ValidateManilaTopology(basePath *field.Path, namespace s
 // ValidateBaseParams -
 func (spec *ManilaSpec) ValidateBaseParams(basePath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if spec.RabbitMqClusterName == "" {
-		rabbitPath := basePath.Child("rabbitMqClusterName")
+	if spec.MessagingBus.Cluster == "" {
+		messagingBusPath := basePath.Child("messagingBus").Child("cluster")
 		allErrs = append(allErrs,
-			field.Invalid(rabbitPath, "rabbitMqClusterName", "RabbitMqClusterName is empty"))
+			field.Invalid(messagingBusPath, "messagingBus.cluster", "MessagingBus.Cluster is empty"))
 	}
 	if spec.MemcachedInstance == "" {
 		mcPath := basePath.Child("memcachedInstance")
@@ -350,10 +433,10 @@ func (spec *ManilaSpec) ValidateBaseParams(basePath *field.Path) field.ErrorList
 // ValidateBaseParams -
 func (spec *ManilaSpecCore) ValidateBaseParams(basePath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if spec.RabbitMqClusterName == "" {
-		rabbitPath := basePath.Child("rabbitMqClusterName")
+	if spec.MessagingBus.Cluster == "" {
+		messagingBusPath := basePath.Child("messagingBus").Child("cluster")
 		allErrs = append(allErrs,
-			field.Invalid(rabbitPath, "rabbitMqClusterName", "RabbitMqClusterName is empty"))
+			field.Invalid(messagingBusPath, "messagingBus.cluster", "MessagingBus.Cluster is empty"))
 	}
 	if spec.MemcachedInstance == "" {
 		mcPath := basePath.Child("memcachedInstance")
