@@ -557,7 +557,7 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 			condition.RequestedReason,
 			condition.SeverityInfo,
 			condition.DeploymentReadyRunningMessage))
-		return ctrlResult, nil
+		return ctrlResult, err
 	}
 
 	ssData := ss.GetStatefulSet()
