@@ -209,6 +209,43 @@ var _ = Describe("Manila controller", func() {
 			ManilaShareNotExists(manilaTest.Instance)
 		})
 	})
+
+	When("Manila CR instance is created with an invalid password", func() {
+		BeforeEach(func() {
+			DeferCleanup(k8sClient.Delete, ctx,
+				CreateManilaInvalidSecret(manilaName.Namespace, manilaTest.ManilaInvalidSecretName))
+			spec := GetManilaEmptySpec()
+			spec["secret"] = manilaTest.ManilaInvalidSecretName
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(
+				manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+		})
+		It("rejects the password and reports InputReadyCondition as False", func() {
+			expectedErrMsg := "Input data error occurred password does not meet the requirements"
+			th.ExpectConditionWithDetails(
+				manilaName,
+				ConditionGetterFunc(ManilaConditionGetter),
+				condition.InputReadyCondition,
+				corev1.ConditionFalse,
+				condition.ErrorReason,
+				expectedErrMsg,
+			)
+		})
+	})
 	When("Both TransportURL secret and osp-secret are available", func() {
 		BeforeEach(func() {
 			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
