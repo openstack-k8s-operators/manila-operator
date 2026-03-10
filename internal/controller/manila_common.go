@@ -156,19 +156,25 @@ func ensureNAD(
 }
 
 // verifyServiceSecret - ensures that the Secret object exists and the expected
-// fields are in the Secret. It also sets a hash of the values of the expected
-// fields passed as input.
+// fields passed as input. It accepts a expectedFields map[string]secret.Validator
+// so we can validate the secret field with the appropriate validator provided
+// by lib-common (e.g. PasswordValidator)
 func verifyServiceSecret(
 	ctx context.Context,
 	secretName types.NamespacedName,
-	expectedFields []string,
+	expectedFields map[string]secret.Validator,
 	reader client.Reader,
 	conditionUpdater conditionUpdater,
 	requeueTimeout time.Duration,
 	envVars *map[string]env.Setter,
 ) (ctrl.Result, error) {
 
-	hash, res, err := secret.VerifySecret(ctx, secretName, expectedFields, reader, requeueTimeout)
+	hash, res, err := secret.VerifySecretFields(
+		ctx,
+		secretName,
+		expectedFields,
+		reader,
+		requeueTimeout)
 	if err != nil {
 		conditionUpdater.Set(condition.FalseCondition(
 			condition.InputReadyCondition,

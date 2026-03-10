@@ -693,12 +693,13 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
 
+	validateFields := map[string]secret.Validator{
+		instance.Spec.PasswordSelectors.Service: secret.PasswordValidator{},
+	}
 	ctrlResult, err := verifyServiceSecret(
 		ctx,
 		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
-		[]string{
-			instance.Spec.PasswordSelectors.Service,
-		},
+		validateFields,
 		helper.GetClient(),
 		&instance.Status.Conditions,
 		manila.NormalDuration,

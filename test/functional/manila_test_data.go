@@ -46,6 +46,8 @@ type ManilaTestData struct {
 	NotificationSecretName         string
 	MemcachedInstance              string
 	ManilaPassword                 string
+	ManilaInvalidPassword          string
+	ManilaInvalidSecretName        string
 	ManilaServiceUser              string
 	Instance                       types.NamespacedName
 	ManilaRole                     types.NamespacedName
@@ -188,9 +190,11 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		NotificationSecretName: "rabbitmq-notification-secret",
 		MemcachedInstance:      MemcachedInstance,
 		// Password used for service
-		ManilaPassword:    "12345678",
-		ManilaServiceUser: "manila",
-		ContainerImage:    "test://manila",
+		ManilaPassword:          "12345678",
+		ManilaInvalidPassword:   "c^sometext02%text%text02$someText&",
+		ManilaInvalidSecretName: "test-osp-secret-invalid",
+		ManilaServiceUser:       "manila",
+		ContainerImage:          "test://manila",
 		CABundleSecret: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      CABundleSecretName,

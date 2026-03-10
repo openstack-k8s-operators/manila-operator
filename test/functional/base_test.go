@@ -514,3 +514,13 @@ func GetKeystoneAC(name types.NamespacedName) *keystonev1.KeystoneApplicationCre
 	}, timeout, interval).Should(Succeed())
 	return instance
 }
+
+// CreateManilaInvalidSecret creates a secret with an invalid password for testing
+func CreateManilaInvalidSecret(namespace string, name string) *corev1.Secret {
+	return th.CreateSecret(
+		types.NamespacedName{Namespace: namespace, Name: name},
+		map[string][]byte{
+			"ManilaPassword": []byte(manilaTest.ManilaInvalidPassword),
+		},
+	)
+}
