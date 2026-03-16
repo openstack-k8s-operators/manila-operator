@@ -30,14 +30,16 @@ import (
 
 var _ = Describe("ManilaAPI controller", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
+	var annotations map[string]string
 
 	BeforeEach(func() {
+		annotations = map[string]string{}
 		memcachedSpec = infra.GetDefaultMemcachedSpec()
 		apiSpec := GetDefaultManilaAPISpec()
 		apiSpec["customServiceConfig"] = "foo=bar"
 		DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 		DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
-		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(apiSpec)))
+		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(apiSpec), annotations))
 		DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
 		DeferCleanup(
 			mariadb.DeleteDBService,
