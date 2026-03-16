@@ -473,8 +473,8 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		service.EndpointInternal: internalEndpointData,
 	}
 
-	apiEndpointsV1 := make(map[string]string)
 	apiEndpointsV2 := make(map[string]string)
+	apiEndpointsV1 := make(map[string]string)
 
 	for _, endpointType := range slices.Sorted(maps.Keys(data)) {
 		data := data[endpointType]
@@ -577,10 +577,7 @@ func (r *ManilaAPIReconciler) reconcileInit(
 			return ctrl.Result{}, err
 		}
 
-		// V1 (Deprected, non micro-versioned API endpoint, here for legacy users)
-		// will be removed when the upstream service (and dependencies) drop it
-		apiEndpointsV1[string(endpointType)], err = svc.GetAPIEndpoint(
-			svcOverride.EndpointURL, data.Protocol, "/v1/%(project_id)s")
+		v1Enabled, err := instance.IsShareV1Enabled()
 		if err != nil {
 			instance.Status.Conditions.MarkFalse(
 				condition.CreateServiceReadyCondition,
@@ -589,6 +586,22 @@ func (r *ManilaAPIReconciler) reconcileInit(
 				condition.CreateServiceReadyErrorMessage,
 				err.Error())
 			return ctrl.Result{}, err
+		}
+
+		if v1Enabled {
+			// V1 (Deprected, non micro-versioned API endpoint, here for legacy users)
+			// will be removed when the upstream service (and dependencies) drop it
+			apiEndpointsV1[string(endpointType)], err = svc.GetAPIEndpoint(
+				svcOverride.EndpointURL, data.Protocol, "/v1/%(project_id)s")
+			if err != nil {
+				instance.Status.Conditions.MarkFalse(
+					condition.CreateServiceReadyCondition,
+					condition.ErrorReason,
+					condition.SeverityWarning,
+					condition.CreateServiceReadyErrorMessage,
+					err.Error())
+				return ctrl.Result{}, err
+			}
 		}
 	}
 

@@ -20,6 +20,7 @@ import (
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/annotations"
 
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -175,4 +176,20 @@ func (instance *ManilaAPI) GetLastAppliedTopology() *topologyv1.TopoRef {
 // SetLastAppliedTopology - Sets the LastAppliedTopology value in the Status
 func (instance *ManilaAPI) SetLastAppliedTopology(topologyRef *topologyv1.TopoRef) {
 	instance.Status.LastAppliedTopology = topologyRef
+}
+
+// IsShareV1Enabled - Returns false when sharev1 is explicitly disabled
+func (instance *ManilaAPI) IsShareV1Enabled() (bool, error) {
+	shareV1API, exists, err := annotations.GetBoolFromAnnotation(
+		instance.GetAnnotations(), ManilaShareV1Label)
+	if err != nil {
+		return true, err
+	}
+	// By default shareV1API is enabled to keep backward compatible with
+	// existing deployments.
+	// (Note) we can modify this if statement in 19 to reverse the behavior
+	if !exists {
+		return true, nil
+	}
+	return shareV1API, nil
 }
