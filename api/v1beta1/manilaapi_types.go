@@ -17,10 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	"github.com/openstack-k8s-operators/lib-common/modules/common/annotations"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/annotations"
 
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

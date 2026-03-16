@@ -153,14 +153,15 @@ func GetManila(name types.NamespacedName) *manilav1.Manila {
 	return instance
 }
 
-func CreateManila(name types.NamespacedName, spec map[string]any) client.Object {
+func CreateManila(name types.NamespacedName, spec map[string]any, annotations map[string]string) client.Object {
 
 	raw := map[string]any{
 		"apiVersion": "manila.openstack.org/v1beta1",
 		"kind":       "Manila",
 		"metadata": map[string]any{
-			"name":      name.Name,
-			"namespace": name.Namespace,
+			"name":        name.Name,
+			"namespace":   name.Namespace,
+			"annotations": annotations,
 		},
 		"spec": spec,
 	}

@@ -30,14 +30,16 @@ import (
 
 var _ = Describe("ManilaScheduler controller", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
+	var annotations map[string]string
 
 	BeforeEach(func() {
 		memcachedSpec = infra.GetDefaultMemcachedSpec()
+		annotations = map[string]string{}
 		schedSpec := GetDefaultManilaSchedulerSpec()
 		schedSpec["customServiceConfig"] = "foo=bar"
 		DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 		DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
-		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(schedSpec)))
+		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(schedSpec), annotations))
 		DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
 		DeferCleanup(
 			mariadb.DeleteDBService,

@@ -30,14 +30,16 @@ import (
 
 var _ = Describe("ManilaShare controller", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
+	var annotations map[string]string
 
 	BeforeEach(func() {
 		memcachedSpec = infra.GetDefaultMemcachedSpec()
+		annotations = map[string]string{}
 		shareSpec := GetDefaultManilaShareSpec()
 		shareSpec["customServiceConfig"] = "foo=bar"
 		DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 		DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
-		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(shareSpec)))
+		DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaSpec(shareSpec), annotations))
 		for _, share := range manilaTest.ManilaShares {
 			DeferCleanup(th.DeleteInstance, CreateManilaShare(share, GetDefaultManilaShareSpec()))
 		}

@@ -476,6 +476,19 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	apiEndpointsV2 := make(map[string]string)
 	apiEndpointsV1 := make(map[string]string)
 
+	// Determine if sharev1 endpoints should be created
+	// based on the annotation and the logic behind
+	v1Enabled, err := instance.IsShareV1Enabled()
+	if err != nil {
+		instance.Status.Conditions.MarkFalse(
+			condition.CreateServiceReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.CreateServiceReadyErrorMessage,
+			err.Error())
+		return ctrl.Result{}, err
+	}
+
 	for _, endpointType := range slices.Sorted(maps.Keys(data)) {
 		data := data[endpointType]
 		endpointTypeStr := string(endpointType)
@@ -577,19 +590,8 @@ func (r *ManilaAPIReconciler) reconcileInit(
 			return ctrl.Result{}, err
 		}
 
-		v1Enabled, err := instance.IsShareV1Enabled()
-		if err != nil {
-			instance.Status.Conditions.MarkFalse(
-				condition.CreateServiceReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.CreateServiceReadyErrorMessage,
-				err.Error())
-			return ctrl.Result{}, err
-		}
-
 		if v1Enabled {
-			// V1 (Deprected, non micro-versioned API endpoint, here for legacy users)
+			// V1 (Deprecated, non micro-versioned API endpoint, here for legacy users)
 			// will be removed when the upstream service (and dependencies) drop it
 			apiEndpointsV1[string(endpointType)], err = svc.GetAPIEndpoint(
 				svcOverride.EndpointURL, data.Protocol, "/v1/%(project_id)s")
@@ -605,6 +607,8 @@ func (r *ManilaAPIReconciler) reconcileInit(
 		}
 	}
 
+	// NOTE: when v1Enabled is false (sharev1 is disabled), apiEndpointsV1
+	// is not populated and the associated endpoint is not created.
 	apiEndpoints := map[string]map[string]string{
 		manila.ServiceNameV2: apiEndpointsV2,
 		manila.ServiceName:   apiEndpointsV1,
@@ -617,6 +621,11 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	// create service and user in keystone - - https://docs.openstack.org/manila/ocata/adminref/quick_start.html
 	//
 	for _, ksSvc := range keystoneServices {
+		// if sharev1 is not enabled no need to create the associated
+		// "share" service
+		if ksSvc["name"] == manila.ServiceName && !v1Enabled {
+			continue
+		}
 		ksSvcSpec := keystonev1.KeystoneServiceSpec{
 			ServiceType:        ksSvc["type"],
 			ServiceName:        ksSvc["name"],
