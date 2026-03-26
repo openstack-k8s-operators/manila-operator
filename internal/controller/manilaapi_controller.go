@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -474,7 +476,8 @@ func (r *ManilaAPIReconciler) reconcileInit(
 	apiEndpointsV1 := make(map[string]string)
 	apiEndpointsV2 := make(map[string]string)
 
-	for endpointType, data := range data {
+	for _, endpointType := range slices.Sorted(maps.Keys(data)) {
+		data := data[endpointType]
 		endpointTypeStr := string(endpointType)
 		endpointName := manila.ServiceName + "-" + endpointTypeStr
 		svcOverride := instance.Spec.Override.Service[endpointType]
@@ -1024,8 +1027,8 @@ func (r *ManilaAPIReconciler) generateServiceConfig(
 		if err != nil {
 			return err
 		}
-		for _, data := range secret.Data {
-			customSecrets += string(data) + "\n"
+		for _, key := range slices.Sorted(maps.Keys(secret.Data)) {
+			customSecrets += string(secret.Data[key]) + "\n"
 		}
 	}
 	customData[manila.CustomServiceConfigSecretsFileName] = customSecrets

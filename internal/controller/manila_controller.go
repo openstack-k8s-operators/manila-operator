@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -881,7 +883,8 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	// Deploy ManilaShare
 	var shareCondition *condition.Condition
-	for name, share := range instance.Spec.ManilaShares {
+	for _, name := range slices.Sorted(maps.Keys(instance.Spec.ManilaShares)) {
+		share := instance.Spec.ManilaShares[name]
 		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share, serviceLabels)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
