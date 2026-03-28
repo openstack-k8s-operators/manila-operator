@@ -31,6 +31,9 @@ const (
 	SvcCleanupHash = "servicecleanup"
 	// DeploymentHash hash used to detect changes
 	DeploymentHash = "deployment"
+	// ManilaShareV1Label - Label set as Annotation to tell whether we need
+	// share v1 endpoints
+	ManilaShareV1Label = "manila.openstack.org/sharev1"
 )
 
 // ManilaSpec defines the desired state of Manila
