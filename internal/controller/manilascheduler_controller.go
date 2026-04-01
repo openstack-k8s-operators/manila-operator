@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -670,8 +672,8 @@ func (r *ManilaSchedulerReconciler) generateServiceConfig(
 		if err != nil {
 			return err
 		}
-		for _, data := range secret.Data {
-			customSecrets += string(data) + "\n"
+		for _, key := range slices.Sorted(maps.Keys(secret.Data)) {
+			customSecrets += string(secret.Data[key]) + "\n"
 		}
 	}
 	customData[manila.CustomServiceConfigSecretsFileName] = customSecrets
