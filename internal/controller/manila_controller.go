@@ -1198,8 +1198,9 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaAPI{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-api", instance.Name),
-			Namespace: instance.Namespace,
+			Name:        fmt.Sprintf("%s-api", instance.Name),
+			Namespace:   instance.Namespace,
+			Annotations: instance.GetAnnotations(),
 		},
 	}
 

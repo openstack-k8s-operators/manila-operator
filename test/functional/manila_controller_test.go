@@ -43,14 +43,16 @@ import (
 
 var _ = Describe("Manila controller", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
+	var annotations map[string]string
 
 	BeforeEach(func() {
 		memcachedSpec = infra.GetDefaultMemcachedSpec()
+		annotations = map[string]string{}
 	})
 
 	When("Manila CR instance is created", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 		})
 		It("initializes the status fields", func() {
 			Eventually(func(g Gomega) {
@@ -146,7 +148,7 @@ var _ = Describe("Manila controller", func() {
 	When("Manila DB is created", func() {
 		BeforeEach(func() {
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(
 				mariadb.DeleteDBService,
 				mariadb.CreateDBService(
@@ -216,10 +218,10 @@ var _ = Describe("Manila controller", func() {
 				CreateManilaInvalidSecret(manilaName.Namespace, manilaTest.ManilaInvalidSecretName))
 			spec := GetManilaEmptySpec()
 			spec["secret"] = manilaTest.ManilaInvalidSecretName
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(
 				manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(
 				mariadb.DeleteDBService,
 				mariadb.CreateDBService(
@@ -248,7 +250,7 @@ var _ = Describe("Manila controller", func() {
 	})
 	When("Both TransportURL secret and osp-secret are available", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(mariadb.DeleteDBService, mariadb.CreateDBService(
 				manilaTest.Instance.Namespace,
@@ -282,7 +284,7 @@ var _ = Describe("Manila controller", func() {
 		BeforeEach(func() {
 			// ManilaEmptySpec is used to provide a standard Manila CR where no
 			// field is customized
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaEmptySpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetManilaEmptySpec(), annotations))
 		})
 		It("has the expected container image defaults", func() {
 			manilaDefault := GetManila(manilaTest.Instance)
@@ -296,7 +298,7 @@ var _ = Describe("Manila controller", func() {
 	When("All the Resources are ready", func() {
 		var keystoneAPIName types.NamespacedName
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
 			DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
@@ -374,7 +376,7 @@ var _ = Describe("Manila controller", func() {
 	})
 	When("Manila CR instance is deleted", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -452,7 +454,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				},
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -539,9 +541,49 @@ var _ = Describe("Manila controller", func() {
 			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manila.Namespace+".svc:8786/v2"))
 		})
 	})
+	When("Manila CR instance is created with sharev1: false annotation", func() {
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+
+			// Explicitly disable sharev1 annotation before creating the Manila CR
+			annotations["manila.openstack.org/sharev1"] = "false"
+
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+		})
+		It("Check the resulting endpoints (sharev1 disabled)", func() {
+			// Retrieve the generated resources
+			manilaCR := GetManila(manilaTest.Instance)
+			keystoneEndpoint := keystone.GetKeystoneEndpoint(types.NamespacedName{Namespace: manilaCR.Namespace, Name: manila.ServiceNameV2})
+			endpoints := keystoneEndpoint.Spec.Endpoints
+			// sharev1 service is not created, therefore there's no "manila" endpoint key (only manilav2)
+			Expect(endpoints).ToNot(HaveKey(manila.ServiceName))
+			// sharev2 service exists and has endpoints associated
+			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manilaCR.Namespace+".svc:8786/v2"))
+			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaCR.Namespace+".svc:8786/v2"))
+		})
+	})
 	When("A Manila with TLS is created", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetTLSManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetTLSManilaSpec(), annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
 			DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
@@ -743,7 +785,7 @@ var _ = Describe("Manila controller", func() {
 			spec["topologyRef"] = map[string]any{
 				"name": topologyRef.Name,
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -982,7 +1024,7 @@ var _ = Describe("Manila controller", func() {
 			spec["nodeSelector"] = map[string]any{
 				"foo": "bar",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -1188,7 +1230,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				},
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -1262,7 +1304,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				},
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -1379,7 +1421,7 @@ var _ = Describe("Manila controller", func() {
 
 	When("Manila is created with quorum queues enabled in transport secret", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(k8sClient.Delete, ctx, infra.CreateTransportURLSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName, true))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -1472,7 +1514,7 @@ var _ = Describe("Manila controller", func() {
 
 	When("Manila is created with quorum queues disabled in transport secret", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(k8sClient.Delete, ctx, infra.CreateTransportURLSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName, false))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -1532,7 +1574,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				},
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -1586,7 +1628,7 @@ var _ = Describe("Manila controller", func() {
 					},
 				},
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.NotificationSecretName))
 			DeferCleanup(
@@ -1624,7 +1666,7 @@ var _ = Describe("Manila controller", func() {
 
 	When("Manila is created with default RabbitMQ config", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -1673,7 +1715,7 @@ var _ = Describe("Manila controller", func() {
 
 			spec := GetDefaultManilaSpec()
 			spec["databaseAccount"] = accountName.Name
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(th.DeleteInstance, CreateManilaAPI(manilaTest.Instance, GetDefaultManilaAPISpec()))
 			DeferCleanup(th.DeleteInstance, CreateManilaScheduler(manilaTest.Instance, GetDefaultManilaSchedulerSpec()))
@@ -1755,7 +1797,7 @@ var _ = Describe("Manila controller", func() {
 			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
 
 			spec := GetManilaSpecWithAC(acSecretName, servicePasswordSecret)
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(
 				mariadb.DeleteDBService,
 				mariadb.CreateDBService(
@@ -2026,9 +2068,11 @@ var _ = Describe("Manila Webhook", func() {
 
 var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 	var memcachedSpec memcachedv1.MemcachedSpec
+	var annotations map[string]string
 
 	BeforeEach(func() {
 		memcachedSpec = infra.GetDefaultMemcachedSpec()
+		annotations = map[string]string{}
 	})
 
 	When("Manila is created with custom RabbitMQ vhost and user", func() {
@@ -2038,7 +2082,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				"user":  "custom-user",
 				"vhost": "custom-vhost",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -2068,7 +2112,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 
 	When("Manila is created with default RabbitMQ configuration", func() {
 		BeforeEach(func() {
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec()))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -2102,7 +2146,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 			spec["messagingBus"] = map[string]any{
 				"user": "custom-user-only",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -2136,7 +2180,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 			spec["messagingBus"] = map[string]any{
 				"vhost": "custom-vhost-only",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -2171,7 +2215,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				"user":  "initial-user",
 				"vhost": "initial-vhost",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
@@ -2225,7 +2269,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 			spec["notificationsBus"] = map[string]any{
 				"cluster": "rabbitmq-notifications",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
 			DeferCleanup(
@@ -2282,7 +2326,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				"user":    "notifications-user",
 				"vhost":   "notifications-vhost",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
 			DeferCleanup(
@@ -2337,7 +2381,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 			spec["notificationsBus"] = map[string]any{
 				"cluster": "rabbitmq-notifications",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, "rabbitmq-notifications-secret"))
 			DeferCleanup(
@@ -2394,7 +2438,7 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				"user":    "notifications-user",
 				"vhost":   "notifications-vhost",
 			}
-			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec))
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
 			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
 			DeferCleanup(
 				mariadb.DeleteDBService,
