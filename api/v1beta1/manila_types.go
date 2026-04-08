@@ -184,6 +184,9 @@ type ManilaStatus struct {
 	// then the controller has not processed the latest changes injected by
 	// the opentack-operator in the top-level CR (e.g. the ContainerImage)
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// ApplicationCredentialSecret - Secret that Manila is actively consuming (AC consumer finalizer present)
+	ApplicationCredentialSecret string `json:"applicationCredentialSecret,omitempty"`
 }
 
 //+kubebuilder:object:root=true
