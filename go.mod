@@ -7,12 +7,12 @@ require (
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20260331181236-4cea0f2e9f54
-	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260321081257-b11a69b068bd
+	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260407135110-d95a889e36ba
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20260205083029-d03e9df035ef
 	github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20260205083029-d03e9df035ef
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260205083029-d03e9df035ef
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260328071714-21e5a0bfd7c8
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260405155028-e3a22bef074d
 	gopkg.in/ini.v1 v1.67.1
 	k8s.io/api v0.31.14
 	k8s.io/apimachinery v0.31.14
