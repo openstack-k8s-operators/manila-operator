@@ -516,6 +516,17 @@ func GetKeystoneAC(name types.NamespacedName) *keystonev1.KeystoneApplicationCre
 	return instance
 }
 
+// GetProbeConfOverrides returns a set of parameters to override the default
+// probes values
+func GetProbeConfOverrides() map[string]any {
+	return map[string]any{
+		"path":                "/healthcheck",
+		"initialDelaySeconds": int32(20),
+		"timeoutSeconds":      int32(30),
+		"periodSeconds":       int32(10),
+	}
+}
+
 // CreateManilaInvalidSecret creates a secret with an invalid password for testing
 func CreateManilaInvalidSecret(namespace string, name string) *corev1.Secret {
 	return th.CreateSecret(
