@@ -530,10 +530,17 @@ func (r *ManilaShareReconciler) reconcileNormal(ctx context.Context, instance *m
 	}
 
 	// Deploy a statefulset
-	ss := statefulset.NewStatefulSet(
-		manilashare.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations, topology, memcached),
-		manila.ShortDuration,
-	)
+	ssDef, err := manilashare.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations, topology, memcached)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.DeploymentReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.DeploymentReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	ss := statefulset.NewStatefulSet(ssDef, manila.ShortDuration)
 
 	ctrlResult, err = ss.CreateOrPatch(ctx, helper)
 	if err != nil {

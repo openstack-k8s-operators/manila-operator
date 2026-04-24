@@ -242,6 +242,10 @@ func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path, namespace strin
 		spec.ManilaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
+
+	probeErrs := spec.ValidateProbes(basePath)
+	allErrs = append(allErrs, probeErrs...)
+
 	return warnings, allErrs
 }
 
@@ -287,6 +291,9 @@ func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, nam
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
 
+	probeErrs := spec.ValidateProbes(basePath)
+	allErrs = append(allErrs, probeErrs...)
+
 	return warnings, allErrs
 }
 
@@ -309,6 +316,10 @@ func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.P
 		spec.ManilaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
+
+	probeErrs := spec.ValidateProbes(basePath)
+	allErrs = append(allErrs, probeErrs...)
+
 	return warnings, allErrs
 }
 
@@ -405,6 +416,58 @@ func (spec *ManilaSpec) ValidateManilaTopology(basePath *field.Path, namespace s
 	for k, ms := range spec.ManilaShares {
 		path := basePath.Child("manilaShares").Key(k)
 		allErrs = append(allErrs, ms.ValidateTopology(path, namespace)...)
+	}
+	return allErrs
+}
+
+// ValidateProbes -
+func (spec *ManilaSpec) ValidateProbes(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// ManilaAPI probes validation
+	apiPath := basePath.Child("manilaAPI").Child("override")
+	apiProbeErrs := spec.ManilaAPI.Override.Probes.ValidateProbes(
+		apiPath.Child("probes"))
+	allErrs = append(allErrs, apiProbeErrs...)
+
+	// ManilaScheduler probes validation
+	schedPath := basePath.Child("manilaScheduler").Child("override")
+	schedProbeErrs := spec.ManilaScheduler.Override.Probes.ValidateProbes(
+		schedPath.Child("probes"))
+	allErrs = append(allErrs, schedProbeErrs...)
+
+	// ManilaShares probes validation
+	sharePath := basePath.Child("manilaShares")
+	for name, share := range spec.ManilaShares {
+		shareProbeErrs := share.Override.Probes.ValidateProbes(
+			sharePath.Child(name).Child("override").Child("probes"))
+		allErrs = append(allErrs, shareProbeErrs...)
+	}
+	return allErrs
+}
+
+// ValidateProbes -
+func (spec *ManilaSpecCore) ValidateProbes(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// ManilaAPI probes validation
+	apiPath := basePath.Child("manilaAPI").Child("override")
+	apiProbeErrs := spec.ManilaAPI.Override.Probes.ValidateProbes(
+		apiPath.Child("probes"))
+	allErrs = append(allErrs, apiProbeErrs...)
+
+	// ManilaScheduler probes validation
+	schedPath := basePath.Child("manilaScheduler").Child("override")
+	schedProbeErrs := spec.ManilaScheduler.Override.Probes.ValidateProbes(
+		schedPath.Child("probes"))
+	allErrs = append(allErrs, schedProbeErrs...)
+
+	// ManilaShares probes validation
+	sharePath := basePath.Child("manilaShares")
+	for name, share := range spec.ManilaShares {
+		shareProbeErrs := share.Override.Probes.ValidateProbes(
+			sharePath.Child(name).Child("override").Child("probes"))
+		allErrs = append(allErrs, shareProbeErrs...)
 	}
 	return allErrs
 }
