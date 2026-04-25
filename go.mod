@@ -7,12 +7,12 @@ require (
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20260416122644-5476763a36b6
-	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260414133946-c146da0da0d6
+	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260422175310-d957b8482944
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20260417092244-81c71b39e981
 	github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20260417092244-81c71b39e981
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260417092244-81c71b39e981
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260413152655-564a51226a2a
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260421135251-4fb605db7d18
 	gopkg.in/ini.v1 v1.67.1
 	k8s.io/api v0.31.14
 	k8s.io/apimachinery v0.31.14
@@ -113,7 +113,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/imdario/mergo v0.3.16 //indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.6.1-0.20260331122750-ecff41ebb61d // indirect
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.6.1-0.20260417092244-81c71b39e981 // indirect
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
 )
