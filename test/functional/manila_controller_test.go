@@ -1955,6 +1955,145 @@ var _ = Describe("Manila controller", func() {
 		})
 	})
 
+	When("ApplicationCredential consumer finalizer is managed", func() {
+		var (
+			acSecretName          string
+			servicePasswordSecret string
+		)
+
+		BeforeEach(func() {
+			servicePasswordSecret = "ac-test-osp-secret" //nolint:gosec // G101
+			DeferCleanup(th.DeleteInstance, CreateManilaSecret(manilaTest.Instance.Namespace, servicePasswordSecret))
+			DeferCleanup(th.DeleteInstance, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				infra.DeleteMemcached,
+				infra.CreateMemcached(manilaTest.ManilaMemcached.Namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+
+			acSecretName = "ac-manila-a1b2c-secret" //nolint:gosec // G101
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      acSecretName,
+				},
+				Data: map[string][]byte{
+					keystonev1.ACIDSecretKey:     []byte("a1b2ctest-ac-id"),
+					keystonev1.ACSecretSecretKey: []byte("test-ac-secret"),
+				},
+			}
+			DeferCleanup(k8sClient.Delete, ctx, secret)
+			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+
+			spec := GetManilaSpecWithAC(acSecretName, servicePasswordSecret)
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, nil))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.ManilaDatabaseName.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+		})
+
+		It("should add the consumer finalizer to the AC secret", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      acSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should track the consumed AC secret in status", func() {
+			Eventually(func(g Gomega) {
+				m := GetManila(manilaTest.Instance)
+				g.Expect(m.Status.ApplicationCredentialSecret).To(Equal(acSecretName))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should move the finalizer from the old to the new secret on rotation", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      acSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			newACSecretName := "ac-manila-x9y8z-secret" //nolint:gosec // G101
+			newSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      newACSecretName,
+				},
+				Data: map[string][]byte{
+					keystonev1.ACIDSecretKey:     []byte("x9y8zrotated-ac-id"),
+					keystonev1.ACSecretSecretKey: []byte("rotated-ac-secret"),
+				},
+			}
+			DeferCleanup(k8sClient.Delete, ctx, newSecret)
+			Expect(k8sClient.Create(ctx, newSecret)).To(Succeed())
+
+			Eventually(func(g Gomega) {
+				m := GetManila(manilaTest.Instance)
+				m.Spec.Auth.ApplicationCredentialSecret = newACSecretName
+				g.Expect(k8sClient.Update(ctx, m)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      newACSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      acSecretName,
+				})
+				g.Expect(secret.Finalizers).NotTo(
+					ContainElement(manila.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				m := GetManila(manilaTest.Instance)
+				g.Expect(m.Status.ApplicationCredentialSecret).To(Equal(newACSecretName))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should remove the consumer finalizer from AC secret on CR deletion", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      acSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			th.DeleteInstance(GetManila(manilaTest.Instance))
+
+			secret := th.GetSecret(types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      acSecretName,
+			})
+			Expect(secret.Finalizers).NotTo(
+				ContainElement(manila.ACConsumerFinalizer))
+		})
+	})
 })
 
 var _ = Describe("Manila Webhook", func() {

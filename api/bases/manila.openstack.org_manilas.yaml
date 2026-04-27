@@ -1901,6 +1901,10 @@ spec:
           status:
             description: ManilaStatus defines the observed state of Manila
             properties:
+              applicationCredentialSecret:
+                description: ApplicationCredentialSecret - Secret that Manila is actively
+                  consuming (AC consumer finalizer present)
+                type: string
               conditions:
                 description: Conditions
                 items:
