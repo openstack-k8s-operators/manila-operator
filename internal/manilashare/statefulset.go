@@ -19,10 +19,10 @@ import (
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	manila "github.com/openstack-k8s-operators/manila-operator/internal/manila"
 
+	"github.com/openstack-k8s-operators/lib-common/modules/common/probes"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -38,33 +38,26 @@ func StatefulSet(
 	annotations map[string]string,
 	topology *topologyv1.Topology,
 	memcached *memcachedv1.Memcached,
-) *appsv1.StatefulSet {
+) (*appsv1.StatefulSet, error) {
 	trueVar := true
 
 	manilaUser := manila.ManilaUserID
 	manilaGroup := manila.ManilaGroupID
 
-	// TODO until we determine how to properly query for these
-	livenessProbe := &corev1.Probe{
-		// TODO might need tuning
-		TimeoutSeconds:      20,
-		PeriodSeconds:       20,
-		InitialDelaySeconds: 10,
+	scheme := corev1.URISchemeHTTP
+	probesPort := int32(8080)
+
+	probes, err := probes.CreateProbeSet(
+		probesPort,
+		&scheme,
+		instance.Spec.Override.Probes,
+		manila.GetDefaultProbesRPCWorker(manila.ManilaServiceDownTime),
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	startupProbe := &corev1.Probe{
-		TimeoutSeconds:      10,
-		FailureThreshold:    12,
-		PeriodSeconds:       10,
-		InitialDelaySeconds: 10,
-	}
-
-	var probeCommand []string
-	livenessProbe.HTTPGet = &corev1.HTTPGetAction{
-		Port: intstr.FromInt(8080),
-	}
-	startupProbe.HTTPGet = livenessProbe.HTTPGet
-	probeCommand = []string{
+	probeCommand := []string{
 		"/usr/local/bin/container-scripts/healthcheck.py",
 		"share",
 		"/etc/manila/manila.conf.d",
@@ -145,8 +138,8 @@ func StatefulSet(
 							Env:           env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:  volumeMounts,
 							Resources:     instance.Spec.Resources,
-							LivenessProbe: livenessProbe,
-							StartupProbe:  startupProbe,
+							LivenessProbe: probes.Liveness,
+							StartupProbe:  probes.Startup,
 						},
 						{
 							Name:    "probe",
@@ -178,5 +171,5 @@ func StatefulSet(
 		statefulset.Spec.Template.Spec.Affinity = manila.GetPodAffinity(ComponentName)
 	}
 
-	return statefulset
+	return statefulset, nil
 }

@@ -1,8 +1,11 @@
 package manila
 
 import (
+	"math"
+
 	common "github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/probes"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 
 	corev1 "k8s.io/api/core/v1"
@@ -65,4 +68,65 @@ func SharesListHash(shareNames []string) (string, error) {
 		return hash, err
 	}
 	return hash, err
+}
+
+// GetDefaultProbesAPI returns default probe configuration for the ManilaAPI
+// service. Probe periods are computed from the apiTimeout parameter so that
+// Kubernetes detects an unresponsive API within the configured timeout window.
+func GetDefaultProbesAPI(apiTimeout int) probes.OverrideSpec {
+	const failureCount = 3
+	period := int32(math.Floor(float64(apiTimeout) / float64(failureCount)))
+	startupPeriod := int32(math.Max(5, float64(period)/2))
+
+	return probes.OverrideSpec{
+		LivenessProbes: &probes.ProbeConf{
+			Path:                "/healthcheck",
+			TimeoutSeconds:      10,
+			PeriodSeconds:       period,
+			InitialDelaySeconds: 5,
+		},
+		ReadinessProbes: &probes.ProbeConf{
+			Path:                "/healthcheck",
+			TimeoutSeconds:      10,
+			PeriodSeconds:       period,
+			InitialDelaySeconds: 5,
+		},
+		StartupProbes: &probes.ProbeConf{
+			TimeoutSeconds:      10,
+			PeriodSeconds:       startupPeriod,
+			InitialDelaySeconds: 5,
+			FailureThreshold:    12,
+		},
+	}
+}
+
+// GetDefaultProbesRPCWorker returns default probe configuration for RPC worker
+// processes (manila-scheduler, manila-share). These processes expose no HTTP
+// healthcheck endpoint, so Path is intentionally omitted. A dedicated
+// serviceDownTime field is not currently exposed in the operator's API, and we
+// rely on the default provided by manila to compute the default values.
+// https://opendev.org/openstack/manila/src/branch/master/manila/common/config.py
+func GetDefaultProbesRPCWorker(serviceDownTime int) probes.OverrideSpec {
+	const failureCount = 3
+	period := int32(math.Floor(float64(serviceDownTime) / float64(failureCount)))
+	startupPeriod := int32(math.Max(5, float64(period)/2))
+
+	return probes.OverrideSpec{
+		LivenessProbes: &probes.ProbeConf{
+			TimeoutSeconds:      10,
+			PeriodSeconds:       period,
+			InitialDelaySeconds: 15,
+		},
+		ReadinessProbes: &probes.ProbeConf{
+			TimeoutSeconds:      10,
+			PeriodSeconds:       period,
+			InitialDelaySeconds: 15,
+		},
+		StartupProbes: &probes.ProbeConf{
+			TimeoutSeconds:      10,
+			PeriodSeconds:       startupPeriod,
+			InitialDelaySeconds: period,
+			FailureThreshold:    12,
+		},
+	}
 }

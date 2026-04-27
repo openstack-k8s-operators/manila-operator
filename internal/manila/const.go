@@ -67,6 +67,10 @@ const (
 	// Manila is the global ServiceType that refers to all the components deployed
 	// by the manila operator
 	Manila storage.PropagationType = "Manila"
+	// ManilaServiceDownTime - Maximum time since last check-in for a service
+	// to be considered up. This is based on:
+	// https://opendev.org/openstack/manila/src/branch/master/manila/common/config.py
+	ManilaServiceDownTime = 60
 	// DefaultsConfigFileName - Provided by Manila umbrella controller
 	DefaultsConfigFileName = "00-config.conf"
 	// ServiceConfigFileName - Represents service config generated in the operator

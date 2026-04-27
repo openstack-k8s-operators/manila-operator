@@ -18,10 +18,17 @@ package v1beta1
 
 import (
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/probes"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 )
+
+// ShareOverrideSpec to override the generated manifest of several child resources.
+type ShareOverrideSpec struct {
+	// Override probes and other common fields in the StatefulSet
+	Probes probes.OverrideSpec `json:"probes,omitempty"`
+}
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
@@ -54,6 +61,10 @@ type ManilaShareTemplateCore struct {
 	// +kubebuilder:validation:Minimum=0
 	// Replicas - Manila API Replicas
 	Replicas *int32 `json:"replicas"`
+
+	// +kubebuilder:validation:Optional
+	// Override, provides the ability to override the generated manifest of several child resources.
+	Override ShareOverrideSpec `json:"override,omitempty"`
 }
 
 // ManilaShareSpec defines the desired state of ManilaShare
