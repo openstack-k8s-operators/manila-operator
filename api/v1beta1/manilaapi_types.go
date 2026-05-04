@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/annotations"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/probes"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 
@@ -63,6 +64,8 @@ type APIOverrideSpec struct {
 	// Override configuration for the Service created to serve traffic to the cluster.
 	// The key must be the endpoint type (public, internal)
 	Service map[service.Endpoint]service.RoutedOverrideSpec `json:"service,omitempty"`
+	// Override probes and other common fields in the StatefulSet
+	Probes probes.OverrideSpec `json:"probes,omitempty"`
 }
 
 // AuthSpec defines authentication parameters
@@ -104,6 +107,12 @@ type ManilaAPISpec struct {
 	// +kubebuilder:default=memcached
 	// Memcached instance name.
 	MemcachedInstance *string `json:"memcachedInstance"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=60
+	// +kubebuilder:validation:Minimum=10
+	// APITimeout for HAProxy, Apache, and rpc_response_timeout
+	APITimeout int `json:"apiTimeout"`
 }
 
 // ManilaAPIStatus defines the observed state of ManilaAPI

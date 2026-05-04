@@ -902,7 +902,7 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 	}
 
 	// Define a new Statefulset
-	ssDef, err := manilaapi.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations, topology, memcached)
+	ssDef, err := manilaapi.StatefulSet(instance, inputHash, serviceLabels, serviceAnnotations, topology, memcached, instance.Spec.APITimeout)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DeploymentReadyCondition,

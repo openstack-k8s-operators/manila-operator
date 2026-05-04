@@ -2495,4 +2495,113 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 			}, timeout, interval).Should(Succeed())
 		})
 	})
+
+	When("Manila CR instance is built with custom probes", func() {
+		stsOverride := GetProbeConfOverrides()
+		BeforeEach(func() {
+			spec := GetDefaultManilaSpec()
+
+			spec["manilaAPI"] = map[string]any{
+				"replicas":       1,
+				"containerImage": manilaTest.ContainerImage,
+				"override": map[string]any{
+					"probes": map[string]any{
+						"livenessProbes":  stsOverride,
+						"readinessProbes": stsOverride,
+					},
+				},
+			}
+			spec["manilaScheduler"] = map[string]any{
+				"replicas":       1,
+				"containerImage": manilaTest.ContainerImage,
+				"override": map[string]any{
+					"probes": map[string]any{
+						"livenessProbes": stsOverride,
+					},
+				},
+			}
+			spec["manilaShares"] = map[string]any{
+				"share0": map[string]any{
+					"replicas":       1,
+					"containerImage": manilaTest.ContainerImage,
+					"override": map[string]any{
+						"probes": map[string]any{
+							"livenessProbes": stsOverride,
+						},
+					},
+				},
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, spec, annotations))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaName).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+		})
+		It("Check the resulting probes generated in the statefulSet", func() {
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+			th.SimulateStatefulSetReplicaReady(manilaTest.ManilaShares[0])
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+			// Check ManilaAPI
+			Eventually(func(g Gomega) {
+				apiContainer := th.GetStatefulSet(manilaTest.ManilaAPI).Spec.Template.Spec.Containers[1]
+				g.Expect(apiContainer.LivenessProbe).ToNot(BeNil())
+				g.Expect(apiContainer.LivenessProbe.HTTPGet.Path).To(Equal(stsOverride["path"]))
+				g.Expect(apiContainer.LivenessProbe.InitialDelaySeconds).To(Equal(stsOverride["initialDelaySeconds"]))
+				g.Expect(apiContainer.LivenessProbe.TimeoutSeconds).To(Equal(stsOverride["timeoutSeconds"]))
+				g.Expect(apiContainer.LivenessProbe.PeriodSeconds).To(Equal(stsOverride["periodSeconds"]))
+				g.Expect(apiContainer.StartupProbe).To(BeNil())
+				g.Expect(apiContainer.ReadinessProbe).ToNot(BeNil())
+				g.Expect(apiContainer.ReadinessProbe.InitialDelaySeconds).To(Equal(stsOverride["initialDelaySeconds"]))
+				g.Expect(apiContainer.ReadinessProbe.TimeoutSeconds).To(Equal(stsOverride["timeoutSeconds"]))
+				g.Expect(apiContainer.ReadinessProbe.PeriodSeconds).To(Equal(stsOverride["periodSeconds"]))
+			}, timeout, interval).Should(Succeed())
+			// Check ManilaScheduler
+			Eventually(func(g Gomega) {
+				schedContainer := th.GetStatefulSet(manilaTest.ManilaScheduler).Spec.Template.Spec.Containers[0]
+				g.Expect(schedContainer.LivenessProbe).ToNot(BeNil())
+				g.Expect(schedContainer.LivenessProbe.HTTPGet.Path).To(Equal("/healthcheck"))
+				g.Expect(schedContainer.LivenessProbe.InitialDelaySeconds).To(Equal(int32(20)))
+				g.Expect(schedContainer.LivenessProbe.TimeoutSeconds).To(Equal(int32(30)))
+				g.Expect(schedContainer.LivenessProbe.PeriodSeconds).To(Equal(int32(10)))
+				g.Expect(schedContainer.ReadinessProbe).To(BeNil())
+				g.Expect(schedContainer.StartupProbe).ToNot(BeNil())
+				g.Expect(schedContainer.StartupProbe.InitialDelaySeconds).To(Equal(int32(manila.GetDefaultProbesRPCWorker(60).StartupProbes.InitialDelaySeconds)))
+				g.Expect(schedContainer.StartupProbe.TimeoutSeconds).To(Equal(int32(manila.GetDefaultProbesRPCWorker(60).StartupProbes.TimeoutSeconds)))
+				g.Expect(schedContainer.StartupProbe.PeriodSeconds).To(Equal(int32(manila.GetDefaultProbesRPCWorker(60).StartupProbes.PeriodSeconds)))
+				g.Expect(schedContainer.StartupProbe.FailureThreshold).To(Equal(int32(manila.GetDefaultProbesRPCWorker(60).StartupProbes.FailureThreshold)))
+			}, timeout, interval).Should(Succeed())
+			// Check ManilaShare
+			Eventually(func(g Gomega) {
+				shareContainer := th.GetStatefulSet(manilaTest.ManilaShares[0]).Spec.Template.Spec.Containers[0]
+				g.Expect(shareContainer.LivenessProbe).ToNot(BeNil())
+				g.Expect(shareContainer.LivenessProbe.HTTPGet.Path).To(Equal("/healthcheck"))
+				g.Expect(shareContainer.LivenessProbe.InitialDelaySeconds).To(Equal(int32(20)))
+				g.Expect(shareContainer.LivenessProbe.TimeoutSeconds).To(Equal(int32(30)))
+				g.Expect(shareContainer.LivenessProbe.PeriodSeconds).To(Equal(int32(10)))
+				g.Expect(shareContainer.ReadinessProbe).To(BeNil())
+				g.Expect(shareContainer.StartupProbe).ToNot(BeNil())
+				g.Expect(shareContainer.StartupProbe.InitialDelaySeconds).To(Equal(int32(manila.GetDefaultProbesRPCWorker(60).StartupProbes.InitialDelaySeconds)))
+				g.Expect(shareContainer.StartupProbe.TimeoutSeconds).To(Equal(int32(manila.GetDefaultProbesRPCWorker(60).StartupProbes.TimeoutSeconds)))
+				g.Expect(shareContainer.StartupProbe.PeriodSeconds).To(Equal(int32(manila.GetDefaultProbesRPCWorker(60).StartupProbes.PeriodSeconds)))
+				g.Expect(shareContainer.StartupProbe.FailureThreshold).To(Equal(int32(manila.GetDefaultProbesRPCWorker(60).StartupProbes.FailureThreshold)))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
 })

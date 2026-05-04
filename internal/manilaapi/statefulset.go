@@ -16,6 +16,7 @@ import (
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/probes"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
@@ -24,7 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -40,33 +40,23 @@ func StatefulSet(
 	annotations map[string]string,
 	topology *topologyv1.Topology,
 	memcached *memcachedv1.Memcached,
+	timeout int,
 ) (*appsv1.StatefulSet, error) {
 	manilaUser := manila.ManilaUserID
 
-	livenessProbe := &corev1.Probe{
-		TimeoutSeconds:      10,
-		PeriodSeconds:       10,
-		InitialDelaySeconds: 10,
-	}
-	readinessProbe := &corev1.Probe{
-		TimeoutSeconds:      10,
-		PeriodSeconds:       10,
-		InitialDelaySeconds: 10,
-	}
-
-	//
-	// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-	//
-
-	livenessProbe.HTTPGet = &corev1.HTTPGetAction{
-		Path: "/healthcheck",
-		Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(manila.ManilaPublicPort)},
-	}
-	readinessProbe.HTTPGet = livenessProbe.HTTPGet
-
+	scheme := corev1.URISchemeHTTP
 	if instance.Spec.TLS.API.Enabled(service.EndpointPublic) {
-		livenessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
-		readinessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		scheme = corev1.URISchemeHTTPS
+	}
+
+	apiProbes, err := probes.CreateProbeSet(
+		int32(manila.ManilaPublicPort),
+		&scheme,
+		instance.Spec.Override.Probes,
+		manila.GetDefaultProbesAPI(timeout),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	// create Volume and VolumeMounts
@@ -169,8 +159,8 @@ func StatefulSet(
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:   volumeMounts,
 							Resources:      instance.Spec.Resources,
-							ReadinessProbe: readinessProbe,
-							LivenessProbe:  livenessProbe,
+							ReadinessProbe: apiProbes.Readiness,
+							LivenessProbe:  apiProbes.Liveness,
 						},
 					},
 					Volumes: volumes,
