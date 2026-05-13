@@ -6,13 +6,13 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.28.2
 	github.com/onsi/gomega v1.40.0
-	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20260429072348-e2e8eaa49a92
-	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260425213537-3fb7aab1c5a4
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20260430090237-a4265c18a162
-	github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20260430090237-a4265c18a162
-	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260430090237-a4265c18a162
+	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20260513062816-ae35cd9de0ee
+	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260507114237-f0b612d6c21f
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20260512122920-c197ec23eaf6
+	github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20260512122920-c197ec23eaf6
+	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260512122920-c197ec23eaf6
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260428063048-3a190112bad3
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260512095554-8504881f0233
 	gopkg.in/ini.v1 v1.67.2
 	k8s.io/api v0.31.14
 	k8s.io/apimachinery v0.31.14
@@ -77,7 +77,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.1 // indirect
+	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.32.0 // indirect
@@ -113,7 +113,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/imdario/mergo v0.3.16 //indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.6.1-0.20260417092244-81c71b39e981 // indirect
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.6.1-0.20260430090237-a4265c18a162 // indirect
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
 )
