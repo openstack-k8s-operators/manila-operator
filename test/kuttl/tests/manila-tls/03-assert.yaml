@@ -380,8 +380,6 @@ spec:
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
-        - mountPath: /var/lib/manila
-          name: var-lib-manila
         - mountPath: /var/lib/kolla/config_files/config.json
           name: config-data
           readOnly: true
@@ -413,8 +411,6 @@ spec:
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
-        - mountPath: /var/lib/manila
-          name: var-lib-manila
         - mountPath: /var/lib/kolla/config_files/config.json
           name: config-data
           readOnly: true
@@ -436,9 +432,6 @@ spec:
         - name: ceph
           secret:
             secretName: ceph-conf-files
-        - name: var-lib-manila
-          hostPath:
-            path: /var/lib/manila
         - name: config-data-custom
           secret:
             secretName: manila-share-share0-config-data

@@ -81,11 +81,6 @@ func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts, svc []storage.Pro
 			SubPath:   "my.cnf",
 			ReadOnly:  true,
 		},
-		/*{
-			Name:      "config-data-merged",
-			MountPath: "/var/lib/config-data/merged",
-			ReadOnly:  false,
-		},*/
 	}
 
 	for _, exv := range extraVol {
