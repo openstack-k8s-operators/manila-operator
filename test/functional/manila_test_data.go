@@ -86,7 +86,7 @@ type ManilaTestData struct {
 func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 
 	m := manilaName
-	return ManilaTestData{
+	return ManilaTestData{ //nolint:gosec
 		Instance: m,
 
 		Manila: types.NamespacedName{
