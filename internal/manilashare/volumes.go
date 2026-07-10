@@ -15,18 +15,8 @@ func GetVolumes(
 	propagationInstanceName string,
 ) []corev1.Volume {
 	var config0644AccessMode int32 = 0644
-	var dirOrCreate = corev1.HostPathDirectoryOrCreate
 
 	shareVolumes := []corev1.Volume{
-		{
-			Name: "var-lib-manila",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/var/lib/manila",
-					Type: &dirOrCreate,
-				},
-			},
-		},
 		{
 			Name: "config-data-custom",
 			VolumeSource: corev1.VolumeSource{
@@ -53,9 +43,6 @@ func GetVolumeMounts(
 			Name:      "config-data-custom",
 			MountPath: "/etc/manila/manila.conf.d",
 			ReadOnly:  true,
-		}, {
-			Name:      "var-lib-manila",
-			MountPath: "/var/lib/manila",
 		},
 		{
 			Name:      "config-data",

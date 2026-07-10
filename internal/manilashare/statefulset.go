@@ -39,7 +39,6 @@ func StatefulSet(
 	topology *topologyv1.Topology,
 	memcached *memcachedv1.Memcached,
 ) (*appsv1.StatefulSet, error) {
-	trueVar := true
 
 	manilaUser := manila.ManilaUserID
 	manilaGroup := manila.ManilaGroupID
@@ -133,7 +132,7 @@ func StatefulSet(
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser:  &manilaUser,
-								Privileged: &trueVar,
+								RunAsGroup: &manilaGroup,
 							},
 							Env:           env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:  volumeMounts,
