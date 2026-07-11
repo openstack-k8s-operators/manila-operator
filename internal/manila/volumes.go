@@ -15,14 +15,6 @@ func GetVolumes(name string, extraVol []manilav1.ManilaExtraVolMounts, svc []sto
 
 	res := []corev1.Volume{
 		{
-			Name: "etc-machine-id",
-			VolumeSource: corev1.VolumeSource{
-				HostPath: &corev1.HostPathVolumeSource{
-					Path: "/etc/machine-id",
-				},
-			},
-		},
-		{
 			Name: "scripts",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -60,11 +52,6 @@ func GetVolumes(name string, extraVol []manilav1.ManilaExtraVolMounts, svc []sto
 // GetVolumeMounts - Nova Control Plane VolumeMounts
 func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts, svc []storage.PropagationType) []corev1.VolumeMount {
 	res := []corev1.VolumeMount{
-		{
-			Name:      "etc-machine-id",
-			MountPath: "/etc/machine-id",
-			ReadOnly:  true,
-		},
 		{
 			Name:      "config-data",
 			MountPath: "/var/lib/config-data/default",

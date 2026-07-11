@@ -177,7 +177,6 @@ rules:
   - security.openshift.io
   resourceNames:
   - anyuid
-  - privileged
   resources:
   - securitycontextconstraints
   verbs:
@@ -191,18 +190,3 @@ rules:
   - list
   - update
   - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: manager-role
-  namespace: openstack
-rules:
-- apiGroups:
-  - security.openshift.io
-  resourceNames:
-  - privileged
-  resources:
-  - securitycontextconstraints
-  verbs:
-  - use

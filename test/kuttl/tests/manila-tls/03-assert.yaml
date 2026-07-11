@@ -267,9 +267,6 @@ spec:
         command:
         - /usr/bin/dumb-init
         volumeMounts:
-        - mountPath: /etc/machine-id
-          name: etc-machine-id
-          readOnly: true
         - mountPath: /var/lib/config-data/default
           name: config-data
         - mountPath: /usr/local/bin/container-scripts
@@ -307,9 +304,6 @@ spec:
           readOnly: true
           subPath: tls.key
       volumes:
-      - name: etc-machine-id
-        hostPath:
-          path: /etc/machine-id
       - name: scripts
         secret:
           secretName: manila-scripts
@@ -362,8 +356,6 @@ spec:
         command:
         - /usr/bin/dumb-init
         volumeMounts:
-        - mountPath: /etc/machine-id
-          name: etc-machine-id
         - mountPath: /var/lib/config-data/default
           name: config-data
           readOnly: true
@@ -393,8 +385,6 @@ spec:
         - share
         - /etc/manila/manila.conf.d
         volumeMounts:
-        - mountPath: /etc/machine-id
-          name: etc-machine-id
         - mountPath: /var/lib/config-data/default
           name: config-data
           readOnly: true
@@ -420,9 +410,6 @@ spec:
           readOnly: true
           subPath: tls-ca-bundle.pem
       volumes:
-        - name: etc-machine-id
-          hostPath:
-            path: /etc/machine-id
         - name: scripts
           secret:
             secretName: manila-scripts
@@ -467,8 +454,6 @@ spec:
         command:
         - /usr/bin/dumb-init
         volumeMounts:
-        - mountPath: /etc/machine-id
-          name: etc-machine-id
         - mountPath: /var/lib/config-data/default
           name: config-data
           readOnly: true
@@ -495,9 +480,6 @@ spec:
         - scheduler
         - /etc/manila/manila.conf.d
         volumeMounts:
-        - mountPath: /etc/machine-id
-          name: etc-machine-id
-          readOnly: true
         - mountPath: /var/lib/config-data/default
           name: config-data
           readOnly: true
@@ -520,9 +502,6 @@ spec:
           readOnly: true
           subPath: tls-ca-bundle.pem
       volumes:
-        - name: etc-machine-id
-          hostPath:
-            path: /etc/machine-id
         - name: scripts
           secret:
             secretName: manila-scripts
