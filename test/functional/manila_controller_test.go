@@ -677,7 +677,7 @@ var _ = Describe("Manila controller", func() {
 			// Check the resulting deployment fieldsq
 			Expect(int(*d.Spec.Replicas)).To(Equal(1))
 
-			Expect(d.Spec.Template.Spec.Volumes).To(HaveLen(8))
+			Expect(d.Spec.Template.Spec.Volumes).To(HaveLen(7))
 			Expect(d.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 			// cert deployment volumes
@@ -1268,13 +1268,13 @@ var _ = Describe("Manila controller", func() {
 			ss := th.GetStatefulSet(share)
 			// Check the resulting deployment fields
 			Expect(int(*ss.Spec.Replicas)).To(Equal(1))
-			Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(5))
+			Expect(ss.Spec.Template.Spec.Volumes).To(HaveLen(4))
 			Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 			// Get the manila-share container
 			container := ss.Spec.Template.Spec.Containers[1]
 			// Fail if manila-share doesn't have the right number of
 			// VolumeMounts entries
-			Expect(container.VolumeMounts).To(HaveLen(7))
+			Expect(container.VolumeMounts).To(HaveLen(6))
 			// Inspect VolumeMounts and make sure we have the Ceph MountPath
 			// provided through extraMounts
 			th.AssertVolumeMountPathExists(ManilaCephExtraMountsSecretName,

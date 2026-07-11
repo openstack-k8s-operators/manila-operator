@@ -40,9 +40,6 @@ func manilaDefaultSecurityContext() *corev1.SecurityContext {
 				"ALL",
 			},
 		},
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
 	}
 }
 
