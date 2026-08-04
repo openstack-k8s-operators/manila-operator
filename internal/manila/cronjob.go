@@ -18,11 +18,14 @@ package manila
 import (
 	"fmt"
 
+	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
+	"github.com/openstack-k8s-operators/lib-common/modules/users"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // CronJob func
@@ -32,7 +35,6 @@ func CronJob(
 	annotations map[string]string,
 ) *batchv1.CronJob {
 
-	var config0644AccessMode int32 = 0644
 	debugArg := ""
 	if instance.Spec.Debug.DBPurge {
 		debugArg = " --debug"
@@ -53,7 +55,7 @@ func CronJob(
 			Name: "db-purge-config-data",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: &config0644AccessMode,
+					DefaultMode: &configMode,
 					SecretName:  instance.Name + "-config-data",
 					Items: []corev1.KeyToPath{
 						{
@@ -103,6 +105,8 @@ func CronJob(
 							Labels:      labels,
 						},
 						Spec: corev1.PodSpec{
+							SecurityContext:              pod.RestrictivePodSecurityContext(users.ManilaUID, users.ManilaGID),
+							AutomountServiceAccountToken: ptr.To(false),
 							Containers: []corev1.Container{
 								{
 									Name:  fmt.Sprintf("%s-db-purge", ServiceName),
@@ -112,7 +116,7 @@ func CronJob(
 									},
 									Args:            args,
 									VolumeMounts:    cronJobVolumeMounts,
-									SecurityContext: manilaDefaultSecurityContext(),
+									SecurityContext: pod.RestrictiveSecurityContext(users.ManilaUID, users.ManilaGID),
 								},
 							},
 							Volumes:            cronJobVolume,

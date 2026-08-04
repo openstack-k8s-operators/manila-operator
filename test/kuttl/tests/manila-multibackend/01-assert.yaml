@@ -162,7 +162,7 @@ spec:
           volumes:
           - name: db-purge-config-data
             secret:
-              defaultMode: 420
+              defaultMode: 288
               items:
               - key: 00-config.conf
                 path: 00-config.conf

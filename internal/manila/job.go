@@ -3,11 +3,13 @@ package manila
 import (
 	"fmt"
 
-	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
+	"github.com/openstack-k8s-operators/lib-common/modules/users"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // Job func
@@ -20,7 +22,6 @@ func Job(
 	jobCommand string,
 	delay int32,
 ) *batchv1.Job {
-	var config0644AccessMode int32 = 0644
 	// Unlike the individual manila services, DbSyncJob or a Job executing a
 	// manila-manage command doesn't need a secret that contains all of the
 	// config snippets required by every service, The two snippet files that it
@@ -31,7 +32,7 @@ func Job(
 			Name: "job-config-data",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: &config0644AccessMode,
+					DefaultMode: &configMode,
 					SecretName:  instance.Name + "-config-data",
 					Items: []corev1.KeyToPath{
 						{
@@ -46,27 +47,12 @@ func Job(
 				},
 			},
 		},
-		{
-			Name: "config-data",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: &config0644AccessMode,
-					SecretName:  instance.Name + "-config-data",
-				},
-			},
-		},
 	}
 
 	manilaJobMounts := []corev1.VolumeMount{
 		{
 			Name:      "job-config-data",
 			MountPath: "/etc/manila/manila.conf.d",
-			ReadOnly:  true,
-		},
-		{
-			Name:      "config-data",
-			MountPath: "/var/lib/kolla/config_files/config.json",
-			SubPath:   "db-sync-config.json",
 			ReadOnly:  true,
 		},
 	}
@@ -80,10 +66,6 @@ func Job(
 		manilaJobMounts = append(manilaJobMounts, instance.Spec.ManilaAPI.TLS.CreateVolumeMounts(nil)...)
 	}
 
-	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
-	envVars["KOLLA_BOOTSTRAP"] = env.SetValue("TRUE")
-
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", instance.Name, jobName),
@@ -96,8 +78,10 @@ func Job(
 					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ServiceAccountName: instance.RbacResourceName(),
+					RestartPolicy:                corev1.RestartPolicyOnFailure,
+					ServiceAccountName:           instance.RbacResourceName(),
+					AutomountServiceAccountToken: ptr.To(false),
+					SecurityContext:              pod.RestrictivePodSecurityContext(users.ManilaUID, users.ManilaGID),
 					Containers: []corev1.Container{
 						{
 							Name: fmt.Sprintf("%s-%s", instance.Name, jobName),
@@ -106,8 +90,8 @@ func Job(
 							},
 							Args:            args,
 							Image:           instance.Spec.ManilaAPI.ContainerImage,
-							SecurityContext: manilaDefaultSecurityContext(),
-							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							SecurityContext: pod.RestrictiveSecurityContext(users.ManilaUID, users.ManilaGID),
+							Env:             []corev1.EnvVar{},
 							VolumeMounts:    manilaJobMounts,
 						},
 					},

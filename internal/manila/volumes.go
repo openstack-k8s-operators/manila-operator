@@ -1,17 +1,17 @@
 package manila
 
 import (
-	"strconv"
-
 	"github.com/openstack-k8s-operators/lib-common/modules/storage"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 )
 
+// configMode is the default file permission for secret-backed config volumes.
+var configMode int32 = 0440
+
 // GetVolumes -
 func GetVolumes(name string, extraVol []manilav1.ManilaExtraVolMounts, svc []storage.PropagationType) []corev1.Volume {
 	var scriptsVolumeDefaultMode int32 = 0755
-	var config0644AccessMode int32 = 0644
 
 	res := []corev1.Volume{
 		{
@@ -27,7 +27,7 @@ func GetVolumes(name string, extraVol []manilav1.ManilaExtraVolMounts, svc []sto
 			Name: "config-data",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: &config0644AccessMode,
+					DefaultMode: &configMode,
 					SecretName:  name + "-config-data",
 				},
 			},
@@ -53,11 +53,6 @@ func GetVolumes(name string, extraVol []manilav1.ManilaExtraVolMounts, svc []sto
 func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts, svc []storage.PropagationType) []corev1.VolumeMount {
 	res := []corev1.VolumeMount{
 		{
-			Name:      "config-data",
-			MountPath: "/var/lib/config-data/default",
-			ReadOnly:  true,
-		},
-		{
 			Name:      "scripts",
 			MountPath: "/usr/local/bin/container-scripts",
 			ReadOnly:  true,
@@ -76,33 +71,4 @@ func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts, svc []storage.Pro
 		}
 	}
 	return res
-}
-
-// GetConfigSecretVolumes - Returns a list of volumes associated with a list of Secret names
-func GetConfigSecretVolumes(secretNames []string) ([]corev1.Volume, []corev1.VolumeMount) {
-	var config0640AccessMode int32 = 0640
-	secretVolumes := []corev1.Volume{}
-	secretMounts := []corev1.VolumeMount{}
-
-	for idx, secretName := range secretNames {
-		secretVol := corev1.Volume{
-			Name: secretName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName:  secretName,
-					DefaultMode: &config0640AccessMode,
-				},
-			},
-		}
-		secretMount := corev1.VolumeMount{
-			Name: secretName,
-			// Each secret needs its own MountPath
-			MountPath: "/var/lib/config-data/secret-" + strconv.Itoa(idx),
-			ReadOnly:  true,
-		}
-		secretVolumes = append(secretVolumes, secretVol)
-		secretMounts = append(secretMounts, secretMount)
-	}
-
-	return secretVolumes, secretMounts
 }

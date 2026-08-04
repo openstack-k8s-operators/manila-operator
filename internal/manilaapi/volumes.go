@@ -1,25 +1,29 @@
 package manilaapi
 
 import (
+	"github.com/openstack-k8s-operators/lib-common/modules/common/volume"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/internal/manila"
 	corev1 "k8s.io/api/core/v1"
 )
 
+// configMode is the default file permission for secret-backed config volumes.
+var configMode int32 = 0440
+
 // GetVolumes -
 func GetVolumes(parentName string, name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.Volume {
-	var config0644AccessMode int32 = 0644
-
 	apiVolumes := []corev1.Volume{
 		{
 			Name: "config-data-custom",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: &config0644AccessMode,
+					DefaultMode: &configMode,
 					SecretName:  name + "-config-data",
 				},
 			},
 		},
+		volume.WritableDirVolume(volume.RunHttpdVolumeName),
+		volume.WritableDirVolume(volume.VarLogHttpdVolumeName),
 	}
 
 	return append(manila.GetVolumes(parentName, extraVol, manila.ManilaAPIPropagation), apiVolumes...)
@@ -35,10 +39,24 @@ func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMo
 		},
 		{
 			Name:      "config-data",
-			MountPath: "/var/lib/kolla/config_files/config.json",
-			SubPath:   "manila-api-config.json",
+			MountPath: "/etc/httpd/conf/httpd.conf",
+			SubPath:   "httpd.conf",
 			ReadOnly:  true,
 		},
+		{
+			Name:      "config-data",
+			MountPath: "/etc/httpd/conf.d/ssl.conf",
+			SubPath:   "ssl.conf",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "config-data",
+			MountPath: "/etc/httpd/conf.d/10-manila_wsgi.conf",
+			SubPath:   "10-manila_wsgi.conf",
+			ReadOnly:  true,
+		},
+		volume.WritableDirVolumeMount(volume.RunHttpdVolumeName, volume.RunHttpdMountPath),
+		volume.WritableDirVolumeMount(volume.VarLogHttpdVolumeName, volume.VarLogHttpdMountPath),
 	}
 
 	return append(manila.GetVolumeMounts(extraVol, manila.ManilaAPIPropagation), apiVolumeMounts...)
@@ -46,19 +64,10 @@ func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMo
 
 // GetLogVolumeMount - Manila API LogVolumeMount
 func GetLogVolumeMount() corev1.VolumeMount {
-	return corev1.VolumeMount{
-		Name:      logVolume,
-		MountPath: "/var/log/manila",
-		ReadOnly:  false,
-	}
+	return volume.WritableDirVolumeMount(logVolume, "/var/log/manila")
 }
 
 // GetLogVolume - Manila API LogVolume
 func GetLogVolume() corev1.Volume {
-	return corev1.Volume{
-		Name: logVolume,
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""},
-		},
-	}
+	return volume.WritableDirVolume(logVolume)
 }
