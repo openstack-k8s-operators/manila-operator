@@ -13,23 +13,23 @@ limitations under the License.
 package manilaapi
 
 import (
+	"fmt"
+
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/probes"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
+	"github.com/openstack-k8s-operators/lib-common/modules/serviceuser"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	manila "github.com/openstack-k8s-operators/manila-operator/internal/manila"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	// ServiceCommand -
-	ServiceCommand = "/usr/local/bin/kolla_start"
+	"k8s.io/utils/ptr"
 )
 
 // StatefulSet func
@@ -42,8 +42,6 @@ func StatefulSet(
 	memcached *memcachedv1.Memcached,
 	timeout int,
 ) (*appsv1.StatefulSet, error) {
-	manilaUser := manila.ManilaUserID
-
 	scheme := corev1.URISchemeHTTP
 	if instance.Spec.TLS.API.Enabled(service.EndpointPublic) {
 		scheme = corev1.URISchemeHTTPS
@@ -71,8 +69,10 @@ func StatefulSet(
 
 	// add MTLS cert if defined
 	if memcached.Status.MTLSCert != "" && instance.Spec.MemcachedInstance != nil {
+		certMountPath := memcachedv1.CertPathDst
+		keyMountPath := memcachedv1.KeyPathDst
 		volumes = append(volumes, memcached.CreateMTLSVolume())
-		volumeMounts = append(volumeMounts, memcached.CreateMTLSVolumeMounts(nil, nil)...)
+		volumeMounts = append(volumeMounts, memcached.CreateMTLSVolumeMounts(&certMountPath, &keyMountPath)...)
 	}
 
 	for _, endpt := range []service.Endpoint{service.EndpointInternal, service.EndpointPublic} {
@@ -89,13 +89,16 @@ func StatefulSet(
 			if err != nil {
 				return nil, err
 			}
+			certMount := fmt.Sprintf("/etc/pki/tls/certs/%s.crt", endpt.String())
+			keyMount := fmt.Sprintf("/etc/pki/tls/private/%s.key", endpt.String())
+			svc.CertMount = &certMount
+			svc.KeyMount = &keyMount
 			volumes = append(volumes, svc.CreateVolume(endpt.String()))
 			volumeMounts = append(volumeMounts, svc.CreateVolumeMounts(endpt.String())...)
 		}
 	}
 
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 
 	statefulset := &appsv1.StatefulSet{
@@ -116,51 +119,33 @@ func StatefulSet(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: instance.Spec.ServiceAccount,
+					ServiceAccountName:           instance.Spec.ServiceAccount,
+					AutomountServiceAccountToken: ptr.To(false),
+					SecurityContext:              pod.RestrictivePodSecurityContext(serviceuser.ManilaUID, serviceuser.ManilaGID, serviceuser.ApacheGID),
 					Containers: []corev1.Container{
 						// the first container in a pod is the default selected
 						// by oc log so define the log stream container first.
 						{
-							Name: instance.Name + "-log",
-							Command: []string{
-								"/usr/bin/dumb-init",
-							},
-							Args: []string{
-								"--single-child",
-								"--",
-								"/bin/sh",
-								"-c",
-								"/usr/bin/tail -n+1 -F " + LogFile + " 2>/dev/null",
-							},
-							Image: instance.Spec.ContainerImage,
-							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &manilaUser,
-							},
-							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts: []corev1.VolumeMount{GetLogVolumeMount()},
-							Resources:    instance.Spec.Resources,
+							Name:            instance.Name + "-log",
+							Command:         []string{"/bin/bash"},
+							Args:            []string{"-c", "tail -n+1 -F " + LogFile},
+							Image:           instance.Spec.ContainerImage,
+							SecurityContext: pod.RestrictiveSecurityContext(serviceuser.ManilaUID, serviceuser.ManilaGID),
+							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:    []corev1.VolumeMount{GetLogVolumeMount()},
+							Resources:       instance.Spec.Resources,
 						},
 						{
-							Name: ComponentName,
-							Command: []string{
-								"/usr/bin/dumb-init",
-							},
-							Args: []string{
-								"--single-child",
-								"--",
-								"/bin/bash",
-								"-c",
-								string(ServiceCommand),
-							},
-							Image: instance.Spec.ContainerImage,
-							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &manilaUser,
-							},
-							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts:   volumeMounts,
-							Resources:      instance.Spec.Resources,
-							ReadinessProbe: apiProbes.Readiness,
-							LivenessProbe:  apiProbes.Liveness,
+							Name:            ComponentName,
+							Command:         []string{"/usr/sbin/httpd"},
+							Args:            []string{"-DFOREGROUND"},
+							Image:           instance.Spec.ContainerImage,
+							SecurityContext: pod.RestrictiveSecurityContext(serviceuser.ManilaUID, serviceuser.ManilaGID),
+							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:    volumeMounts,
+							Resources:       instance.Spec.Resources,
+							ReadinessProbe:  apiProbes.Readiness,
+							LivenessProbe:   apiProbes.Liveness,
 						},
 					},
 					Volumes: volumes,

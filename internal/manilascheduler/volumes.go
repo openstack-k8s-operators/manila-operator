@@ -6,16 +6,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// configMode is the default file permission for secret-backed config volumes.
+var configMode int32 = 0440
+
 // GetVolumes -
 func GetVolumes(parentName string, name string, extraVol []manilav1.ManilaExtraVolMounts) []corev1.Volume {
-	var config0644AccessMode int32 = 0644
-
 	schedulerVolumes := []corev1.Volume{
 		{
 			Name: "config-data-custom",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: &config0644AccessMode,
+					DefaultMode: &configMode,
 					SecretName:  name + "-config-data",
 				},
 			},
@@ -31,12 +32,6 @@ func GetVolumeMounts(extraVol []manilav1.ManilaExtraVolMounts) []corev1.VolumeMo
 		{
 			Name:      "config-data-custom",
 			MountPath: "/etc/manila/manila.conf.d",
-			ReadOnly:  true,
-		},
-		{
-			Name:      "config-data",
-			MountPath: "/var/lib/kolla/config_files/config.json",
-			SubPath:   "manila-scheduler-config.json",
 			ReadOnly:  true,
 		},
 	}

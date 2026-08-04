@@ -38,13 +38,6 @@ const (
 	// is to be generated, e.g. "manila_e5a4", "manila_78bc", etc
 	DatabaseUsernamePrefix = "manila"
 
-	// Manila's uid and gid magic numbers come from the 'manila-user' in
-	// https://github.com/openstack/kolla/blob/master/kolla/common/users.py
-
-	// ManilaUserID -
-	ManilaUserID int64 = 42429
-	// ManilaGroupID -
-	ManilaGroupID int64 = 42429
 	// ManilaPublicPort -
 	ManilaPublicPort int32 = 8786
 	// ManilaInternalPort -
