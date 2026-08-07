@@ -111,6 +111,7 @@ require (
 require (
 	github.com/google/uuid v1.6.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7
+	github.com/openstack-k8s-operators/lib-common/modules/serviceuser v0.0.0-00010101000000-000000000000
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
 )
@@ -139,3 +140,7 @@ replace k8s.io/code-generator => k8s.io/code-generator v0.33.13 //allow-merging
 replace k8s.io/component-base => k8s.io/component-base v0.33.13 //allow-merging
 
 replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250627150254-e9823e99808e //allow-merging
+
+replace github.com/openstack-k8s-operators/lib-common/modules/common => github.com/stuggi/lib-common/modules/common v0.0.0-20260807111253-08c9a0504119
+
+replace github.com/openstack-k8s-operators/lib-common/modules/serviceuser => github.com/stuggi/lib-common/modules/serviceuser v0.0.0-20260807111253-08c9a0504119

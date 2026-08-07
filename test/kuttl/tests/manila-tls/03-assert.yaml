@@ -175,7 +175,7 @@ spec:
           volumes:
           - name: db-purge-config-data
             secret:
-              defaultMode: 420
+              defaultMode: 288
               items:
               - key: 00-config.conf
                 path: 00-config.conf
@@ -250,27 +250,21 @@ spec:
       serviceAccountName: manila-manila
       containers:
       - args:
-        - --single-child
-        - --
-        - /bin/sh
         - -c
-        - /usr/bin/tail -n+1 -F /var/log/manila/manila-api.log 2>/dev/null
+        - tail -n+1 -F /var/log/manila/manila-api.log
+        command:
+        - /bin/bash
         volumeMounts:
         - name: logs
           mountPath: /var/log/manila
       - args:
-        - --single-child
-        - --
-        - /bin/bash
-        - -c
-        - /usr/local/bin/kolla_start
+        - -DFOREGROUND
         command:
-        - /usr/bin/dumb-init
+        - /usr/sbin/httpd
         volumeMounts:
-        - mountPath: /var/lib/config-data/default
-          name: config-data
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
+          readOnly: true
         - mountPath: /etc/my.cnf
           name: config-data
           readOnly: true
@@ -278,28 +272,41 @@ spec:
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
-        - mountPath: /var/lib/kolla/config_files/config.json
+        - mountPath: /etc/httpd/conf/httpd.conf
           name: config-data
           readOnly: true
-          subPath: manila-api-config.json
+          subPath: httpd.conf
+        - mountPath: /etc/httpd/conf.d/ssl.conf
+          name: config-data
+          readOnly: true
+          subPath: ssl.conf
+        - mountPath: /etc/httpd/conf.d/10-manila_wsgi.conf
+          name: config-data
+          readOnly: true
+          subPath: 10-manila_wsgi.conf
+        - mountPath: /run/httpd
+          name: run-httpd
+        - mountPath: /var/log/httpd
+          name: var-log-httpd
         - mountPath: /var/log/manila
           name: logs
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           name: combined-ca-bundle
           readOnly: true
-        - mountPath: /var/lib/config-data/tls/certs/internal.crt
+          subPath: tls-ca-bundle.pem
+        - mountPath: /etc/pki/tls/certs/internal.crt
           name: internal-tls-certs
           readOnly: true
           subPath: tls.crt
-        - mountPath: /var/lib/config-data/tls/private/internal.key
+        - mountPath: /etc/pki/tls/private/internal.key
           name: internal-tls-certs
           readOnly: true
           subPath: tls.key
-        - mountPath: /var/lib/config-data/tls/certs/public.crt
+        - mountPath: /etc/pki/tls/certs/public.crt
           name: public-tls-certs
           readOnly: true
           subPath: tls.crt
-        - mountPath: /var/lib/config-data/tls/private/public.key
+        - mountPath: /etc/pki/tls/private/public.key
           name: public-tls-certs
           readOnly: true
           subPath: tls.key
@@ -313,6 +320,10 @@ spec:
       - name: config-data-custom
         secret:
           secretName: manila-api-config-data
+      - name: run-httpd
+        emptyDir: {}
+      - name: var-log-httpd
+        emptyDir: {}
       - name: logs
         emptyDir: {}
       - name: combined-ca-bundle
@@ -348,17 +359,11 @@ spec:
       serviceAccountName: manila-manila
       containers:
       - args:
-        - --single-child
-        - --
-        - /bin/bash
-        - -c
-        - /usr/local/bin/kolla_start
+        - --config-dir
+        - /etc/manila/manila.conf.d
         command:
-        - /usr/bin/dumb-init
+        - /usr/bin/manila-share
         volumeMounts:
-        - mountPath: /var/lib/config-data/default
-          name: config-data
-          readOnly: true
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
@@ -372,10 +377,6 @@ spec:
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
-        - mountPath: /var/lib/kolla/config_files/config.json
-          name: config-data
-          readOnly: true
-          subPath: manila-share-config.json
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           name: combined-ca-bundle
           readOnly: true
@@ -385,9 +386,6 @@ spec:
         - share
         - /etc/manila/manila.conf.d
         volumeMounts:
-        - mountPath: /var/lib/config-data/default
-          name: config-data
-          readOnly: true
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
@@ -401,10 +399,6 @@ spec:
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
-        - mountPath: /var/lib/kolla/config_files/config.json
-          name: config-data
-          readOnly: true
-          subPath: manila-share-config.json
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           name: combined-ca-bundle
           readOnly: true
@@ -446,17 +440,11 @@ spec:
       serviceAccountName: manila-manila
       containers:
       - args:
-        - --single-child
-        - --
-        - /bin/bash
-        - -c
-        - /usr/local/bin/kolla_start
+        - --config-dir
+        - /etc/manila/manila.conf.d
         command:
-        - /usr/bin/dumb-init
+        - /usr/bin/manila-scheduler
         volumeMounts:
-        - mountPath: /var/lib/config-data/default
-          name: config-data
-          readOnly: true
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
@@ -467,10 +455,6 @@ spec:
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
-        - mountPath: /var/lib/kolla/config_files/config.json
-          name: config-data
-          readOnly: true
-          subPath: manila-scheduler-config.json
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           name: combined-ca-bundle
           readOnly: true
@@ -480,9 +464,6 @@ spec:
         - scheduler
         - /etc/manila/manila.conf.d
         volumeMounts:
-        - mountPath: /var/lib/config-data/default
-          name: config-data
-          readOnly: true
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
@@ -493,10 +474,6 @@ spec:
         - mountPath: /etc/manila/manila.conf.d
           name: config-data-custom
           readOnly: true
-        - mountPath: /var/lib/kolla/config_files/config.json
-          name: config-data
-          readOnly: true
-          subPath: manila-scheduler-config.json
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           name: combined-ca-bundle
           readOnly: true

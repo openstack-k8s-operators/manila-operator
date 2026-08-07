@@ -16,6 +16,8 @@ import (
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
+	"github.com/openstack-k8s-operators/lib-common/modules/serviceuser"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	manila "github.com/openstack-k8s-operators/manila-operator/internal/manila"
 
@@ -23,11 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-const (
-	// ServiceCommand -
-	ServiceCommand = "/usr/local/bin/kolla_start"
+	"k8s.io/utils/ptr"
 )
 
 // StatefulSet func
@@ -39,9 +37,6 @@ func StatefulSet(
 	topology *topologyv1.Topology,
 	memcached *memcachedv1.Memcached,
 ) (*appsv1.StatefulSet, error) {
-	manilaUser := manila.ManilaUserID
-	manilaGroup := manila.ManilaGroupID
-
 	scheme := corev1.URISchemeHTTP
 	probesPort := int32(8080)
 
@@ -62,7 +57,6 @@ func StatefulSet(
 	}
 
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 
 	volumes := GetVolumes(
@@ -80,8 +74,10 @@ func StatefulSet(
 
 	// add MTLS cert if defined
 	if memcached.Status.MTLSCert != "" && instance.Spec.MemcachedInstance != nil {
+		certMountPath := memcachedv1.CertPathDst
+		keyMountPath := memcachedv1.KeyPathDst
 		volumes = append(volumes, memcached.CreateMTLSVolume())
-		volumeMounts = append(volumeMounts, memcached.CreateMTLSVolumeMounts(nil, nil)...)
+		volumeMounts = append(volumeMounts, memcached.CreateMTLSVolumeMounts(&certMountPath, &keyMountPath)...)
 	}
 
 	statefulset := &appsv1.StatefulSet{
@@ -101,39 +97,28 @@ func StatefulSet(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: instance.Spec.ServiceAccount,
+					ServiceAccountName:           instance.Spec.ServiceAccount,
+					AutomountServiceAccountToken: ptr.To(false),
+					SecurityContext:              pod.RestrictivePodSecurityContext(serviceuser.ManilaUID, serviceuser.ManilaGID),
 					Containers: []corev1.Container{
 						{
-							Name: ComponentName,
-							Command: []string{
-								"/usr/bin/dumb-init",
-							},
-							Args: []string{
-								"--single-child",
-								"--",
-								"/bin/bash",
-								"-c",
-								string(ServiceCommand),
-							},
-							Image: instance.Spec.ContainerImage,
-							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &manilaUser,
-							},
-							Env:           env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts:  volumeMounts,
-							Resources:     instance.Spec.Resources,
-							LivenessProbe: schedProbes.Liveness,
-							StartupProbe:  schedProbes.Startup,
+							Name:            ComponentName,
+							Command:         []string{"/usr/bin/manila-scheduler"},
+							Args:            []string{"--config-dir", "/etc/manila/manila.conf.d"},
+							Image:           instance.Spec.ContainerImage,
+							SecurityContext: pod.RestrictiveSecurityContext(serviceuser.ManilaUID, serviceuser.ManilaGID),
+							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:    volumeMounts,
+							Resources:       instance.Spec.Resources,
+							LivenessProbe:   schedProbes.Liveness,
+							StartupProbe:    schedProbes.Startup,
 						},
 						{
-							Name:    "probe",
-							Command: probeCommand,
-							Image:   instance.Spec.ContainerImage,
-							SecurityContext: &corev1.SecurityContext{
-								RunAsUser:  &manilaUser,
-								RunAsGroup: &manilaGroup,
-							},
-							VolumeMounts: volumeMounts,
+							Name:            "probe",
+							Command:         probeCommand,
+							Image:           instance.Spec.ContainerImage,
+							SecurityContext: pod.RestrictiveSecurityContext(serviceuser.ManilaUID, serviceuser.ManilaGID),
+							VolumeMounts:    volumeMounts,
 						},
 					},
 					Volumes: volumes,
