@@ -18,6 +18,7 @@ package functional
 import (
 	"fmt"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
@@ -1410,11 +1411,22 @@ var _ = Describe("Manila controller", func() {
 				g.Expect(k8sClient.Update(ctx, manila)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
+			// Disabling notifications now defers teardown of the notifications
+			// TransportURL/secret and its consumer finalizer until the workload
+			// rolls a config without notifications and all services report ready.
+			// Re-simulate the full readiness chain for the rolled generation on
+			// every iteration until the notifications secret ref is cleared, while
+			// the primary transport secret must remain set.
 			Eventually(func(g Gomega) {
+				keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaShares[0])
+
 				manila := GetManila(manilaTest.Instance)
 				g.Expect(manila.Status.NotificationsURLSecret).To(BeNil())
 				g.Expect(manila.Status.TransportURLSecret).ToNot(Equal(""))
-			}, timeout, interval).Should(Succeed())
+			}, timeout*10, interval).Should(Succeed())
 		})
 	})
 
@@ -1641,6 +1653,11 @@ var _ = Describe("Manila controller", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
@@ -2151,6 +2168,340 @@ var _ = Describe("Manila controller", func() {
 			}, timeout, interval).Should(Succeed())
 		})
 	})
+
+	When("TransportURL consumer finalizer is managed", func() {
+		BeforeEach(func() {
+			DeferCleanup(k8sClient.Delete, ctx,
+				CreateManilaMessageBusSecret(
+					manilaTest.Instance.Namespace,
+					manilaTest.RabbitmqSecretName,
+				),
+			)
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaName).Spec.DatabaseInstance,
+					corev1.ServiceSpec{
+						Ports: []corev1.ServicePort{{Port: 3306}},
+					},
+				),
+			)
+			DeferCleanup(keystone.DeleteKeystoneAPI,
+				keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace))
+			DeferCleanup(infra.DeleteMemcached,
+				infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
+		})
+
+		It("should add the consumer finalizer to the transport secret", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      manilaTest.RabbitmqSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should remove the consumer finalizer from transport secret on CR deletion", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      manilaTest.RabbitmqSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			th.DeleteInstance(GetManila(manilaTest.Instance))
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      manilaTest.RabbitmqSecretName,
+				})
+				g.Expect(secret.Finalizers).NotTo(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should move the finalizer from the old to the new secret on transport rotation", func() {
+			oldSecretName := manilaTest.RabbitmqSecretName
+			newSecretName := "rabbitmq-secret-rotated"
+
+			// Wait for the consumer finalizer to be added to the old secret
+			// and for the TransportURLSecret status to be set
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      oldSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+				m := GetManila(manilaTest.Instance)
+				g.Expect(m.Status.TransportURLSecret).To(Equal(oldSecretName))
+			}, timeout, interval).Should(Succeed())
+
+			// Create the new rotated secret with DIFFERENT content
+			newSecret := th.CreateSecret(
+				types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      newSecretName,
+				},
+				map[string][]byte{
+					"transport_url": []byte("rabbit://rotated-user:rotated-pass@rabbitmq/fake"),
+				},
+			)
+			DeferCleanup(k8sClient.Delete, ctx, newSecret)
+
+			// Simulate transport rotation: update TransportURL status with new secret name
+			Eventually(func(g Gomega) {
+				transport := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				transport.Status.SecretName = newSecretName
+				g.Expect(k8sClient.Status().Update(ctx, transport)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Verify finalizer is added to the new secret
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      newSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			// The old secret's finalizer should NOT be removed yet — sub-CRs
+			// are not ready (StatefulSets have not been simulated ready)
+			Consistently(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      oldSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			// Simulate sub-CRs becoming ready with the new credentials
+			Eventually(func(g Gomega) {
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaShares[0])
+				// Trigger a parent reconcile by touching the Manila CR
+				m := GetManila(manilaTest.Instance)
+				if m.Annotations == nil {
+					m.Annotations = map[string]string{}
+				}
+				m.Annotations["test-reconcile-trigger"] = fmt.Sprintf("%d", time.Now().UnixNano())
+				g.Expect(k8sClient.Update(ctx, m)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Verify old finalizer is removed and status updated
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      oldSecretName,
+				})
+				g.Expect(secret.Finalizers).NotTo(
+					ContainElement(manila.TransportConsumerFinalizer))
+				m := GetManila(manilaTest.Instance)
+				g.Expect(m.Status.TransportURLSecret).To(Equal(newSecretName))
+			}, 10*time.Second, interval).Should(Succeed())
+		})
+
+		It("should not release the finalizer on the same reconcile that updates sub-CRs", func() {
+			oldSecretName := manilaTest.RabbitmqSecretName
+			newSecretName := "rabbitmq-secret-rotated"
+
+			// Wait for the consumer finalizer to be added and status set
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      oldSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+				m := GetManila(manilaTest.Instance)
+				g.Expect(m.Status.TransportURLSecret).To(Equal(oldSecretName))
+			}, timeout, interval).Should(Succeed())
+
+			// Create the new rotated secret with DIFFERENT credentials
+			newSecret := th.CreateSecret(
+				types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      newSecretName,
+				},
+				map[string][]byte{
+					"transport_url": []byte("rabbit://rotated-user:rotated-pass@rabbitmq/fake"),
+				},
+			)
+			DeferCleanup(k8sClient.Delete, ctx, newSecret)
+
+			// Trigger transport rotation
+			Eventually(func(g Gomega) {
+				transport := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				transport.Status.SecretName = newSecretName
+				g.Expect(k8sClient.Status().Update(ctx, transport)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Wait for the new secret to get the finalizer
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      newSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			// CRITICAL CHECK: the old secret's finalizer must NOT be removed
+			// immediately. Without the requeue-when-unstable fix, the parent
+			// reconcile that updates sub-CR specs also evaluates the guard
+			// in the same pass. The guard sees stale True conditions (from
+			// before the spec change) and releases the finalizer before
+			// pods have rolled to the new credentials.
+			//
+			// DO NOT simulate sub-CR readiness here — we are specifically
+			// testing that the guard holds WITHOUT any readiness simulation,
+			// proving the requeue prevents same-reconcile evaluation.
+			Consistently(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      oldSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer),
+					"old secret's finalizer was removed before sub-CRs processed the rotation")
+			}, timeout, interval).Should(Succeed())
+
+			// Verify status was NOT updated to the new secret
+			m := GetManila(manilaTest.Instance)
+			Expect(m.Status.TransportURLSecret).To(Equal(oldSecretName),
+				"TransportURLSecret status was updated before sub-CRs rolled")
+
+			// Now simulate all sub-CRs ready and trigger a reconcile
+			Eventually(func(g Gomega) {
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaShares[0])
+				m := GetManila(manilaTest.Instance)
+				if m.Annotations == nil {
+					m.Annotations = map[string]string{}
+				}
+				m.Annotations["test-reconcile-trigger"] = fmt.Sprintf("%d", time.Now().UnixNano())
+				g.Expect(k8sClient.Update(ctx, m)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// NOW the finalizer should be released
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      oldSecretName,
+				})
+				g.Expect(secret.Finalizers).NotTo(
+					ContainElement(manila.TransportConsumerFinalizer))
+				m := GetManila(manilaTest.Instance)
+				g.Expect(m.Status.TransportURLSecret).To(Equal(newSecretName))
+			}, 10*time.Second, interval).Should(Succeed())
+		})
+
+		It("should hold the finalizer until the last sub-CR is ready", func() {
+			oldSecretName := manilaTest.RabbitmqSecretName
+			newSecretName := "rabbitmq-secret-rotated"
+
+			// Wait for the TransportURLSecret status to be set
+			Eventually(func(g Gomega) {
+				m := GetManila(manilaTest.Instance)
+				g.Expect(m.Status.TransportURLSecret).To(Equal(oldSecretName))
+			}, timeout, interval).Should(Succeed())
+
+			// Create the new rotated secret
+			newSecret := th.CreateSecret(
+				types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      newSecretName,
+				},
+				map[string][]byte{
+					"transport_url": []byte("rabbit://rotated-user:rotated-pass@rabbitmq/fake"),
+				},
+			)
+			DeferCleanup(k8sClient.Delete, ctx, newSecret)
+
+			// Trigger rotation
+			Eventually(func(g Gomega) {
+				transport := infra.GetTransportURL(manilaTest.ManilaTransportURL)
+				transport.Status.SecretName = newSecretName
+				g.Expect(k8sClient.Status().Update(ctx, transport)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Wait for new secret to get the finalizer
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      newSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			// Simulate only ManilaAPI and ManilaScheduler ready, but NOT ManilaShare.
+			// The finalizer on the old secret MUST be held because not all
+			// sub-CRs are ready.
+			Eventually(func(g Gomega) {
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+				m := GetManila(manilaTest.Instance)
+				if m.Annotations == nil {
+					m.Annotations = map[string]string{}
+				}
+				m.Annotations["test-reconcile-trigger"] = fmt.Sprintf("%d", time.Now().UnixNano())
+				g.Expect(k8sClient.Update(ctx, m)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Verify old secret's finalizer is still held (ManilaShare not ready)
+			Consistently(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      oldSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			// Now simulate all sub-CRs ready including ManilaShare
+			Eventually(func(g Gomega) {
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaAPI)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaScheduler)
+				th.SimulateStatefulSetReplicaReady(manilaTest.ManilaShares[0])
+				m := GetManila(manilaTest.Instance)
+				if m.Annotations == nil {
+					m.Annotations = map[string]string{}
+				}
+				m.Annotations["test-reconcile-trigger"] = fmt.Sprintf("%d", time.Now().UnixNano())
+				g.Expect(k8sClient.Update(ctx, m)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Now the finalizer should be released
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: manilaTest.Instance.Namespace,
+					Name:      oldSecretName,
+				})
+				g.Expect(secret.Finalizers).NotTo(
+					ContainElement(manila.TransportConsumerFinalizer))
+			}, 10*time.Second, interval).Should(Succeed())
+		})
+	})
 })
 
 var _ = Describe("Manila Webhook", func() {
@@ -2479,6 +2830,11 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
@@ -2536,6 +2892,11 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
@@ -2591,6 +2952,11 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
@@ -2647,6 +3013,11 @@ var _ = Describe("Manila with RabbitMQ custom vhost and user", func() {
 				),
 			)
 			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			notificationsTransportURLName := types.NamespacedName{
+				Namespace: manilaTest.Instance.Namespace,
+				Name:      fmt.Sprintf("%s-manila-notifications-transport", manilaTest.Instance.Name),
+			}
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
 			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
 			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
 			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)

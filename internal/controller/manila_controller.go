@@ -19,11 +19,11 @@ package controller
 import (
 	"context"
 	"fmt"
-	"maps"
-	"slices"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
+	"maps"
+	"slices"
 
 	"github.com/go-logr/logr"
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
@@ -37,6 +37,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/object"
 	common_rbac "github.com/openstack-k8s-operators/lib-common/modules/common/rbac"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
@@ -81,8 +82,9 @@ func (r *ManilaReconciler) GetScheme() *runtime.Scheme {
 // ManilaReconciler reconciles a Manila object
 type ManilaReconciler struct {
 	client.Client
-	Kclient kubernetes.Interface
-	Scheme  *runtime.Scheme
+	Kclient   kubernetes.Interface
+	Scheme    *runtime.Scheme
+	APIReader client.Reader
 }
 
 // GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
@@ -147,7 +149,6 @@ func (r *ManilaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res
 		Log.Error(err, fmt.Sprintf("could not instantiate helper for instance %s", instance.Name))
 		return ctrl.Result{}, err
 	}
-
 	// initialize status
 	isNewInstance := instance.Status.Conditions == nil
 	if isNewInstance {
@@ -459,6 +460,33 @@ func (r *ManilaReconciler) reconcileDelete(ctx context.Context, instance *manila
 		}
 	}
 
+	// Remove consumer finalizer from transport secrets Manila was consuming.
+	// Check both status and the TransportURL CR to handle the case where
+	// status was reverted to empty by the defer-based rotation guard.
+	transportSecrets := []string{instance.Status.TransportURLSecret}
+	for _, tuName := range []string{
+		fmt.Sprintf("%s-manila-transport", instance.Name),
+		fmt.Sprintf("%s-manila-notifications-transport", instance.Name),
+	} {
+		tu := &rabbitmqv1.TransportURL{}
+		if err := r.Get(ctx, types.NamespacedName{Name: tuName, Namespace: instance.Namespace}, tu); err != nil {
+			if !k8s_errors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+		} else {
+			transportSecrets = append(transportSecrets, tu.Status.SecretName)
+		}
+	}
+	if instance.Status.NotificationsURLSecret != nil {
+		transportSecrets = append(transportSecrets, *instance.Status.NotificationsURLSecret)
+	}
+	for _, secretName := range transportSecrets {
+		if err := object.RemoveSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+			secretName, manila.TransportConsumerFinalizer); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Remove consumer finalizer from AC secrets Manila was consuming.
 	// Check both status and spec to handle the edge case where the reconciler
 	// crashed after adding the finalizer but before updating the status.
@@ -466,7 +494,7 @@ func (r *ManilaReconciler) reconcileDelete(ctx context.Context, instance *manila
 		instance.Status.ApplicationCredentialSecret,
 		instance.Spec.Auth.ApplicationCredentialSecret,
 	} {
-		if err := keystonev1.RemoveACSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+		if err := object.RemoveSecretConsumerFinalizer(ctx, helper, instance.Namespace,
 			secretName, manila.ACConsumerFinalizer); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -588,9 +616,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		Log.Info(fmt.Sprintf("TransportURL %s successfully reconciled - operation: %s", transportURL.Name, string(op)))
 	}
 
-	instance.Status.TransportURLSecret = transportURL.Status.SecretName
-
-	if instance.Status.TransportURLSecret == "" {
+	if transportURL.Status.SecretName == "" {
 		Log.Info(fmt.Sprintf("Waiting for TransportURL %s secret to be created", transportURL.Name))
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.RabbitMqTransportURLReadyCondition,
@@ -602,6 +628,19 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 
 	instance.Status.Conditions.MarkTrue(condition.RabbitMqTransportURLReadyCondition, condition.RabbitMqTransportURLReadyMessage)
 
+	// Set status early for first-time setup so PatchInstance persists it
+	// even on early returns. During rotation (old != current), the status
+	// is only updated by FinalizeSecretRotation at end of reconcile.
+	if instance.Status.TransportURLSecret == "" ||
+		instance.Status.TransportURLSecret == transportURL.Status.SecretName {
+		instance.Status.TransportURLSecret = transportURL.Status.SecretName
+	}
+
+	if err := object.ManageSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+		transportURL.Status.SecretName, manila.TransportConsumerFinalizer); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// end transportURL
 
 	//
@@ -612,15 +651,18 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// Request TransportURL when notifications are configured either via:
 	// Determine if notifications are enabled by checking NotificationsBus.Cluster
 	// (the webhook defaults this from the deprecated NotificationsBusInstance field)
+	var notificationBusInstanceURL *rabbitmqv1.TransportURL
 	if instance.Spec.NotificationsBus != nil && instance.Spec.NotificationsBus.Cluster != "" {
-		// init .Status.NotificationsURLSecret
-		instance.Status.NotificationsURLSecret = ptr.To("")
+		if instance.Status.NotificationsURLSecret == nil {
+			instance.Status.NotificationsURLSecret = ptr.To("")
+		}
 
 		// Use NotificationsBus config (never fall back to MessagingBus to ensure separation)
 		notificationsRabbitMqConfig := *instance.Spec.NotificationsBus
 		// A separate TransportURL is always created for notifications,
 		// even when using the same cluster as messaging (to allow different vhost/user)
-		notificationBusInstanceURL, op, err := r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, true, notificationsRabbitMqConfig)
+		var op controllerutil.OperationResult
+		notificationBusInstanceURL, op, err = r.transportURLCreateOrUpdate(ctx, instance, serviceLabels, true, notificationsRabbitMqConfig)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NotificationBusInstanceReadyCondition,
@@ -635,9 +677,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			Log.Info(fmt.Sprintf("NotificationBusInstanceURL %s successfully reconciled - operation: %s", notificationBusInstanceURL.Name, string(op)))
 		}
 
-		*instance.Status.NotificationsURLSecret = notificationBusInstanceURL.Status.SecretName
-
-		if instance.Status.NotificationsURLSecret == nil {
+		if notificationBusInstanceURL.Status.SecretName == "" {
 			Log.Info(fmt.Sprintf("Waiting for NotificationBusInstanceURL %s secret to be created", notificationBusInstanceURL.Name))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NotificationBusInstanceReadyCondition,
@@ -647,11 +687,28 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			return manila.ResultRequeue, nil
 		}
 
+		// Set status early for first-time setup so PatchInstance persists it
+		// even on early returns. During rotation (old != current), the status
+		// is only updated by FinalizeSecretRotation at end of reconcile.
+		if instance.Status.NotificationsURLSecret == nil ||
+			*instance.Status.NotificationsURLSecret == notificationBusInstanceURL.Status.SecretName {
+			instance.Status.NotificationsURLSecret = ptr.To(notificationBusInstanceURL.Status.SecretName)
+		}
+
+		if err := object.ManageSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+			notificationBusInstanceURL.Status.SecretName, manila.TransportConsumerFinalizer); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		instance.Status.Conditions.MarkTrue(condition.NotificationBusInstanceReadyCondition, condition.NotificationBusInstanceReadyMessage)
 	} else {
-		// make sure we do not have an entry in the status if
-		// .Spec.NotificationsURLSecret is not provided
-		instance.Status.NotificationsURLSecret = nil
+		// Notifications bus disabled. Config regenerated below no longer
+		// references the notifications transport URL, so its input hash
+		// changes and the Deployment rolls. Defer teardown of the
+		// TransportURL and its consumer finalizer until that rollout is
+		// complete (guardReady at end of reconcile), otherwise the RabbitMQ
+		// user backing the secret would be revoked while pods still use it.
+		instance.Status.Conditions.Remove(condition.NotificationBusInstanceReadyCondition)
 	}
 
 	// end notificationBusInstanceURL
@@ -740,7 +797,11 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// - %-config configmap holding minimal manila config required to get the service up, user can add additional files to be added to the service
 	// - parameters which has passwords gets added from the OpenStack secret via the init container
 	//
-	err = r.generateServiceConfig(ctx, helper, instance, &configVars, serviceLabels, memcached, db)
+	notificationsURLSecretName := ""
+	if notificationBusInstanceURL != nil {
+		notificationsURLSecretName = notificationBusInstanceURL.Status.SecretName
+	}
+	err = r.generateServiceConfig(ctx, helper, instance, &configVars, serviceLabels, memcached, db, transportURL.Status.SecretName, notificationsURLSecretName)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -781,9 +842,8 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// The old secret's finalizer is removed later (after all services deploy)
 	// so that rapid rotations don't revoke a credential still in use by pods.
 	if instance.Spec.Auth.ApplicationCredentialSecret != "" {
-		if err := keystonev1.ManageACSecretFinalizer(ctx, helper, instance.Namespace,
+		if err := object.ManageSecretConsumerFinalizer(ctx, helper, instance.Namespace,
 			instance.Spec.Auth.ApplicationCredentialSecret,
-			"",
 			manila.ACConsumerFinalizer); err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.ServiceConfigReadyCondition,
@@ -817,8 +877,14 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	// normal reconcile tasks
 	//
 
+	expectedInputHash, err := util.ObjectHash([]string{transportURL.Status.SecretName, notificationsURLSecretName})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to compute expected input hash: %w", err)
+	}
+	allServicesReady := true
+
 	// deploy manila-api
-	manilaAPI, op, err := r.apiDeploymentCreateOrUpdate(ctx, instance)
+	manilaAPI, op, err := r.apiDeploymentCreateOrUpdate(ctx, instance, transportURL.Status.SecretName)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaAPIReadyCondition,
@@ -828,23 +894,12 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	apiObsGen, err := r.checkManilaAPIGeneration(ctx, instance)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			manilav1beta1.ManilaAPIReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			manilav1beta1.ManilaAPIReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, nil
+	if op != controllerutil.OperationResultNone {
+		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
-	if !apiObsGen {
-		instance.Status.Conditions.Set(condition.UnknownCondition(
-			manilav1beta1.ManilaAPIReadyCondition,
-			condition.InitReason,
-			manilav1beta1.ManilaAPIReadyInitMessage,
-		))
-	} else {
+
+	if manilaAPI.Generation == manilaAPI.Status.ObservedGeneration &&
+		manilaAPI.Status.AppliedInputSecretHash == expectedInputHash {
 		// Mirror ManilaAPI status' ReadyCount to this parent CR
 		instance.Status.ManilaAPIReadyCount = manilaAPI.Status.ReadyCount
 		// Mirror ManilaAPI's condition status
@@ -852,10 +907,17 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		if c != nil {
 			instance.Status.Conditions.Set(c)
 		}
+	} else {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			manilav1beta1.ManilaAPIReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.DeploymentReadyRunningMessage))
 	}
-	if op != controllerutil.OperationResultNone && apiObsGen {
-		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
-	}
+	allServicesReady = allServicesReady &&
+		manilaAPI.Generation == manilaAPI.Status.ObservedGeneration &&
+		manilaAPI.Status.AppliedInputSecretHash == expectedInputHash &&
+		manilaAPI.IsReady()
 
 	// remove finalizers from unused MariaDBAccount records
 	err = mariadbv1.DeleteUnusedMariaDBAccountFinalizers(
@@ -866,7 +928,7 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	}
 
 	// Deploy ManilaScheduler
-	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(ctx, instance)
+	manilaScheduler, op, err := r.schedulerDeploymentCreateOrUpdate(ctx, instance, transportURL.Status.SecretName)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			manilav1beta1.ManilaSchedulerReadyCondition,
@@ -876,23 +938,12 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	schedObsGen, err := r.checkManilaSchedulerGeneration(ctx, instance)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			manilav1beta1.ManilaSchedulerReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			manilav1beta1.ManilaSchedulerReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, nil
+	if op != controllerutil.OperationResultNone {
+		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
-	if !schedObsGen {
-		instance.Status.Conditions.Set(condition.UnknownCondition(
-			manilav1beta1.ManilaSchedulerReadyCondition,
-			condition.InitReason,
-			manilav1beta1.ManilaSchedulerReadyInitMessage,
-		))
-	} else {
+
+	if manilaScheduler.Generation == manilaScheduler.Status.ObservedGeneration &&
+		manilaScheduler.Status.AppliedInputSecretHash == expectedInputHash {
 		// Mirror ManilaScheduler status' ReadyCount to this parent CR
 		instance.Status.ManilaSchedulerReadyCount = manilaScheduler.Status.ReadyCount
 
@@ -901,16 +952,23 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 		if c != nil {
 			instance.Status.Conditions.Set(c)
 		}
+	} else {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			manilav1beta1.ManilaSchedulerReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.DeploymentReadyRunningMessage))
 	}
-	if op != controllerutil.OperationResultNone && schedObsGen {
-		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
-	}
+	allServicesReady = allServicesReady &&
+		manilaScheduler.Generation == manilaScheduler.Status.ObservedGeneration &&
+		manilaScheduler.Status.AppliedInputSecretHash == expectedInputHash &&
+		manilaScheduler.IsReady()
 
 	// Deploy ManilaShare
 	var shareCondition *condition.Condition
 	for _, name := range slices.Sorted(maps.Keys(instance.Spec.ManilaShares)) {
 		share := instance.Spec.ManilaShares[name]
-		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share, serviceLabels)
+		manilaShare, op, err := r.shareDeploymentCreateOrUpdate(ctx, instance, name, share, serviceLabels, transportURL.Status.SecretName)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				manilav1beta1.ManilaShareReadyCondition,
@@ -920,38 +978,34 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 				err.Error()))
 			return ctrl.Result{}, err
 		}
-		shareObsGen, err := r.checkManilaShareGeneration(ctx, instance)
-		if err != nil {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				manilav1beta1.ManilaShareReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				manilav1beta1.ManilaShareReadyErrorMessage,
-				err.Error()))
-			return ctrlResult, nil
+		if op != controllerutil.OperationResultNone {
+			Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 		}
-		if !shareObsGen {
-			instance.Status.Conditions.Set(condition.UnknownCondition(
-				manilav1beta1.ManilaShareReadyCondition,
-				condition.InitReason,
-				manilav1beta1.ManilaShareReadyInitMessage,
-			))
-		} else {
+
+		if manilaShare.Generation == manilaShare.Status.ObservedGeneration &&
+			manilaShare.Status.AppliedInputSecretHash == expectedInputHash {
 			// Mirror ManilaShare status' ReadyCount to this parent CR
 			if instance.Status.ManilaSharesReadyCounts == nil {
 				instance.Status.ManilaSharesReadyCounts = map[string]int32{}
 			}
 			instance.Status.ManilaSharesReadyCounts[name] = manilaShare.Status.ReadyCount
-		}
-		if op != controllerutil.OperationResultNone && shareObsGen {
-			Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
-		}
 
-		// If this manilaShare is not IsReady, mirror the condition to get the latest step it is in.
-		// Could also check the overall ReadyCondition of the manilaShare.
-		if !manilaShare.IsReady() {
-			c := manilaShare.Status.Conditions.Mirror(manilav1beta1.ManilaShareReadyCondition)
-			// Get the condition with higher priority for shareCondition.
+			allServicesReady = allServicesReady &&
+				manilaShare.Generation == manilaShare.Status.ObservedGeneration &&
+				manilaShare.Status.AppliedInputSecretHash == expectedInputHash &&
+				manilaShare.IsReady()
+
+			if !manilaShare.IsReady() {
+				c := manilaShare.Status.Conditions.Mirror(manilav1beta1.ManilaShareReadyCondition)
+				shareCondition = condition.GetHigherPrioCondition(c, shareCondition).DeepCopy()
+			}
+		} else {
+			allServicesReady = false
+			c := condition.FalseCondition(
+				manilav1beta1.ManilaShareReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.DeploymentReadyRunningMessage)
 			shareCondition = condition.GetHigherPrioCondition(c, shareCondition).DeepCopy()
 		}
 	}
@@ -1019,23 +1073,92 @@ func (r *ManilaReconciler) reconcileNormal(ctx context.Context, instance *manila
 	}
 	Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 
-	// Manage the old AC secret's finalizer and status tracking.
-	// On rotation (old != new), only remove the old secret's finalizer after
-	// all sub-services are ready with the new credentials. This prevents
-	// premature revocation during rapid rotations.
-	isRotation := instance.Status.ApplicationCredentialSecret != "" && instance.Status.ApplicationCredentialSecret != instance.Spec.Auth.ApplicationCredentialSecret
+	guardReady := allServicesReady
 
-	if isRotation {
-		allServicesReady := instance.Status.Conditions.AllSubConditionIsTrue()
-		if allServicesReady {
-			if err := keystonev1.RemoveACSecretConsumerFinalizer(ctx, helper, instance.Namespace,
-				instance.Status.ApplicationCredentialSecret, manila.ACConsumerFinalizer); err != nil {
-				return ctrl.Result{}, err
-			}
-			instance.Status.ApplicationCredentialSecret = instance.Spec.Auth.ApplicationCredentialSecret
+	transportSecretName, err := object.FinalizeSecretRotation(
+		ctx, helper, instance.Namespace,
+		instance.Status.TransportURLSecret,
+		transportURL.Status.SecretName,
+		manila.TransportConsumerFinalizer,
+		guardReady,
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	instance.Status.TransportURLSecret = transportSecretName
+
+	if notificationBusInstanceURL != nil {
+		notifStatusSecret := ""
+		if instance.Status.NotificationsURLSecret != nil {
+			notifStatusSecret = *instance.Status.NotificationsURLSecret
 		}
-	} else {
-		instance.Status.ApplicationCredentialSecret = instance.Spec.Auth.ApplicationCredentialSecret
+		notifSecretName, err := object.FinalizeSecretRotation(
+			ctx, helper, instance.Namespace,
+			notifStatusSecret,
+			notificationBusInstanceURL.Status.SecretName,
+			manila.TransportConsumerFinalizer,
+			guardReady,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		instance.Status.NotificationsURLSecret = ptr.To(notifSecretName)
+	} else if instance.Status.NotificationsURLSecret != nil &&
+		*instance.Status.NotificationsURLSecret != "" && guardReady {
+		// Notifications bus disabled and the Deployment has rolled out a
+		// config that no longer references it: now it is safe to release the
+		// consumer finalizer and delete the notifications TransportURL.
+		if err := object.RemoveSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+			*instance.Status.NotificationsURLSecret, manila.TransportConsumerFinalizer); err != nil {
+			return ctrl.Result{}, err
+		}
+		notificationTransportURLName := fmt.Sprintf("%s-manila-notifications-transport", instance.Name)
+		if err := r.transportURLDeleted(ctx, instance, notificationTransportURLName); err != nil {
+			Log.Error(err, fmt.Sprintf("Could not delete notification TransportURL %s", notificationTransportURLName))
+			return ctrl.Result{}, err
+		}
+		instance.Status.NotificationsURLSecret = nil
+	}
+
+	acSecretName, err := object.FinalizeSecretRotation(
+		ctx, helper, instance.Namespace,
+		instance.Status.ApplicationCredentialSecret,
+		instance.Spec.Auth.ApplicationCredentialSecret,
+		manila.ACConsumerFinalizer,
+		guardReady,
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	instance.Status.ApplicationCredentialSecret = acSecretName
+
+	// Self-heal consumer finalizers stranded on secrets superseded during
+	// rapid rotation (A -> B -> C before the workload became ready):
+	// FinalizeSecretRotation only ever releases the single tracked "old"
+	// secret, so any intermediate secret's finalizer would otherwise leak.
+	// keep enumerates every secret that legitimately still holds the
+	// finalizer; all others in the namespace are pruned.
+	notifKeep := ""
+	if instance.Status.NotificationsURLSecret != nil {
+		notifKeep = *instance.Status.NotificationsURLSecret
+	}
+	currentNotifKeep := ""
+	if notificationBusInstanceURL != nil {
+		currentNotifKeep = notificationBusInstanceURL.Status.SecretName
+	}
+	if err := object.PruneSecretConsumerFinalizers(
+		ctx, helper, instance.Namespace, manila.TransportConsumerFinalizer,
+		instance.Status.TransportURLSecret, transportURL.Status.SecretName,
+		notifKeep, currentNotifKeep,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := object.PruneSecretConsumerFinalizers(
+		ctx, helper, instance.Namespace, manila.ACConsumerFinalizer,
+		instance.Status.ApplicationCredentialSecret,
+		instance.Spec.Auth.ApplicationCredentialSecret,
+	); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// update the overall status condition if service is ready
@@ -1054,6 +1177,8 @@ func (r *ManilaReconciler) generateServiceConfig(
 	serviceLabels map[string]string,
 	memcached *memcachedv1.Memcached,
 	db *mariadbv1.Database,
+	transportURLSecretName string,
+	notificationsURLSecretName string,
 ) error {
 	//
 	// create Secret required for manila input
@@ -1095,7 +1220,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 		return err
 	}
 
-	transportURLSecret, _, err := secret.GetSecret(ctx, h, instance.Status.TransportURLSecret, instance.Namespace)
+	transportURLSecret, _, err := secret.GetSecret(ctx, h, transportURLSecretName, instance.Namespace)
 	if err != nil {
 		return err
 	}
@@ -1170,7 +1295,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 	templateParameters["VHosts"] = httpdVhostConfig
 
 	var notificationInstanceURLSecret *corev1.Secret
-	if instance.Status.NotificationsURLSecret != nil {
+	if notificationsURLSecretName != "" {
 		// Get a notificationInstanceURLSecret only if rabbitMQ referenced in
 		// the spec is different, otherwise inherits the existing transport_url
 		// Check both the new NotificationsBus.Cluster field and deprecated NotificationsBusInstance
@@ -1182,7 +1307,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 		}
 
 		if instance.Spec.RabbitMqClusterName != notificationCluster {
-			notificationInstanceURLSecret, _, err = secret.GetSecret(ctx, h, *instance.Status.NotificationsURLSecret, instance.Namespace)
+			notificationInstanceURLSecret, _, err = secret.GetSecret(ctx, h, notificationsURLSecretName, instance.Namespace)
 			if err != nil {
 				return err
 			}
@@ -1241,7 +1366,7 @@ func (r *ManilaReconciler) createHashOfInputHashes(
 	return hash, changed, nil
 }
 
-func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila, transportURLSecretName string) (*manilav1beta1.ManilaAPI, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaAPI{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        fmt.Sprintf("%s-api", instance.Name),
@@ -1255,7 +1380,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 		ManilaAPITemplate:  instance.Spec.ManilaAPI,
 		ExtraMounts:        instance.Spec.ExtraMounts,
 		DatabaseHostname:   instance.Status.DatabaseHostname,
-		TransportURLSecret: instance.Status.TransportURLSecret,
+		TransportURLSecret: transportURLSecretName,
 		ServiceAccount:     instance.RbacResourceName(),
 		MemcachedInstance:  &instance.Spec.MemcachedInstance,
 		APITimeout:         instance.Spec.APITimeout,
@@ -1289,7 +1414,7 @@ func (r *ManilaReconciler) apiDeploymentCreateOrUpdate(ctx context.Context, inst
 	return deployment, op, err
 }
 
-func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila) (*manilav1beta1.ManilaScheduler, controllerutil.OperationResult, error) {
+func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context, instance *manilav1beta1.Manila, transportURLSecretName string) (*manilav1beta1.ManilaScheduler, controllerutil.OperationResult, error) {
 	deployment := &manilav1beta1.ManilaScheduler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-scheduler", instance.Name),
@@ -1302,7 +1427,7 @@ func (r *ManilaReconciler) schedulerDeploymentCreateOrUpdate(ctx context.Context
 		ManilaSchedulerTemplate: instance.Spec.ManilaScheduler,
 		ExtraMounts:             instance.Spec.ExtraMounts,
 		DatabaseHostname:        instance.Status.DatabaseHostname,
-		TransportURLSecret:      instance.Status.TransportURLSecret,
+		TransportURLSecret:      transportURLSecretName,
 		ServiceAccount:          instance.RbacResourceName(),
 		TLS:                     instance.Spec.ManilaAPI.TLS.Ca,
 		MemcachedInstance:       &instance.Spec.MemcachedInstance,
@@ -1342,6 +1467,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 	name string,
 	share manilav1beta1.ManilaShareTemplate,
 	serviceLabels map[string]string,
+	transportURLSecretName string,
 ) (*manilav1beta1.ManilaShare, controllerutil.OperationResult, error) {
 
 	// Add the ShareName to the ManilaShare instance as a label
@@ -1359,7 +1485,7 @@ func (r *ManilaReconciler) shareDeploymentCreateOrUpdate(
 		ManilaShareTemplate: share,
 		ExtraMounts:         instance.Spec.ExtraMounts,
 		DatabaseHostname:    instance.Status.DatabaseHostname,
-		TransportURLSecret:  instance.Status.TransportURLSecret,
+		TransportURLSecret:  transportURLSecretName,
 		ServiceAccount:      instance.RbacResourceName(),
 		TLS:                 instance.Spec.ManilaAPI.TLS.Ca,
 		MemcachedInstance:   &instance.Spec.MemcachedInstance,
@@ -1434,6 +1560,33 @@ func (r *ManilaReconciler) transportURLCreateOrUpdate(
 		return controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
 	})
 	return transportURL, op, err
+}
+
+func (r *ManilaReconciler) transportURLDeleted(
+	ctx context.Context,
+	instance *manilav1beta1.Manila,
+	transportURLName string,
+) error {
+	Log := r.GetLogger(ctx)
+	transportURL := &rabbitmqv1.TransportURL{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      transportURLName,
+			Namespace: instance.Namespace,
+		},
+	}
+
+	err := r.Delete(ctx, transportURL)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			return nil
+		}
+		Log.Info(fmt.Sprintf("Could not delete TransportURL %s err: %s", transportURLName, err))
+		return err
+	}
+
+	Log.Info("Deleted transportURL", ":", transportURLName)
+
+	return nil
 }
 
 func (r *ManilaReconciler) ensureDB(
@@ -1522,72 +1675,6 @@ func (r *ManilaReconciler) ensureDB(
 	instance.Status.DatabaseHostname = db.GetDatabaseHostname()
 	instance.Status.Conditions.MarkTrue(condition.DBReadyCondition, condition.DBReadyMessage)
 	return db, ctrlResult, nil
-}
-
-// checkManilaAPIGeneration -
-func (r *ManilaReconciler) checkManilaAPIGeneration(
-	ctx context.Context,
-	instance *manilav1beta1.Manila,
-) (bool, error) {
-	Log := r.GetLogger(ctx)
-	api := &manilav1beta1.ManilaAPIList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(instance.Namespace),
-	}
-	if err := r.List(context.Background(), api, listOpts...); err != nil {
-		Log.Error(err, "Unable to retrieve ManilaAPI %w")
-		return false, err
-	}
-	for _, item := range api.Items {
-		if item.Generation != item.Status.ObservedGeneration {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// checkManilaSchedulerGeneration -
-func (r *ManilaReconciler) checkManilaSchedulerGeneration(
-	ctx context.Context,
-	instance *manilav1beta1.Manila,
-) (bool, error) {
-	Log := r.GetLogger(ctx)
-	sched := &manilav1beta1.ManilaSchedulerList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(instance.Namespace),
-	}
-	if err := r.List(context.Background(), sched, listOpts...); err != nil {
-		Log.Error(err, "Unable to retrieve ManilaScheduler %w")
-		return false, err
-	}
-	for _, item := range sched.Items {
-		if item.Generation != item.Status.ObservedGeneration {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// checkManilaShareGeneration -
-func (r *ManilaReconciler) checkManilaShareGeneration(
-	ctx context.Context,
-	instance *manilav1beta1.Manila,
-) (bool, error) {
-	Log := r.GetLogger(ctx)
-	share := &manilav1beta1.ManilaShareList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(instance.Namespace),
-	}
-	if err := r.List(context.Background(), share, listOpts...); err != nil {
-		Log.Error(err, "Unable to retrieve ManilaShare %w")
-		return false, err
-	}
-	for _, item := range share.Items {
-		if item.Generation != item.Status.ObservedGeneration {
-			return false, nil
-		}
-	}
-	return true, nil
 }
 
 // shareCleanup - Delete manila share instances that no longer appears in the spec.

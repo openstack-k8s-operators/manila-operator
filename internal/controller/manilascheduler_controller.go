@@ -75,8 +75,9 @@ func (r *ManilaSchedulerReconciler) GetScheme() *runtime.Scheme {
 // ManilaSchedulerReconciler reconciles a ManilaScheduler object
 type ManilaSchedulerReconciler struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	Kclient kubernetes.Interface
+	Scheme    *runtime.Scheme
+	Kclient   kubernetes.Interface
+	APIReader client.Reader
 }
 
 // GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
@@ -606,7 +607,11 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 			return ctrl.Result{}, err
 		}
 
-		if instance.Status.ReadyCount > 0 {
+		ready, err := statefulset.IsReadyForInput(ctx, r.APIReader, types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, inputHash)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check statefulset readiness for %s: %w", instance.Name, err)
+		}
+		if ready {
 			instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
 		} else if *instance.Spec.Replicas > 0 {
 			instance.Status.Conditions.Set(condition.FalseCondition(
@@ -623,6 +628,12 @@ func (r *ManilaSchedulerReconciler) reconcileNormal(ctx context.Context, instanc
 		}
 	}
 	// create StatefulSet - end
+
+	inputSecretHash, err := util.ObjectHash([]string{instance.Spec.TransportURLSecret, instance.Spec.NotificationsURLSecret})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to compute input secret hash for %s: %w", instance.Name, err)
+	}
+	instance.Status.AppliedInputSecretHash = inputSecretHash
 
 	Log.Info(fmt.Sprintf("Reconciled Service '%s' successfully", instance.Name))
 	if instance.IsReady() {
