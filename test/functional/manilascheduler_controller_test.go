@@ -140,7 +140,7 @@ var _ = Describe("ManilaScheduler controller", func() {
 				Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 				container := ss.Spec.Template.Spec.Containers[1]
-				Expect(container.VolumeMounts).To(HaveLen(5))
+				Expect(container.VolumeMounts).To(HaveLen(3))
 				Expect(container.Image).To(Equal(manilaTest.ContainerImage))
 			})
 			It("stored the input hash in the Status", func() {

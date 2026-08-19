@@ -153,7 +153,7 @@ var _ = Describe("ManilaShare controller", func() {
 					Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 					container := ss.Spec.Template.Spec.Containers[1]
-					Expect(container.VolumeMounts).To(HaveLen(5))
+					Expect(container.VolumeMounts).To(HaveLen(3))
 					Expect(container.Image).To(Equal(manilaTest.ContainerImage))
 
 					// the input hash is stored in the current manilaShare.Status

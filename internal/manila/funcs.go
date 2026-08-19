@@ -23,26 +23,6 @@ func GetOwningManilaName(instance client.Object) string {
 	return ""
 }
 
-// manilaDefaultSecurityContext - Returns the right set of SecurityContext that
-// does not violate the k8s requirements
-func manilaDefaultSecurityContext() *corev1.SecurityContext {
-	falseVal := false
-	trueVal := true
-	runAsUser := ManilaUserID
-	runAsGroup := ManilaGroupID
-	return &corev1.SecurityContext{
-		RunAsUser:                &runAsUser,
-		RunAsGroup:               &runAsGroup,
-		RunAsNonRoot:             &trueVal,
-		AllowPrivilegeEscalation: &falseVal,
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{
-				"ALL",
-			},
-		},
-	}
-}
-
 // GetPodAffinity - Returns a corev1.Affinity reference for the specified component.
 func GetPodAffinity(componentName string) *corev1.Affinity {
 	// If possible two pods of the same component (e.g manila-share) should not
