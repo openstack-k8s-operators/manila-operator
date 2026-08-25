@@ -135,6 +135,9 @@ type ManilaAPIStatus struct {
 	// the opentack-operator in the top-level CR (e.g. the ContainerImage)
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// AppliedInputSecretHash - hash of input secret names last applied
+	AppliedInputSecretHash string `json:"appliedInputSecretHash,omitempty"`
+
 	// LastAppliedTopology - the last applied Topology
 	LastAppliedTopology *topologyv1.TopoRef `json:"lastAppliedTopology,omitempty"`
 }

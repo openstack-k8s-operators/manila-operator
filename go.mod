@@ -6,12 +6,12 @@ require (
 	github.com/go-logr/logr v1.4.4
 	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.42.1
-	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20260811190835-054aa14112d8
+	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20260815111556-ad0006892c31
 	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260813151745-0d7ef88e4045
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20260813160234-fdcb3ee3699d
-	github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20260813160234-fdcb3ee3699d
-	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260813160234-fdcb3ee3699d
-	github.com/openstack-k8s-operators/lib-common/modules/users v0.0.0-20260813160234-fdcb3ee3699d
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20260824142420-113dc64ecfd4
+	github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20260824142420-113dc64ecfd4
+	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260824142420-113dc64ecfd4
+	github.com/openstack-k8s-operators/lib-common/modules/users v0.0.0-20260824142420-113dc64ecfd4
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
 	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260813083726-eee3e1c5aa5c
 	gopkg.in/ini.v1 v1.67.3
@@ -57,7 +57,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/openshift/api v3.9.0+incompatible // indirect
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.6.1-0.20260813160234-fdcb3ee3699d // indirect
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.6.1-0.20260824142420-113dc64ecfd4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect

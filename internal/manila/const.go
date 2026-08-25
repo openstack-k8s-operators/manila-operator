@@ -77,6 +77,10 @@ const (
 	CustomServiceConfigSecretsFileName = "04-config.conf" // #nosec G101
 	// ACConsumerFinalizer is added to AC secrets that Manila is actively consuming
 	ACConsumerFinalizer = "openstack.org/manila-ac-consumer"
+	// TransportConsumerFinalizer is added to transport URL secrets that Manila
+	// is actively consuming, ensuring infra-operator does not remove the
+	// old RabbitMQ user while pods are still using it.
+	TransportConsumerFinalizer = "openstack.org/manila-transport-consumer"
 	// ShortDuration -
 	ShortDuration = time.Duration(5) * time.Second
 	// NormalDuration -
