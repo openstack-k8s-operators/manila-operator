@@ -32,6 +32,13 @@
       cifmw_test_operator_tempest_concurrency: 4
       cifmw_test_operator_tempest_include_list: |
         ^manila_tempest_tests.tests.api
+      cifmw_test_operator_tempest_tempestconf_config:
+        overrides: |
+          share.capability_storage_protocol CEPHFS
+          share.catalog_type 'sharev2'
+          share.default_share_type_name 'default'
+          share.run_share_group_tests False
+          share.suppress_errors_in_cleanup True
 
 - job:
     name: manila-s2i-content-provider
