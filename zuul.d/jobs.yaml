@@ -30,5 +30,7 @@
     irrelevant-files: *ir_files
     vars:
       cifmw_test_operator_tempest_concurrency: 4
+      cifmw_test_operator_tempest_tempestconf_config:
+        overrides: "share.catalog_type sharev2"
       cifmw_test_operator_tempest_include_list: |
         ^manila_tempest_tests.tests.api
