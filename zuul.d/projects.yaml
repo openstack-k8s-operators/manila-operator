@@ -9,6 +9,11 @@
         - manila-operator-kuttl:
             dependencies:
               - openstack-k8s-operators-content-provider
-        - manila-operator-tempest:
+        - manila-operator-antelope-tempest:
             dependencies:
               - openstack-k8s-operators-content-provider
+        - manila-s2i-content-provider
+        - manila-s2i-test-cephfs:
+            dependencies:
+              - openstack-k8s-operators-content-provider
+              - manila-s2i-content-provider
