@@ -64,8 +64,9 @@ import (
 // ManilaAPIReconciler reconciles a ManilaAPI object
 type ManilaAPIReconciler struct {
 	client.Client
-	Scheme  *runtime.Scheme
-	Kclient kubernetes.Interface
+	Scheme    *runtime.Scheme
+	Kclient   kubernetes.Interface
+	APIReader client.Reader
 }
 
 var keystoneServices = []map[string]string{
@@ -976,8 +977,19 @@ func (r *ManilaAPIReconciler) reconcileNormal(ctx context.Context, instance *man
 			return ctrl.Result{}, err
 		}
 
-		if instance.Status.ReadyCount > 0 {
+		ready, err := statefulset.IsReadyForInput(ctx, r.APIReader, types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, inputHash)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check statefulset readiness for %s: %w", instance.Name, err)
+		}
+		if ready {
 			instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
+
+			// Only update AppliedInputSecretHash after rollout is confirmed
+			inputSecretHash, err := util.ObjectHash([]string{instance.Spec.TransportURLSecret, instance.Spec.NotificationsURLSecret})
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to compute input secret hash for %s: %w", instance.Name, err)
+			}
+			instance.Status.AppliedInputSecretHash = inputSecretHash
 		} else if *instance.Spec.Replicas > 0 {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.DeploymentReadyCondition,
