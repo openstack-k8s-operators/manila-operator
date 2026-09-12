@@ -29,6 +29,11 @@ const (
 	ServiceNameV2 = "manilav2"
 	// ServiceTypeV2 - API V2 service type, supported
 	ServiceTypeV2 = "sharev2"
+	// ServiceNameSFS - API service name for the official shared-file-system service type
+	ServiceNameSFS = "shared-file-system"
+	// ServiceTypeSFS - Official service type per OpenStack Service Types Authority
+	// https://service-types.openstack.org/
+	ServiceTypeSFS = "shared-file-system"
 
 	// DatabaseName - Name of the database used in CREATE DATABASE statement
 	DatabaseName = "manila"

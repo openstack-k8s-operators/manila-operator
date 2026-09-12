@@ -499,14 +499,14 @@ var _ = Describe("Manila controller", func() {
 			)
 			keystone.SimulateKeystoneEndpointReady(manilaTest.ManilaKeystoneEndpoint)
 			// Retrieve the generated resources
-			manila := GetManila(manilaTest.Instance)
+			manilaCR := GetManila(manilaTest.Instance)
 			api := GetManilaAPI(manilaTest.ManilaAPI)
 			sched := GetManilaScheduler(manilaTest.ManilaScheduler)
 			share := GetManilaShare(manilaTest.ManilaShares[0])
 			// Check ManilaAPI NADs
-			Expect(api.Spec.NetworkAttachments).To(Equal(manila.Spec.ManilaAPI.NetworkAttachments))
+			Expect(api.Spec.NetworkAttachments).To(Equal(manilaCR.Spec.ManilaAPI.NetworkAttachments))
 			// Check ManilaScheduler NADs
-			Expect(sched.Spec.NetworkAttachments).To(Equal(manila.Spec.ManilaScheduler.NetworkAttachments))
+			Expect(sched.Spec.NetworkAttachments).To(Equal(manilaCR.Spec.ManilaScheduler.NetworkAttachments))
 			// Check ManilaShare exists
 			ManilaShareExists(manilaTest.ManilaShares[0])
 			// Check ManilaShare NADs
@@ -515,12 +515,12 @@ var _ = Describe("Manila controller", func() {
 			// As the internal endpoint has service override configured it
 			// gets a LoadBalancer Service with MetalLB annotations
 			service := th.GetService(types.NamespacedName{
-				Namespace: manila.Namespace,
-				Name:      manila.Name + "-internal",
+				Namespace: manilaCR.Namespace,
+				Name:      manilaCR.Name + "-internal",
 			})
 			Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeLoadBalancer))
 			Expect(service.Annotations).To(
-				HaveKeyWithValue("dnsmasq.network.openstack.org/hostname", "manila-internal."+manila.Namespace+".svc"))
+				HaveKeyWithValue("dnsmasq.network.openstack.org/hostname", "manila-internal."+manilaCR.Namespace+".svc"))
 			Expect(service.Annotations).To(
 				HaveKeyWithValue("metallb.universe.tf/address-pool", "osp-internalapi"))
 			Expect(service.Annotations).To(
@@ -529,15 +529,24 @@ var _ = Describe("Manila controller", func() {
 				HaveKeyWithValue("metallb.universe.tf/loadBalancerIPs", "internal-lb-ip-1,internal-lb-ip-2"))
 
 			// check keystone endpoints for v1 and v2
-			keystoneEndpoint := keystone.GetKeystoneEndpoint(types.NamespacedName{Namespace: manila.Namespace, Name: "manila"})
+			keystoneEndpoint := keystone.GetKeystoneEndpoint(types.NamespacedName{Namespace: manilaCR.Namespace, Name: "manila"})
 			endpoints := keystoneEndpoint.Spec.Endpoints
-			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manila.Namespace+".svc:8786/v1/%(project_id)s"))
-			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manila.Namespace+".svc:8786/v1/%(project_id)s"))
+			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manilaCR.Namespace+".svc:8786/v1/%(project_id)s"))
+			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaCR.Namespace+".svc:8786/v1/%(project_id)s"))
 
-			keystoneEndpoint = keystone.GetKeystoneEndpoint(types.NamespacedName{Namespace: manila.Namespace, Name: "manilav2"})
+			keystoneEndpoint = keystone.GetKeystoneEndpoint(types.NamespacedName{Namespace: manilaCR.Namespace, Name: "manilav2"})
 			endpoints = keystoneEndpoint.Spec.Endpoints
-			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manila.Namespace+".svc:8786/v2"))
-			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manila.Namespace+".svc:8786/v2"))
+			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manilaCR.Namespace+".svc:8786/v2"))
+			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaCR.Namespace+".svc:8786/v2"))
+
+			keystoneService := keystone.GetKeystoneService(manilaTest.ManilaSFSService)
+			Expect(keystoneService.Spec.ServiceType).To(Equal(manila.ServiceTypeSFS))
+			Expect(keystoneService.Spec.ServiceName).To(Equal(manila.ServiceNameSFS))
+
+			keystoneEndpoint = keystone.GetKeystoneEndpoint(manilaTest.ManilaSFSEndpoint)
+			endpoints = keystoneEndpoint.Spec.Endpoints
+			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manilaCR.Namespace+".svc:8786/v2"))
+			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaCR.Namespace+".svc:8786/v2"))
 		})
 	})
 	When("Manila CR instance is created with sharev1: false annotation", func() {
@@ -576,6 +585,15 @@ var _ = Describe("Manila controller", func() {
 			// sharev1 service is not created, therefore there's no "manila" endpoint key (only manilav2)
 			Expect(endpoints).ToNot(HaveKey(manila.ServiceName))
 			// sharev2 service exists and has endpoints associated
+			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manilaCR.Namespace+".svc:8786/v2"))
+			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaCR.Namespace+".svc:8786/v2"))
+
+			keystoneService := keystone.GetKeystoneService(manilaTest.ManilaSFSService)
+			Expect(keystoneService.Spec.ServiceType).To(Equal(manila.ServiceTypeSFS))
+			Expect(keystoneService.Spec.ServiceName).To(Equal(manila.ServiceNameSFS))
+
+			keystoneEndpoint = keystone.GetKeystoneEndpoint(manilaTest.ManilaSFSEndpoint)
+			endpoints = keystoneEndpoint.Spec.Endpoints
 			Expect(endpoints).To(HaveKeyWithValue("public", "http://manila-public."+manilaCR.Namespace+".svc:8786/v2"))
 			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaCR.Namespace+".svc:8786/v2"))
 		})
@@ -757,6 +775,15 @@ var _ = Describe("Manila controller", func() {
 			// check keystone endpoints
 			keystoneEndpoint := keystone.GetKeystoneEndpoint(manilaTest.ManilaKeystoneEndpoint)
 			endpoints := keystoneEndpoint.Spec.Endpoints
+			Expect(endpoints).To(HaveKeyWithValue("public", "https://manila-public."+namespace+".svc:8786/v2"))
+			Expect(endpoints).To(HaveKeyWithValue("internal", "https://manila-internal."+namespace+".svc:8786/v2"))
+
+			keystoneService := keystone.GetKeystoneService(manilaTest.ManilaSFSService)
+			Expect(keystoneService.Spec.ServiceType).To(Equal(manila.ServiceTypeSFS))
+			Expect(keystoneService.Spec.ServiceName).To(Equal(manila.ServiceNameSFS))
+
+			keystoneEndpoint = keystone.GetKeystoneEndpoint(manilaTest.ManilaSFSEndpoint)
+			endpoints = keystoneEndpoint.Spec.Endpoints
 			Expect(endpoints).To(HaveKeyWithValue("public", "https://manila-public."+namespace+".svc:8786/v2"))
 			Expect(endpoints).To(HaveKeyWithValue("internal", "https://manila-internal."+namespace+".svc:8786/v2"))
 		})
