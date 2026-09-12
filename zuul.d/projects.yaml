@@ -9,6 +9,8 @@
         - manila-operator-kuttl:
             dependencies:
               - openstack-k8s-operators-content-provider
+              - manila-s2i-content-provider
+        - manila-s2i-content-provider
         - manila-operator-tempest:
             dependencies:
               - openstack-k8s-operators-content-provider
