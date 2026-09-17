@@ -25,10 +25,80 @@
         - manila
 
 - job:
-    name: manila-operator-tempest
+    name: manila-operator-antelope-tempest
     parent: podified-multinode-hci-deployment-crc-1comp-backends
     irrelevant-files: *ir_files
     vars:
       cifmw_test_operator_tempest_concurrency: 4
       cifmw_test_operator_tempest_include_list: |
         ^manila_tempest_tests.tests.api
+      cifmw_test_operator_tempest_tempestconf_config:
+        overrides: |
+          share.capability_storage_protocol CEPHFS
+          share.catalog_type 'sharev2'
+          share.default_share_type_name 'default'
+          share.run_share_group_tests False
+          share.suppress_errors_in_cleanup True
+
+- job:
+    name: manila-s2i-content-provider
+    parent: s2i-openstack-container-content-provider
+    description: |
+      Build s2i manila service images for manila-s2i tempest jobs.
+    required-projects:
+      - name: openstack-k8s-operators/s2i-openstack-containers
+        override-checkout: main
+    vars:
+      s2i_ci_images:
+        - manila/manila-api
+        - manila/manila-scheduler
+        - manila/manila-share
+
+- job:
+    name: manila-s2i-test-cephfs
+    parent: s2i-test-base-ceph
+    description: |
+      Validate speculatively-built s2i manila images against a live
+      HCI OpenStack deployment with Ceph.
+    irrelevant-files: *ir_files
+    vars:
+      s2i_manila_share_backends: ['share1']
+      cifmw_block_device_size: 15G
+      cifmw_test_operator_tempest_concurrency: 3
+      cifmw_test_operator_tempest_include_list: |
+        ^manila_tempest_tests.tests.api..*
+        ^manila_tempest_tests.tests.rbac..*
+      # Reenable when a newer tempest (current main, definitely > 2023.1-last) is available
+      cifmw_test_operator_tempest_expected_failures_list: |
+        manila_tempest_tests.tests.api.admin.test_share_networks.ShareNetworkAdminTest.test_list_share_networks_all_filter_opts
+        manila_tempest_tests.tests.api.test_microversions.MicroversionsTest.test_microversions_root_version
+        manila_tempest_tests.tests.api.test_microversions.MicroversionsTest.test_microversions_v1_no_version
+        manila_tempest_tests.tests.api.test_microversions.MicroversionsTest.test_microversions_v1_with_version
+        manila_tempest_tests.tests.api.admin.test_export_locations.ExportLocationsTest.test_get_share_export_location
+        manila_tempest_tests.tests.api.admin.test_export_locations.ExportLocationsTest.test_get_share_export_location_by_member
+        manila_tempest_tests.tests.api.admin.test_export_locations.ExportLocationsTest.test_get_share_instance_export_location
+        manila_tempest_tests.tests.api.admin.test_export_locations.ExportLocationsTest.test_list_share_export_locations_by_member
+        manila_tempest_tests.tests.api.admin.test_share_types_extra_specs_negative.ExtraSpecsAdminNegativeTest.test_try_read_extra_specs_on_share_type_with_user
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectMemberTestsCEPHFS.test_delete_access_rule_metadata
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectMemberTestsCEPHFS.test_get_access
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectReaderTestsCEPHFS.test_delete_access
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectMemberTestsCEPHFS.test_list_access
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectReaderTestsCEPHFS.test_delete_access_rule_metadata
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectMemberTestsCEPHFS.test_update_access_rule_metadata
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectReaderTestsCEPHFS.test_get_access
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectReaderTestsCEPHFS.test_list_access
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectReaderTestsCEPHFS.test_update_access_rule_metadata
+        manila_tempest_tests.tests.api.test_share_networks.ShareNetworksTest.test_get_share_network
+        manila_tempest_tests.tests.api.test_share_networks.ShareNetworksTest.test_list_share_networks_all_filter_opts
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectAdminTestsCEPHFS.test_delete_access_rule_metadata
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectAdminTestsCEPHFS.test_get_access
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectAdminTestsCEPHFS.test_grant_access_rule
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectAdminTestsCEPHFS.test_list_access
+        manila_tempest_tests.tests.rbac.test_rules.TestProjectAdminTestsCEPHFS.test_update_access_rule_metadata
+      cifmw_test_operator_tempest_tempestconf_config:
+        overrides: |
+          share.capability_storage_protocol CEPHFS
+          share.catalog_type 'sharev2'
+          share.default_share_type_name 'default'
+          share.run_share_group_tests False
+          share.suppress_errors_in_cleanup True
