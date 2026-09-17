@@ -24,3 +24,65 @@ timeout: 300
 parallel: 1
 suppress:
    - events
+commands:
+   # The tests apply the config/samples/layout CRs unmodified, so the service
+   # images come from the operator RELATED_IMAGE_* defaults (which the asserts
+   # compare the CRs against). When CI provides speculatively built images,
+   # rewrite those defaults on the CSV and let OLM re-render the controller
+   # deployment before the test steps create Manila CRs.
+   - timeout: 300
+     script: |
+        set -eu -o pipefail
+
+        if [ -z "${S2I_MANILA_API_IMAGE:-}" ] && \
+           [ -z "${S2I_MANILA_SCHEDULER_IMAGE:-}" ] && \
+           [ -z "${S2I_MANILA_SHARE_IMAGE:-}" ]; then
+            echo "No CI provided manila images, keeping the operator defaults"
+            exit 0
+        fi
+
+        if [ -z "${S2I_MANILA_API_IMAGE:-}" ] || \
+           [ -z "${S2I_MANILA_SCHEDULER_IMAGE:-}" ] || \
+           [ -z "${S2I_MANILA_SHARE_IMAGE:-}" ]; then
+            echo "ERROR: all CI provided Manila images must be set"
+            exit 1
+        fi
+
+        OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-openstack-operators}
+
+        # manila_kuttl runs "make wait" before kuttl, so the operator deployment
+        # is already available and the CSV exists. The label is attached by OLM
+        # separately from the CSV itself, so fall back to matching by name.
+        CSV=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' \
+              -l "operators.coreos.com/manila-operator.${OPERATOR_NAMESPACE}" || true)
+        if [ -z "${CSV}" ]; then
+            CSV=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name \
+                  | sed 's|.*/||' | grep '^manila-operator' | head -1)
+        fi
+        echo "Rewriting manila image defaults on CSV ${CSV}"
+
+        # Emit only the deployments array: echoing the whole CSV back would
+        # carry metadata.resourceVersion into the merge patch and turn it into
+        # an optimistic concurrency check, which races OLM still writing the
+        # install status conditions.
+        oc get csv -n "${OPERATOR_NAMESPACE}" "${CSV}" -o json \
+           | jq --arg api "${S2I_MANILA_API_IMAGE}" \
+                --arg scheduler "${S2I_MANILA_SCHEDULER_IMAGE}" \
+                --arg share "${S2I_MANILA_SHARE_IMAGE}" \
+                '
+                def set_related_image($name; $value):
+                  (.spec.template.spec.containers[]?.env[]?
+                   | select(.name == $name).value) = $value;
+
+                {spec: {install: {spec: {deployments:
+                  [ .spec.install.spec.deployments[]
+                    | set_related_image("RELATED_IMAGE_MANILA_API_IMAGE_URL_DEFAULT"; $api)
+                    | set_related_image("RELATED_IMAGE_MANILA_SCHEDULER_IMAGE_URL_DEFAULT"; $scheduler)
+                    | set_related_image("RELATED_IMAGE_MANILA_SHARE_IMAGE_URL_DEFAULT"; $share)
+                  ]
+                }}}}
+                ' \
+           | oc patch csv -n "${OPERATOR_NAMESPACE}" "${CSV}" --type=merge --patch-file=/dev/stdin
+
+        oc rollout status deployment manila-operator-controller-manager \
+           -n "${OPERATOR_NAMESPACE}" --timeout=120s

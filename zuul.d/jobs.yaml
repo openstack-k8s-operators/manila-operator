@@ -16,13 +16,37 @@
       - tests?\/functional
       - ^renovate.json$
     vars:
+      cifmw_crc_additional_insecure_registries:
+        - "{{ s2i_content_provider_registry_ip }}:5001"
+      cifmw_crc_additional_allowed_registries:
+        - "{{ s2i_content_provider_registry_ip }}:5001"
       cifmw_kuttl_tests_env_vars:
         CEPH_HOSTNETWORK: true
         CEPH_TIMEOUT: 90
         CEPH_DATASIZE: "2Gi"
         PV_NUM: 20
+        S2I_MANILA_API_IMAGE: >-
+          {{ s2i_content_provider_registry_ip }}:5001/{{ s2i_ci_content.namespace }}/openstack-manila-api:{{ s2i_ci_content.tag }}
+        S2I_MANILA_SCHEDULER_IMAGE: >-
+          {{ s2i_content_provider_registry_ip }}:5001/{{ s2i_ci_content.namespace }}/openstack-manila-scheduler:{{ s2i_ci_content.tag }}
+        S2I_MANILA_SHARE_IMAGE: >-
+          {{ s2i_content_provider_registry_ip }}:5001/{{ s2i_ci_content.namespace }}/openstack-manila-share:{{ s2i_ci_content.tag }}
       cifmw_kuttl_tests_operator_list:
         - manila
+
+- job:
+    name: manila-s2i-content-provider
+    parent: s2i-openstack-container-content-provider
+    description: |
+      Build s2i manila service images for manila jobs.
+    required-projects:
+      - name: openstack-k8s-operators/s2i-openstack-containers
+        override-checkout: main
+    vars:
+      s2i_ci_images:
+        - manila/manila-api
+        - manila/manila-scheduler
+        - manila/manila-share
 
 - job:
     name: manila-operator-tempest
