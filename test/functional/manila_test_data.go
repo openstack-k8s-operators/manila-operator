@@ -60,6 +60,8 @@ type ManilaTestData struct {
 	ManilaSA                       types.NamespacedName
 	ManilaDBSync                   types.NamespacedName
 	ManilaKeystoneEndpoint         types.NamespacedName
+	ManilaSFSService               types.NamespacedName
+	ManilaSFSEndpoint              types.NamespacedName
 	ManilaServicePublic            types.NamespacedName
 	ManilaServiceInternal          types.NamespacedName
 	ManilaConfigSecret             types.NamespacedName
@@ -180,6 +182,14 @@ func GetManilaTestData(manilaName types.NamespacedName) ManilaTestData {
 		ManilaKeystoneEndpoint: types.NamespacedName{
 			Namespace: manilaName.Namespace,
 			Name:      fmt.Sprintf("%sv2", manilaName.Name),
+		},
+		ManilaSFSService: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      manila.ServiceNameSFS,
+		},
+		ManilaSFSEndpoint: types.NamespacedName{
+			Namespace: manilaName.Namespace,
+			Name:      manila.ServiceNameSFS,
 		},
 		InternalAPINAD: types.NamespacedName{
 			Namespace: manilaName.Namespace,
