@@ -12,8 +12,8 @@ spec:
       - name: manager
         env:
         - name: RELATED_IMAGE_MANILA_API_IMAGE_URL_DEFAULT
-          value: quay.io/openstack-k8s-operators/openstack-manila-api:master-latest
+          value: quay.io/openstack-s2i-containers/openstack-manila-api:master-latest
         - name: RELATED_IMAGE_MANILA_SCHEDULER_IMAGE_URL_DEFAULT
-          value: quay.io/openstack-k8s-operators/openstack-manila-scheduler:master-latest
+          value: quay.io/openstack-s2i-containers/openstack-manila-scheduler:master-latest
         - name: RELATED_IMAGE_MANILA_SHARE_IMAGE_URL_DEFAULT
-          value: quay.io/openstack-k8s-operators/openstack-manila-share:master-latest
+          value: quay.io/openstack-s2i-containers/openstack-manila-share:master-latest
