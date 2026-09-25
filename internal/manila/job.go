@@ -2,7 +2,9 @@ package manila
 
 import (
 	"fmt"
+	"maps"
 
+	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
 	"github.com/openstack-k8s-operators/lib-common/modules/users"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
@@ -21,6 +23,7 @@ func Job(
 	jobName string,
 	jobCommand string,
 	delay int32,
+	component string,
 ) *batchv1.Job {
 	// Unlike the individual manila services, DbSyncJob or a Job executing a
 	// manila-manage command doesn't need a secret that contains all of the
@@ -60,6 +63,9 @@ func Job(
 	delayCommand := fmt.Sprintf("sleep %d", delay)
 	args := []string{"-c", fmt.Sprintf("%s && %s", delayCommand, jobCommand)}
 
+	podLabels := maps.Clone(labels)
+	podLabels[common.ComponentSelector] = component
+
 	// add CA cert if defined
 	if instance.Spec.ManilaAPI.TLS.CaBundleSecretName != "" {
 		manilaJobVolume = append(manilaJobVolume, instance.Spec.ManilaAPI.TLS.CreateVolume())
@@ -70,12 +76,13 @@ func Job(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", instance.Name, jobName),
 			Namespace: instance.Namespace,
-			Labels:    labels,
+			Labels:    podLabels,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: annotations,
+					Labels:      podLabels,
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:                corev1.RestartPolicyOnFailure,

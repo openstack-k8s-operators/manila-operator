@@ -98,6 +98,12 @@ const (
 	SvcCleanupJobName = "service-cleanup"
 	// SvcCleanupCommand -
 	SvcCleanupCommand = "/usr/bin/manila-manage --config-dir /etc/manila/manila.conf.d service cleanup"
+	// ComponentDBSync - component label for the db-sync job pods
+	ComponentDBSync = "manila-db-sync"
+	// ComponentSvcCleanup - component label for the service-cleanup job pods
+	ComponentSvcCleanup = "manila-service-cleanup"
+	// ComponentDBPurge - component label for the db-purge cronjob pods
+	ComponentDBPurge = "manila-db-purge"
 	// TruncateHash -
 	TruncateHash int = 8
 	// TTL -
