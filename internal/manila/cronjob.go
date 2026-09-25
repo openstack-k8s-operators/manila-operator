@@ -17,7 +17,9 @@ package manila
 
 import (
 	"fmt"
+	"maps"
 
+	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
 	"github.com/openstack-k8s-operators/lib-common/modules/users"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
@@ -49,6 +51,9 @@ func CronJob(
 
 	parallelism := int32(1)
 	completions := int32(1)
+
+	podLabels := maps.Clone(labels)
+	podLabels[common.ComponentSelector] = ComponentDBPurge
 
 	cronJobVolume := []corev1.Volume{
 		{
@@ -86,7 +91,7 @@ func CronJob(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-db-purge", ServiceName),
 			Namespace: instance.Namespace,
-			Labels:    labels,
+			Labels:    podLabels,
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule:          instance.Spec.DBPurge.Schedule,
@@ -94,7 +99,7 @@ func CronJob(
 			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: annotations,
-					Labels:      labels,
+					Labels:      podLabels,
 				},
 				Spec: batchv1.JobSpec{
 					Parallelism: &parallelism,
@@ -102,7 +107,7 @@ func CronJob(
 					Template: corev1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Annotations: annotations,
-							Labels:      labels,
+							Labels:      podLabels,
 						},
 						Spec: corev1.PodSpec{
 							SecurityContext:              pod.RestrictivePodSecurityContext(users.ManilaUID, users.ManilaGID),
