@@ -106,14 +106,12 @@
 
 - job:
     name: manila-s2i-test-dummy-dhss
-    parent: s2i-test-base
+    # parent: s2i-test-base
+    parent: s2i-test-base-ceph
     description: |
-      Validate speculatively-built s2i manila images against an
-      OpenStack deployment using dummy drivers with DHSS=True.
+      Validate s2i manila images against an OpenStack deployment
+      using dummy drivers with DHSS=True.
     irrelevant-files: *ir_files
-    dependencies:
-      - openstack-k8s-operators-content-provider
-      - manila-s2i-content-provider
     vars:
       s2i_manila_share_backends: ['share1', 'share2']
       cifmw_block_device_size: 15G
