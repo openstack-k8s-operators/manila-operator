@@ -1,4 +1,5 @@
 ---
+## test
 # project template to be used locally for operator testing
 - project-template:
     name: manila-operator-s2i-testing
