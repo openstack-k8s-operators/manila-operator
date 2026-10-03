@@ -9,6 +9,10 @@
             dependencies:
               - openstack-k8s-operators-content-provider
               - manila-s2i-content-provider
+        # - manila-s2i-test-dummy-dhss:
+        #     dependencies:
+        #       - openstack-k8s-operators-content-provider
+        #       - manila-s2i-content-provider
 
 # project template to be used in the s2i repository
 - project-template:
