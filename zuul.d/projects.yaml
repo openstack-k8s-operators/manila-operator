@@ -37,6 +37,3 @@
         - manila-operator-kuttl:
             dependencies:
               - openstack-k8s-operators-content-provider
-        - manila-operator-antelope-tempest:
-            dependencies:
-              - openstack-k8s-operators-content-provider
