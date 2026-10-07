@@ -37,3 +37,8 @@
         - manila-operator-kuttl:
             dependencies:
               - openstack-k8s-operators-content-provider
+        - manila-s2i-content-provider
+        - manila-s2i-test-nfsganesha:
+            dependencies:
+              - openstack-k8s-operators-content-provider
+              - manila-s2i-content-provider
