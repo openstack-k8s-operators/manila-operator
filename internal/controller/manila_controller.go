@@ -1255,6 +1255,7 @@ func (r *ManilaReconciler) generateServiceConfig(
 			manila.DatabaseCRName),
 		"MemcachedServersWithInet": memcached.GetMemcachedServerListWithInetString(),
 		"MemcachedServers":         memcached.GetMemcachedServerListString(),
+		"MemcachedTLS":             memcached.GetMemcachedTLSSupport(),
 		"TimeOut":                  instance.Spec.APITimeout,
 		"Region":                   keystoneAPI.GetRegion(),
 	}
