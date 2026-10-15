@@ -91,3 +91,88 @@
           share.enable_protocols 'nfs'
           share.nfs_versions '3,4.1,4.2'
           share.run_share_group_tests False
+
+- job:
+    name: manila-s2i-test-dummy-dhss
+    parent: s2i-test-base
+    description: |
+      Validate s2i manila images against an OpenStack deployment using the
+      dummy driver with DHSS=True.
+    irrelevant-files: *ir_files
+    vars:
+      s2i_manila_share_backends: ['share1', 'share2']
+      cifmw_test_operator_tempest_concurrency: 3
+      cifmw_test_operator_tempest_include_list: |
+        ^manila_tempest_tests.tests.api..*
+      cifmw_test_operator_tempest_tempestconf_config:
+        overrides: |
+          share.backend_names ALPHA,BETA
+          share.capability_storage_protocol NFS_CIFS
+          share.catalog_type 'sharev2'
+          share.default_share_type_name 'default'
+          share.enable_protocols nfs
+          share.multi_backend True
+          share.multitenancy_enabled True
+          share.run_ipv6_tests False
+          share.run_share_group_tests False
+      # Gateway mismatch: StandaloneNetworkPlugin uses configured gateway,
+      # not Neutron's. This is not an S2I issue.
+      cifmw_test_operator_tempest_exclude_list: |
+        manila_tempest_tests.tests.api.test_share_networks.ShareNetworksTest.test_gateway_mtu_neutron_net_id_with_neutron
+      # yamllint disable rule:line-length
+      cifmw_edpm_prepare_kustomizations:
+        - apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          namespace: openstack
+          patches:
+            - target:
+                kind: OpenStackControlPlane
+              patch: |-
+                - op: replace
+                  path: /spec/manila/enabled
+                  value: true
+                - op: add
+                  path: /spec/manila/template/customServiceConfig
+                  value: |
+                    [DEFAULT]
+                    enabled_share_backends = alpha
+                    enabled_share_protocols = NFS
+                    debug = True
+                    [alpha]
+                    driver_handles_share_servers = True
+                    share_backend_name = ALPHA
+                    share_driver = manila.tests.share.drivers.dummy.DummyDriver
+                    network_config_group = membernet
+                    admin_network_config_group = membernet
+                    [membernet]
+                    network_api_class = manila.network.standalone_network_plugin.StandaloneNetworkPlugin
+                    network_plugin_ipv4_enabled = True
+                    standalone_network_plugin_allowed_ip_ranges = 10.0.0.10-10.0.0.209
+                    standalone_network_plugin_gateway = 10.0.0.1
+                    standalone_network_plugin_mask = 24
+                    standalone_network_plugin_network_type = vlan
+                    standalone_network_plugin_segmentation_id = 1010
+                - op: add
+                  path: /spec/manila/template/manilaShares/share2
+                  value:
+                    replicas: 1
+                    networkAttachments:
+                      - storage
+                    customServiceConfig: |
+                      [DEFAULT]
+                      enabled_share_backends = beta
+                      enabled_share_protocols = NFS
+                      [beta]
+                      driver_handles_share_servers = True
+                      share_backend_name = BETA
+                      share_driver = manila.tests.share.drivers.dummy.DummyDriver
+                      network_config_group = membernet
+                      admin_network_config_group = membernet
+                      [membernet]
+                      network_api_class = manila.network.standalone_network_plugin.StandaloneNetworkPlugin
+                      network_plugin_ipv4_enabled = True
+                      standalone_network_plugin_allowed_ip_ranges = 10.0.1.10-10.0.1.209
+                      standalone_network_plugin_gateway = 10.0.1.1
+                      standalone_network_plugin_mask = 24
+                      standalone_network_plugin_network_type = vlan
+                      standalone_network_plugin_segmentation_id = 1020
