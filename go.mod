@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	github.com/go-logr/logr v1.4.4
-	github.com/onsi/ginkgo/v2 v2.33.0
+	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/onsi/gomega v1.44.0
 	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20261008072659-d6ede618a4d5
 	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20261005220300-5f2434f1d2cb
