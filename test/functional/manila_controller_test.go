@@ -275,9 +275,58 @@ var _ = Describe("Manila controller", func() {
 			myCnf := string(secretDataMap.Data["my.cnf"])
 			Expect(myCnf).To(
 				ContainSubstring("[client]\nssl=0"))
+
+			// With a non-TLS memcached, keystone_authtoken must use the
+			// inet-prefixed server list and must NOT enable memcache TLS.
+			conf := string(secretDataMap.Data["00-config.conf"])
+			memcachedInstance := infra.GetMemcached(manilaTest.ManilaMemcached)
+			Expect(conf).Should(ContainSubstring(
+				"memcached_servers = %s", memcachedInstance.GetMemcachedServerListWithInetString()))
+			Expect(conf).ShouldNot(ContainSubstring("memcache_tls_enabled = true"))
+			Expect(conf).ShouldNot(ContainSubstring("memcache_tls_certfile"))
+			Expect(conf).ShouldNot(ContainSubstring("memcache_tls_keyfile"))
+			Expect(conf).ShouldNot(ContainSubstring("memcache_tls_cafile"))
+
 			Eventually(func() corev1.Secret {
 				return th.GetSecret(manilaTest.ManilaConfigScripts)
 			}, timeout, interval).ShouldNot(BeNil())
+		})
+	})
+	When("Both TransportURL secret and osp-secret are available with MTLS memcached", func() {
+		BeforeEach(func() {
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, GetDefaultManilaSpec(), annotations))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(mariadb.DeleteDBService, mariadb.CreateDBService(
+				manilaTest.Instance.Namespace,
+				GetManila(manilaName).Spec.DatabaseInstance,
+				corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{{Port: 3306}},
+				},
+			),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMTLSMemcached(namespace, "memcached", memcachedSpec))
+			infra.SimulateMTLSMemcachedReady(manilaTest.ManilaMemcached)
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+		})
+		It("configures keystone_authtoken memcached with TLS and MTLS certs", func() {
+			keystoneAPI := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPI)
+
+			secretDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
+			Expect(secretDataMap).ShouldNot(BeNil())
+
+			// With a TLS memcached, keystone_authtoken uses the TLS listener
+			// server list and enables memcache TLS with the MTLS cert files.
+			conf := string(secretDataMap.Data["00-config.conf"])
+			memcachedInstance := infra.GetMemcached(manilaTest.ManilaMemcached)
+			Expect(conf).Should(ContainSubstring(
+				"memcached_servers = %s", memcachedInstance.GetMemcachedServerListString()))
+			Expect(conf).Should(ContainSubstring("memcache_tls_enabled = true"))
+			Expect(conf).Should(ContainSubstring("memcache_tls_certfile = "))
+			Expect(conf).Should(ContainSubstring("memcache_tls_keyfile = "))
+			Expect(conf).Should(ContainSubstring("memcache_tls_cafile = "))
 		})
 	})
 	When("Manila CR is created without container images defined", func() {
