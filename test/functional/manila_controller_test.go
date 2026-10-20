@@ -279,6 +279,7 @@ var _ = Describe("Manila controller", func() {
 			// With a non-TLS memcached, keystone_authtoken must use the
 			// inet-prefixed server list and must NOT enable memcache TLS.
 			conf := string(secretDataMap.Data["00-config.conf"])
+			Expect(conf).Should(ContainSubstring("update_shares_status_on_ensure = False"))
 			memcachedInstance := infra.GetMemcached(manilaTest.ManilaMemcached)
 			Expect(conf).Should(ContainSubstring(
 				"memcached_servers = %s", memcachedInstance.GetMemcachedServerListWithInetString()))
