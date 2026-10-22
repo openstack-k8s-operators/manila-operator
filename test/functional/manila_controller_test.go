@@ -271,6 +271,8 @@ var _ = Describe("Manila controller", func() {
 
 			secretDataMap := th.GetSecret(manilaTest.ManilaConfigSecret)
 			Expect(secretDataMap).ShouldNot(BeNil())
+			conf := string(secretDataMap.Data["00-config.conf"])
+			Expect(conf).Should(ContainSubstring("update_shares_status_on_ensure = False"))
 			myCnf := string(secretDataMap.Data["my.cnf"])
 			Expect(myCnf).To(
 				ContainSubstring("[client]\nssl=0"))
