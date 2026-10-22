@@ -53,6 +53,14 @@
       cifmw_test_operator_tempest_include_list: |
         ^manila_tempest_tests.tests.api..*
         ^manila_tempest_tests.tests.rbac..*
+      # Reenable when https://review.opendev.org/c/openstack/manila-tempest-plugin/+/1011484 lands (followup fix for CVE-2026-71195)
+      cifmw_test_operator_tempest_expected_failures_list: |
+         manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_list_share_export_locations_by_different_project_user
+         manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_get_share_export_location_by_different_project_user
+         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsCEPHFS.test_list_export_locations
+         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsCEPHFS.test_show_export_location
+         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsCEPHFS.test_list_export_locations
+         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsCEPHFS.test_show_export_location
       cifmw_test_operator_tempest_tempestconf_config:
         overrides: |
           share.capability_storage_protocol CEPHFS
@@ -81,6 +89,14 @@
       cifmw_test_operator_tempest_include_list: |
         ^manila_tempest_tests.tests.api..*
         ^manila_tempest_tests.tests.rbac..*
+      # Reenable when https://review.opendev.org/c/openstack/manila-tempest-plugin/+/1011484 lands (followup fix for CVE-2026-71195)
+      cifmw_test_operator_tempest_expected_failures_list: |
+         manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_list_share_export_locations_by_different_project_user
+         manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_get_share_export_location_by_different_project_user
+         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsNFS.test_list_export_locations
+         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsNFS.test_show_export_location
+         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsNFS.test_list_export_locations
+         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsNFS.test_show_export_location
       cifmw_test_operator_tempest_tempestconf_config:
         overrides: |
           share.capability_storage_protocol NFS
