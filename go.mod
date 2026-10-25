@@ -6,13 +6,13 @@ require (
 	github.com/go-logr/logr v1.4.4
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.43.1
-	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20261003073849-a5ea1d9f8445
-	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20261003111705-9b442003e6a4
+	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20261020055343-66a79fe1e289
+	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20261019065335-360d198c1212
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20261001134834-c55d623872db
 	github.com/openstack-k8s-operators/lib-common/modules/storage v0.6.1-0.20261001134834-c55d623872db
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20261001134834-c55d623872db
 	github.com/openstack-k8s-operators/manila-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20261003073850-052fb7265dd7
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20261023181448-7b9ebd1220dc
 	gopkg.in/ini.v1 v1.67.3
 	k8s.io/api v0.33.13
 	k8s.io/apimachinery v0.33.13
