@@ -11,6 +11,10 @@
               - manila-s2i-content-provider
     github-experimental-trigger:
       jobs:
+        - manila-s2i-content-provider
+        - openstack-k8s-operators-content-provider:
+            vars:
+              cifmw_install_yamls_sdk_version: v1.41.1
         - manila-s2i-test-nfsganesha:
             dependencies: *manila_s2i_operator_test_dependencies
 
