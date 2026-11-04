@@ -115,9 +115,16 @@ func StatefulSet(
 					SecurityContext:              pod.RestrictivePodSecurityContext(users.ManilaUID, users.ManilaGID),
 					Containers: []corev1.Container{
 						{
-							Name:            ComponentName,
-							Command:         []string{"/usr/bin/manila-share"},
-							Args:            []string{"--config-dir", "/etc/manila/manila.conf.d"},
+							Name: ComponentName,
+							Command: []string{
+								"/usr/bin/dumb-init",
+							},
+							Args: []string{
+								"--single-child",
+								"--",
+								"/usr/bin/manila-share",
+								"--config-dir", "/etc/manila/manila.conf.d",
+							},
 							Image:           instance.Spec.ContainerImage,
 							SecurityContext: pod.RestrictiveSecurityContext(users.ManilaUID, users.ManilaGID),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),

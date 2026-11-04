@@ -139,6 +139,11 @@ var _ = Describe("ManilaAPI controller", func() {
 				Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 				container := ss.Spec.Template.Spec.Containers[1]
+				Expect(container.Command).To(Equal([]string{"/usr/bin/dumb-init"}))
+				Expect(container.Args).To(Equal([]string{"--single-child", "--", "/usr/sbin/httpd", "-DFOREGROUND"}))
+				logContainer := ss.Spec.Template.Spec.Containers[0]
+				Expect(logContainer.Command).To(Equal([]string{"/usr/bin/dumb-init"}))
+				Expect(logContainer.Args).To(Equal([]string{"--single-child", "--", "/bin/bash", "-c", "tail -n+1 -F /var/log/manila/manila-api.log"}))
 				Expect(container.VolumeMounts).To(HaveLen(9))
 				Expect(container.Image).To(Equal(manilaTest.ContainerImage))
 				Expect(container.LivenessProbe.HTTPGet.Port.IntVal).To(Equal(int32(8786)))

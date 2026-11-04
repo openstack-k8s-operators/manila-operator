@@ -126,9 +126,16 @@ func StatefulSet(
 						// the first container in a pod is the default selected
 						// by oc log so define the log stream container first.
 						{
-							Name:            instance.Name + "-log",
-							Command:         []string{"/bin/bash"},
-							Args:            []string{"-c", "tail -n+1 -F " + LogFile},
+							Name: instance.Name + "-log",
+							Command: []string{
+								"/usr/bin/dumb-init",
+							},
+							Args: []string{
+								"--single-child",
+								"--",
+								"/bin/bash",
+								"-c", "tail -n+1 -F " + LogFile,
+							},
 							Image:           instance.Spec.ContainerImage,
 							SecurityContext: pod.RestrictiveSecurityContext(users.ManilaUID, users.ManilaGID),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
@@ -136,9 +143,16 @@ func StatefulSet(
 							Resources:       instance.Spec.Resources,
 						},
 						{
-							Name:            ComponentName,
-							Command:         []string{"/usr/sbin/httpd"},
-							Args:            []string{"-DFOREGROUND"},
+							Name: ComponentName,
+							Command: []string{
+								"/usr/bin/dumb-init",
+							},
+							Args: []string{
+								"--single-child",
+								"--",
+								"/usr/sbin/httpd",
+								"-DFOREGROUND",
+							},
 							Image:           instance.Spec.ContainerImage,
 							SecurityContext: pod.RestrictiveSecurityContext(users.ManilaUID, users.ManilaGID),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
