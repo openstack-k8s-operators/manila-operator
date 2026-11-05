@@ -18,6 +18,7 @@ package functional
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
@@ -36,7 +37,9 @@ import (
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
+	clusterdns "github.com/openstack-k8s-operators/lib-common/modules/common/clusterdns"
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	commonservice "github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	manilav1 "github.com/openstack-k8s-operators/manila-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/manila-operator/internal/manila"
@@ -579,6 +582,13 @@ var _ = Describe("Manila controller", func() {
 			Expect(service.Annotations).To(
 				HaveKeyWithValue("metallb.universe.tf/loadBalancerIPs", "internal-lb-ip-1,internal-lb-ip-2"))
 
+			// Service port names are bare, object names unchanged
+			Expect(service.Name).To(Equal("manila-internal"))
+			Expect(service.Spec.Ports[0].Name).To(Equal("internal"))
+			public := th.GetService(types.NamespacedName{Namespace: manilaCR.Namespace, Name: "manila-public"})
+			Expect(public.Name).To(Equal("manila-public"))
+			Expect(public.Spec.Ports[0].Name).To(Equal("public"))
+
 			// check keystone endpoints for v1 and v2
 			keystoneEndpoint := keystone.GetKeystoneEndpoint(types.NamespacedName{Namespace: manilaCR.Namespace, Name: "manila"})
 			endpoints := keystoneEndpoint.Spec.Endpoints
@@ -600,6 +610,208 @@ var _ = Describe("Manila controller", func() {
 			Expect(endpoints).To(HaveKeyWithValue("internal", "http://manila-internal."+manilaCR.Namespace+".svc:8786/v2"))
 		})
 	})
+	When("Manila endpoints are LoadBalancers with endpointURL set", func() {
+		BeforeEach(func() {
+			lb := map[string]any{"type": "LoadBalancer"}
+			rawSpec := map[string]any{
+				"secret":           SecretName,
+				"databaseInstance": "openstack",
+				"messagingBus":     map[string]any{"cluster": "rabbitmq"},
+				"manilaAPI": map[string]any{
+					"containerImage": manilav1.ManilaAPIContainerImage,
+					"override": map[string]any{
+						"service": map[string]any{
+							"public": map[string]any{
+								"endpointURL": "https://manila.foo.bar:8786",
+								"spec":        lb,
+							},
+							"internal": map[string]any{
+								"endpointURL": "https://manila-int.foo.bar:8786",
+								"spec":        lb,
+							},
+						},
+					},
+				},
+				"manilaScheduler": map[string]any{
+					"containerImage": manilav1.ManilaSchedulerContainerImage,
+				},
+				"manilaShares": map[string]any{
+					"share0": map[string]any{
+						"containerImage": manilav1.ManilaShareContainerImage,
+					},
+				},
+			}
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec, map[string]string{}))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 3306}}},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)
+			keystoneAPI.Status.APIEndpoints["internal"] = "http://keystone-internal-openstack.testing"
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			// The controller creates Services one by one and stops at the
+			// first LoadBalancer without an IP: give every LB an IP as it appears.
+			Eventually(func(g Gomega) {
+				for _, endpt := range []string{"internal", "public"} {
+					svc := &corev1.Service{}
+					name := types.NamespacedName{Namespace: namespace, Name: manilaTest.Instance.Name + "-" + endpt}
+					g.Expect(k8sClient.Get(ctx, name, svc)).To(Succeed())
+					if len(svc.Status.LoadBalancer.Ingress) == 0 {
+						svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{IP: "10.0.0.5"}}
+						g.Expect(k8sClient.Status().Update(ctx, svc)).To(Succeed())
+					}
+				}
+			}, timeout, interval).Should(Succeed())
+			keystone.SimulateKeystoneServiceReady(manilaTest.Instance)
+		})
+
+		It("renders vhost ServerName from endpointURL with the in-cluster names as ServerAlias", func() {
+			ns := manilaTest.Instance.Namespace
+			Eventually(func(g Gomega) {
+				conf := string(th.GetSecret(manilaTest.ManilaConfigSecret).Data["10-manila_wsgi.conf"])
+				g.Expect(conf).To(ContainSubstring("ServerName manila.foo.bar"))
+				g.Expect(conf).To(ContainSubstring("ServerAlias manila-public." + ns + ".svc"))
+				g.Expect(conf).To(ContainSubstring("ServerAlias manila-public." + ns + ".svc." + clusterdns.GetDNSClusterDomain()))
+				g.Expect(conf).To(ContainSubstring("ServerName manila-int.foo.bar"))
+				g.Expect(conf).To(ContainSubstring("ServerAlias manila-internal." + ns + ".svc"))
+				g.Expect(conf).To(ContainSubstring("ServerAlias manila-internal." + ns + ".svc." + clusterdns.GetDNSClusterDomain()))
+				g.Expect(strings.Count(conf, "ServerAlias")).To(Equal(4))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("keeps the default public vhost ServerName when the public endpointURL has no LoadBalancer (Route)", func() {
+			ns := manilaTest.Instance.Namespace
+			Eventually(func(g Gomega) {
+				instance := GetManila(manilaTest.Instance)
+				override := instance.Spec.ManilaAPI.Override.Service[commonservice.EndpointPublic]
+				override.Spec = nil
+				instance.Spec.ManilaAPI.Override.Service[commonservice.EndpointPublic] = override
+				g.Expect(k8sClient.Update(ctx, instance)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				conf := string(th.GetSecret(manilaTest.ManilaConfigSecret).Data["10-manila_wsgi.conf"])
+				// the router sends no SNI, so the route host must not become a ServerName
+				g.Expect(conf).NotTo(ContainSubstring("ServerName manila.foo.bar"))
+				g.Expect(conf).To(ContainSubstring("ServerName manila-public." + ns + ".svc\n"))
+				// the internal LoadBalancer endpointURL still drives its ServerName
+				g.Expect(conf).To(ContainSubstring("ServerName manila-int.foo.bar"))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("drops a stale dnsmasq hostname annotation when the public Service becomes ClusterIP", func() {
+			name := types.NamespacedName{Namespace: manilaTest.Instance.Namespace, Name: "manila-public"}
+			Eventually(func(g Gomega) {
+				instance := GetManila(manilaTest.Instance)
+				override := instance.Spec.ManilaAPI.Override.Service[commonservice.EndpointPublic]
+				override.Spec = nil
+				instance.Spec.ManilaAPI.Override.Service[commonservice.EndpointPublic] = override
+				g.Expect(k8sClient.Update(ctx, instance)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetService(name).Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+			}, timeout, interval).Should(Succeed())
+
+			// inject the stale registration only once the Service is ClusterIP: while it
+			// was still a LoadBalancer a reconcile would strip it before the switch
+			Eventually(func(g Gomega) {
+				svc := th.GetService(name)
+				svc.Annotations[commonservice.AnnotationHostnameKey] = "manila-public.stale.svc"
+				g.Expect(k8sClient.Update(ctx, svc)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetService(name).Annotations).NotTo(HaveKey(commonservice.AnnotationHostnameKey))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("keeps bare port names and registers dnsmasq only for the internal LoadBalancer", func() {
+			ns := manilaTest.Instance.Namespace
+			public := th.GetService(types.NamespacedName{Namespace: ns, Name: "manila-public"})
+			Expect(public.Spec.Ports[0].Name).To(Equal("public"))
+			Expect(public.Annotations).NotTo(HaveKey(commonservice.AnnotationHostnameKey))
+
+			internal := th.GetService(types.NamespacedName{Namespace: ns, Name: "manila-internal"})
+			Expect(internal.Spec.Ports[0].Name).To(Equal("internal"))
+			Expect(internal.Annotations).To(
+				HaveKeyWithValue(commonservice.AnnotationHostnameKey, "manila-internal."+ns+".svc"))
+		})
+	})
+
+	When("Manila internal endpoint is a LoadBalancer that is then switched to ClusterIP", func() {
+		BeforeEach(func() {
+			rawSpec := GetDefaultManilaSpec()
+			apiSpec := GetDefaultManilaAPISpec()
+			apiSpec["override"] = map[string]any{
+				"service": map[string]any{
+					"internal": map[string]any{"spec": map[string]any{"type": "LoadBalancer"}},
+				},
+			}
+			rawSpec["manilaAPI"] = apiSpec
+			DeferCleanup(th.DeleteInstance, CreateManila(manilaTest.Instance, rawSpec, map[string]string{}))
+			DeferCleanup(k8sClient.Delete, ctx, CreateManilaMessageBusSecret(manilaTest.Instance.Namespace, manilaTest.RabbitmqSecretName))
+			DeferCleanup(
+				mariadb.DeleteDBService,
+				mariadb.CreateDBService(
+					manilaTest.Instance.Namespace,
+					GetManila(manilaTest.Instance).Spec.DatabaseInstance,
+					corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 3306}}},
+				),
+			)
+			infra.SimulateTransportURLReady(manilaTest.ManilaTransportURL)
+			DeferCleanup(infra.DeleteMemcached, infra.CreateMemcached(namespace, manilaTest.MemcachedInstance, memcachedSpec))
+			infra.SimulateMemcachedReady(manilaTest.ManilaMemcached)
+			keystoneAPIName := keystone.CreateKeystoneAPI(manilaTest.Instance.Namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)
+			keystoneAPI.Status.APIEndpoints["internal"] = "http://keystone-internal-openstack.testing"
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+			mariadb.SimulateMariaDBDatabaseCompleted(manilaTest.ManilaDatabaseName)
+			mariadb.SimulateMariaDBAccountCompleted(manilaTest.ManilaDatabaseAccount)
+			th.SimulateJobSuccess(manilaTest.ManilaDBSync)
+			th.SimulateLoadBalancerServiceIP(types.NamespacedName{Namespace: namespace, Name: "manila-internal"})
+		})
+
+		It("drops the dnsmasq hostname annotation", func() {
+			name := types.NamespacedName{Namespace: manilaTest.Instance.Namespace, Name: "manila-internal"}
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetService(name).Annotations).To(HaveKey(commonservice.AnnotationHostnameKey))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				instance := GetManila(manilaTest.Instance)
+				override := instance.Spec.ManilaAPI.Override.Service[commonservice.EndpointInternal]
+				override.Spec = nil
+				instance.Spec.ManilaAPI.Override.Service[commonservice.EndpointInternal] = override
+				g.Expect(k8sClient.Update(ctx, instance)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				svc := th.GetService(name)
+				g.Expect(svc.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+				g.Expect(svc.Annotations).NotTo(HaveKey(commonservice.AnnotationHostnameKey))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 	When("Manila CR instance is created with sharev1: false annotation", func() {
 		BeforeEach(func() {
 			spec := GetDefaultManilaSpec()
