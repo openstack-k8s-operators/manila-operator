@@ -232,17 +232,23 @@ spec:
       serviceAccountName: manila-manila
       containers:
       - args:
+        - --single-child
+        - --
+        - /bin/bash
         - -c
         - tail -n+1 -F /var/log/manila/manila-api.log
         command:
-        - /bin/bash
+        - /usr/bin/dumb-init
         volumeMounts:
         - name: logs
           mountPath: /var/log/manila
       - args:
+        - --single-child
+        - --
+        - /usr/sbin/httpd
         - -DFOREGROUND
         command:
-        - /usr/sbin/httpd
+        - /usr/bin/dumb-init
         volumeMounts:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
@@ -341,10 +347,13 @@ spec:
       serviceAccountName: manila-manila
       containers:
       - args:
+        - --single-child
+        - --
+        - /usr/bin/manila-share
         - --config-dir
         - /etc/manila/manila.conf.d
         command:
-        - /usr/bin/manila-share
+        - /usr/bin/dumb-init
         volumeMounts:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
@@ -413,10 +422,13 @@ spec:
       serviceAccountName: manila-manila
       containers:
       - args:
+        - --single-child
+        - --
+        - /usr/bin/manila-scheduler
         - --config-dir
         - /etc/manila/manila.conf.d
         command:
-        - /usr/bin/manila-scheduler
+        - /usr/bin/dumb-init
         volumeMounts:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts

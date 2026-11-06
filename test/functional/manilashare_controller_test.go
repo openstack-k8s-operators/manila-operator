@@ -153,6 +153,9 @@ var _ = Describe("ManilaShare controller", func() {
 					Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(2))
 
 					container := ss.Spec.Template.Spec.Containers[1]
+					serviceContainer := ss.Spec.Template.Spec.Containers[0]
+					Expect(serviceContainer.Command).To(Equal([]string{"/usr/bin/dumb-init"}))
+					Expect(serviceContainer.Args).To(Equal([]string{"--single-child", "--", "/usr/bin/manila-share", "--config-dir", "/etc/manila/manila.conf.d"}))
 					Expect(container.VolumeMounts).To(HaveLen(3))
 					Expect(container.Image).To(Equal(manilaTest.ContainerImage))
 
