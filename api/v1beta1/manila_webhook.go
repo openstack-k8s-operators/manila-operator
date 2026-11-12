@@ -216,6 +216,9 @@ func (spec *ManilaSpec) ValidateCreate(basePath *field.Path, namespace string) (
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
+	allErrs = append(allErrs, validateServicePortNames(
+		basePath.Child("manilaAPI").Child("override").Child("service"),
+		spec.ManilaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
 	return warnings, allErrs
@@ -233,6 +236,9 @@ func (spec *ManilaSpecCore) ValidateCreate(basePath *field.Path, namespace strin
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("manilaAPI").Child("override").Child("service"),
+		spec.ManilaAPI.Override.Service)...)
+	allErrs = append(allErrs, validateServicePortNames(
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
 
@@ -283,6 +289,9 @@ func (spec *ManilaSpec) ValidateUpdate(old ManilaSpec, basePath *field.Path, nam
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
+	allErrs = append(allErrs, validateServicePortNames(
+		basePath.Child("manilaAPI").Child("override").Child("service"),
+		spec.ManilaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, spec.ValidateManilaTopology(basePath, namespace)...)
 
@@ -307,6 +316,9 @@ func (spec *ManilaSpecCore) ValidateUpdate(old ManilaSpecCore, basePath *field.P
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("manilaAPI").Child("override").Child("service"),
+		spec.ManilaAPI.Override.Service)...)
+	allErrs = append(allErrs, validateServicePortNames(
 		basePath.Child("manilaAPI").Child("override").Child("service"),
 		spec.ManilaAPI.Override.Service)...)
 
@@ -507,4 +519,11 @@ func (spec *ManilaSpecCore) ValidateBaseParams(basePath *field.Path) field.Error
 			field.Invalid(dbAcc, "databaseAccount", "DatabaseAccount is empty"))
 	}
 	return allErrs
+}
+
+// validateServicePortNames rejects a service override (public or internal)
+// whose endpointURL or port names are invalid. See
+// webhook.ValidatePortNameOverrides for why this matters.
+func validateServicePortNames(basePath *field.Path, overrides map[service.Endpoint]service.RoutedOverrideSpec) field.ErrorList {
+	return common_webhook.ValidatePortNameOverrides(basePath, overrides, common_webhook.DefaultServicePortNames())
 }

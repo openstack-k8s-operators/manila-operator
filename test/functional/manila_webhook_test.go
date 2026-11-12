@@ -18,6 +18,7 @@ package functional
 
 import (
 	"errors"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
@@ -123,4 +124,76 @@ var _ = Describe("Manila webhook", func() {
 				ContainSubstring("use \"spec.notificationsBus.cluster\" instead"))
 		}, timeout, interval).Should(Succeed())
 	})
+
+	// createWithOverride creates a Manila with the given manilaAPI endpoint override.
+	createWithOverride := func(name string, endpoint string, override map[string]any) error {
+		spec := GetDefaultManilaSpec()
+		apiSpec := GetDefaultManilaAPISpec()
+		apiSpec["override"] = map[string]any{
+			"service": map[string]any{endpoint: override},
+		}
+		spec["manilaAPI"] = apiSpec
+		obj := &unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "manila.openstack.org/v1beta1",
+			"kind":       "Manila",
+			"metadata":   map[string]any{"name": name, "namespace": namespace},
+			"spec":       spec,
+		}}
+		_, err := controllerutil.CreateOrPatch(ctx, k8sClient, obj, func() error { return nil })
+		if err == nil {
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, obj) })
+		}
+		return err
+	}
+
+	for _, endpoint := range []string{"public", "internal"} {
+		It("accepts the bare "+endpoint+" service port name", func() {
+			Expect(createWithOverride("manila-wh-ok-"+endpoint, endpoint, map[string]any{
+				"spec": map[string]any{"ports": []any{map[string]any{"name": endpoint, "port": 8786}}},
+			})).To(Succeed())
+		})
+
+		It("rejects a wrong "+endpoint+" service port name", func() {
+			err := createWithOverride("manila-wh-bad-"+endpoint, endpoint, map[string]any{
+				"spec": map[string]any{"ports": []any{map[string]any{"name": "wrong", "port": 8786}}},
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(
+				fmt.Sprintf("spec.manilaAPI.override.service[%s].spec.ports[0].name: Invalid value: \"wrong\": must be \"%s\"", endpoint, endpoint)))
+		})
+
+		It("accepts an FQDN endpointURL on the "+endpoint+" endpoint", func() {
+			Expect(createWithOverride("manila-wh-url-"+endpoint, endpoint, map[string]any{
+				"endpointURL": "https://manila.example.com:8786",
+			})).To(Succeed())
+		})
+
+		It("accepts a ports[].port matching the endpointURL port on the "+endpoint+" endpoint", func() {
+			Expect(createWithOverride("manila-wh-port-ok-"+endpoint, endpoint, map[string]any{
+				"endpointURL": "https://manila.example.com:8443",
+				"spec":        map[string]any{"ports": []any{map[string]any{"name": endpoint, "port": 8443}}},
+			})).To(Succeed())
+		})
+
+		It("rejects a ports[].port differing from the endpointURL port on the "+endpoint+" endpoint", func() {
+			err := createWithOverride("manila-wh-port-bad-"+endpoint, endpoint, map[string]any{
+				"endpointURL": "https://manila.example.com:8443",
+				"spec":        map[string]any{"ports": []any{map[string]any{"name": endpoint, "port": 8786}}},
+			})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("must match the port in endpointURL"))
+		})
+
+		for name, url := range map[string]string{
+			"a bare short name":  "https://manila",
+			"a missing scheme":   "manila.example.com:8786",
+			"an IP literal host": "https://192.168.1.10:8786",
+		} {
+			It("rejects "+name+" as endpointURL on the "+endpoint+" endpoint", func() {
+				err := createWithOverride("manila-wh-bad-url-"+endpoint, endpoint, map[string]any{"endpointURL": url})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("spec.manilaAPI.override.service[" + endpoint + "].endpointURL"))
+			})
+		}
+	}
 })
