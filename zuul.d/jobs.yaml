@@ -64,7 +64,6 @@
       cifmw_test_operator_tempest_tempestconf_config:
         overrides: |
           share.capability_storage_protocol CEPHFS
-          share.catalog_type 'sharev2'
           share.default_share_type_name 'default'
           share.run_share_group_tests False
           share.suppress_errors_in_cleanup True
@@ -100,7 +99,6 @@
       cifmw_test_operator_tempest_tempestconf_config:
         overrides: |
           share.capability_storage_protocol NFS
-          share.catalog_type 'sharev2'
           share.default_share_type_name 'default'
           share.enable_cert_rules_for_protocols ""
           share.enable_ip_rules_for_protocols 'nfs'
