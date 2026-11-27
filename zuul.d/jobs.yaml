@@ -49,10 +49,15 @@
       s2i_manila_share_backends: ['share1']
       cifmw_block_device_size: 15G
       cifmw_services_manila_enabled: True
+      # workaround: force ceph to run on the public network
+      cifmw_ceph_spec_public_network: "{{ cifmw_ceph_ssh_network_range | default('192.168.122.0/24') }}"
       cifmw_test_operator_tempest_concurrency: 3
       cifmw_test_operator_tempest_include_list: |
-        ^manila_tempest_tests.tests.api..*
-        ^manila_tempest_tests.tests.rbac..*
+        ^manila_tempest_tests.tests..*
+      # The service image used here does not ship ceph fuse client,
+      # and only supports kernel access, so exclude ceph fuse tests
+      cifmw_test_operator_tempest_exclude_list: |
+        ^manila_tempest_tests.tests.scenario.*ceph_fuse.*
       # Reenable when https://review.opendev.org/c/openstack/manila-tempest-plugin/+/1011484 lands (followup fix for CVE-2026-71195)
       cifmw_test_operator_tempest_expected_failures_list: |
          manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_list_share_export_locations_by_different_project_user
@@ -61,11 +66,25 @@
          manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsCEPHFS.test_show_export_location
          manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsCEPHFS.test_list_export_locations
          manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsCEPHFS.test_show_export_location
+      cifmw_test_operator_tempest_extra_images:
+        - name: manila-service-image-master
+          URL: https://tarballs.opendev.org/openstack/manila-test-image/images/manila-test-image-client.qcow2
+          diskFormat: qcow2
+          flavor:
+            name: customized_flavor
+            ID: "100"
+            RAM: 128
+            disk: 1
+            vcpus: 1
+      cifmw_test_operator_tempest_network_attachments:
+        - ctlplane
       cifmw_test_operator_tempest_tempestconf_config:
         overrides: |
           share.capability_storage_protocol CEPHFS
           share.catalog_type 'sharev2'
           share.default_share_type_name 'default'
+          share.enable_cert_rules_for_protocols ""
+          share.enable_ip_rules_for_protocols ""
           share.run_share_group_tests False
           share.suppress_errors_in_cleanup True
 
@@ -79,24 +98,51 @@
     vars:
       s2i_manila_share_backends: ['share1']
       cifmw_block_device_size: 15G
+      cifmw_cephadm_nfsv3: true
       cifmw_ceph_daemons_layout:
         rgw_enabled: false
         dashboard_enabled: false
         cephfs_enabled: false
         ceph_nfs_enabled: true
+      # workaround: force ceph to run on the public network
+      cifmw_ceph_spec_public_network: "{{ cifmw_ceph_ssh_network_range | default('192.168.122.0/24') }}"
       cifmw_services_manila_enabled: True
-      cifmw_test_operator_tempest_concurrency: 3
-      cifmw_test_operator_tempest_include_list: |
-        ^manila_tempest_tests.tests.api..*
-        ^manila_tempest_tests.tests.rbac..*
-      # Reenable when https://review.opendev.org/c/openstack/manila-tempest-plugin/+/1011484 lands (followup fix for CVE-2026-71195)
-      cifmw_test_operator_tempest_expected_failures_list: |
-         manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_list_share_export_locations_by_different_project_user
-         manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_get_share_export_location_by_different_project_user
-         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsNFS.test_list_export_locations
-         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsNFS.test_show_export_location
-         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsNFS.test_list_export_locations
-         manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsNFS.test_show_export_location
+      cifmw_test_operator_tempest_workflow:
+        - stepName: multi-thread
+          tempestRun:
+            concurrency: 3
+            includeList: |
+              ^manila_tempest_tests.tests.api..*
+              ^manila_tempest_tests.tests.rbac..*
+            # Reenable when https://review.opendev.org/c/openstack/manila-tempest-plugin/+/1011484 lands (followup fix for CVE-2026-71195)
+            expectedFailuresList: |
+              manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_list_share_export_locations_by_different_project_user
+              manila_tempest_tests.tests.api.admin.test_export_locations_negative.ExportLocationsNegativeTest.test_get_share_export_location_by_different_project_user
+              manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsNFS.test_list_export_locations
+              manila_tempest_tests.tests.rbac.test_export_locations.TestProjectMemberTestsNFS.test_show_export_location
+              manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsNFS.test_list_export_locations
+              manila_tempest_tests.tests.rbac.test_export_locations.TestProjectReaderTestsNFS.test_show_export_location
+        - stepName: single-thread
+          tempestRun:
+            concurrency: 1
+            includeList: |
+              ^manila_tempest_tests.tests.scenario..*
+            # The service image used here does not ship ceph fuse client,
+            # and only supports kernel access, so exclude ceph fuse tests
+            excludeList: |
+              ^manila_tempest_tests.tests.scenario.*ceph_fuse.*
+            extraImages:
+              - name: manila-service-image-master
+                URL: https://tarballs.opendev.org/openstack/manila-test-image/images/manila-test-image-client.qcow2
+                diskFormat: qcow2
+                flavor:
+                  name: customized_flavor
+                  ID: "100"
+                  RAM: 128
+                  disk: 1
+                  vcpus: 1
+      cifmw_test_operator_tempest_network_attachments:
+        - ctlplane
       cifmw_test_operator_tempest_tempestconf_config:
         overrides: |
           share.capability_storage_protocol NFS
@@ -105,5 +151,7 @@
           share.enable_cert_rules_for_protocols ""
           share.enable_ip_rules_for_protocols 'nfs'
           share.enable_protocols 'nfs'
+          share.override_ip_for_nfs_access 192.168.122.0/24
           share.nfs_versions '3,4.1,4.2'
           share.run_share_group_tests False
+      cifmw_test_operator_timeout: 5400
